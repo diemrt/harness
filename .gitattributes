@@ -1,0 +1,8 @@
+# The harness manifest hashes file bytes. A working copy whose line endings
+# depend on the platform would make the same file hash differently on Windows
+# and Linux, turning the drift check into a false conflict. Force LF everywhere.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
