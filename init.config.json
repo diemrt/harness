@@ -1,0 +1,23 @@
+{
+  "_comment": "Configurazione dei task eseguiti da init.ps1. Personalizza i 'command' per il tuo stack (Node, Python, Go, .NET, ...). Ogni task ha una 'workingDirectory' opzionale (relativa alla cartella dello script, default '.') e una lista ordinata di 'steps'. Ogni step ha 'description' (mostrata a video) e 'command' (riga eseguita nella shell). Se un comando esce con codice diverso da 0, il task si ferma con errore.",
+  "tasks": {
+    "setup": {
+      "workingDirectory": ".",
+      "steps": [
+        {
+          "description": "Esempio: installazione delle dipendenze del progetto",
+          "command": "Write-Host 'Configura lo step di setup in init.config.json (es. npm install)'"
+        }
+      ]
+    },
+    "build": {
+      "workingDirectory": ".",
+      "steps": [
+        {
+          "description": "Esempio: compilazione del progetto",
+          "command": "Write-Host 'Configura lo step di build in init.config.json (es. npm run build)'"
+        }
+      ]
+    }
+  }
+}

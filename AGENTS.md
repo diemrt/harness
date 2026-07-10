@@ -80,16 +80,25 @@ fallisce, nessun commit finché la issue non viene ripresa, corretta e riverific
 
 ## Init / verifica ambiente (init.ps1)
 
-Lo script `init.ps1` è il punto unico di setup e verifica dell'ambiente. Il progetto usa
-**packages.config** e un modello **EDMX**, quindi viene compilato con **MSBuild** di Visual
-Studio (non con `dotnet build`); lo script localizza MSBuild tramite `vswhere`. Comandi:
+Lo script `init.ps1` è il punto unico di setup e verifica dell'ambiente ed è **generico e
+indipendente dallo stack**: non contiene comandi specifici di una tecnologia. I comandi
+effettivi sono definiti nel file di configurazione **`init.config.json`** (nella stessa
+cartella dello script), così lo stesso harness può adattarsi a qualsiasi stack (Node,
+Python, Go, .NET, ...). Per adattarlo a un progetto basta modificare `init.config.json`,
+senza toccare `init.ps1`. Comandi:
 
-- `.\init.ps1 setup` — localizza MSBuild, esegue **clean + restore** dei pacchetti
-  (packages.config) sulla solution `..\CTX_Reitek_Records_Manager.sln`, verificando il corretto
-  import delle librerie. Da usare in fase di clock-in.
-- `.\init.ps1 build` — esegue **restore + compilazione** MSBuild in configurazione **Debug**,
-  producendo `bin\Debug\CTX_Reitek_Records_Manager.dll`. Da usare come verifica in fase di
+- `.\init.ps1 setup` — esegue in ordine gli `steps` del task `setup` definito in
+  `init.config.json` (es. install delle librerie, preparazione dell'ambiente). Da usare in
+  fase di clock-in.
+- `.\init.ps1 build` — esegue in ordine gli `steps` del task `build` definito in
+  `init.config.json` (es. compilazione, packaging). Da usare come verifica in fase di
   clock-out (prova che il codice compili e le dipendenze siano risolte).
 
-**Nota:** in caso di errore (MSBuild non trovato, restore o build falliti) lo script termina
-con `exit 1` e un messaggio chiaro; fermarsi e notificare il problema.
+Formato di `init.config.json`: un oggetto `tasks` con una chiave per task (`setup`,
+`build`); ogni task ha una `workingDirectory` opzionale (relativa alla cartella dello
+script) e una lista ordinata di `steps`, ognuno con `description` (messaggio a video) e
+`command` (riga eseguita nella shell).
+
+**Nota:** in caso di errore (config mancante o non valida, task inesistente, uno step che
+esce con codice diverso da 0) lo script termina con `exit 1` e un messaggio chiaro;
+fermarsi e notificare il problema.
