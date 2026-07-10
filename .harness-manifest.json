@@ -1,0 +1,46 @@
+{
+  "harnessVersion": "0.1.0",
+  "generatedAt": "2026-07-10T15:34:09.352Z",
+  "files": {
+    "AGENTS.md": {
+      "sha256": "cd13234d1849059b6aa32a73eed1c6587d835ce3008f0f8d8aa383e8bc8ff3a3",
+      "policy": "seeded-once"
+    },
+    "docs/AGENTS-RULES.md": {
+      "sha256": "d19aa2592dfc4f5bd4986a8edb14ba3f00881a6cbd4335b1c464cac65ec7b297",
+      "policy": "managed"
+    },
+    "docs/ARCHITECTURE.md": {
+      "sha256": "77742261f5cf3e9ebd660ab69c03bf9331046f57e5656dd94e83d371370b5191",
+      "policy": "seeded-once"
+    },
+    "docs/GIT.md": {
+      "sha256": "37bc7b43fc7e8274beb8ca0c8393d5908e56e0264bfca14718263876450eccdd",
+      "policy": "managed"
+    },
+    "docs/ISSUES.md": {
+      "sha256": "3fb978e55bd1b703296446c3ef866636b7200fb649a0890022104791aed67a2b",
+      "policy": "managed"
+    },
+    "init.config.json": {
+      "sha256": "8b743444bfa6d2449c534e031505a8f597a8903338aa3a25493d47853172d7bf",
+      "policy": "seeded-once"
+    },
+    "init.mjs": {
+      "sha256": "d995711d2b7ed099c6310c54c98050d8d05fc772ba2ba90df028a5341e23b571",
+      "policy": "managed"
+    },
+    "issue-manager.mjs": {
+      "sha256": "311c2ffa453f4c43adef5360f2618ee92d8c394f04bb0883b8d9e4e1ab3088dc",
+      "policy": "managed"
+    },
+    "issues.html": {
+      "sha256": "9b61f66ea7f8929e98d8b26c6c3ea1edf12ba82b4a7f4a28c9a49a461495a1ee",
+      "policy": "managed"
+    },
+    "issues.json": {
+      "sha256": "a0b56ec9fdfe24e4a15c2404029d2a552c4af71b2f07c1a5a49f219799389ea1",
+      "policy": "data"
+    }
+  }
+}

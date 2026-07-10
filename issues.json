@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-10T17:29:12Z",
+  "last_updated": "2026-07-10T15:44:08Z",
   "rules": {
     "single_active_issue": false
   },
@@ -94,13 +94,13 @@
       "id": "57ed2f0a-fe28-4855-9931-f9577ccbceea",
       "title": "P6 - Dogfooding: materializza harness in root e drift check CI",
       "description": "Fase 6. Il repo usa il proprio harness. `npm run dev:sync` (= node src/cli.mjs update .) materializza in root i file managed e seeded da template/, senza toccare il root issues.json (policy data, contiene i veri issue di sviluppo). Le copie di root vengono committate. Elimina i vecchi init.ps1 e issue-manager.ps1 dalla root: .mjs e l'unica fonte di verita. Aggiungi CLAUDE.md (non managed, non shippato) con la regola: 'edita template/, mai la copia di root; poi npm run dev:sync'. Aggiungi un job CI di drift check che esegue `npm run dev:check` (update . --dry-run --json) e fallisce se ci sono updated o conflicts su file managed. Aggiorna .gitignore per node_modules. Dipende da P1, P2, P4, P5.",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "1) Dopo `npm run dev:sync` la root contiene issue-manager.mjs, init.mjs, issues.html, docs/AGENTS-RULES.md, docs/GIT.md, docs/ISSUES.md, AGENTS.md, docs/ARCHITECTURE.md, init.config.json, .harness-manifest.json. 2) Il root issues.json conserva le issue di sviluppo del repo: nessuna issue persa, confrontare totalCount prima e dopo dev:sync. 3) `node issue-manager.mjs --get-all --status backlog` in root risponde con l'envelope {ok:true,...}. 4) init.ps1 e issue-manager.ps1 non esistono piu in root ne in template/. 5) `npm run dev:check` esce 0 e riporta zero updated e zero conflicts. 6) `npm pack --dry-run` continua a NON includere le copie di root. 7) Il workflow CI di drift esiste ed esegue dev:check.",
-        "state": "unknown"
+        "criteria": "1) Data safety: get-all backlog=1(P7) in_progress=1(P6) done=6(P0-P5) total=8, none lost. 2) Get-ChildItem -Recurse -Filter *.ps1 -> zero results; init.ps1 and issue-manager.ps1 staged as D in git status --short. 3) Root has issue-manager.mjs, init.mjs, issues.html, docs/AGENTS-RULES.md, docs/GIT.md, docs/ISSUES.md, AGENTS.md, docs/ARCHITECTURE.md, init.config.json, issues.json, .harness-manifest.json - all confirmed present. 4) sha256 of 6 managed root files == sha256 of template/ counterparts exactly (issue-manager.mjs, init.mjs, issues.html, docs/AGENTS-RULES.md, docs/GIT.md, docs/ISSUES.md). 5) Seeded-once files (AGENTS.md, docs/ARCHITECTURE.md, init.config.json) have DIFFERENT hashes from template; root AGENTS.md read in full: real @diemrt/harness project description, no clock-in/1-WIP/commit-gate rules restated, points to docs/AGENTS-RULES.md instead; root init.config.json setup=npm install, build=npm test. 6) npm test: 62/62 pass, 0 fail. 7) node init.mjs build: runs npm test (62/62 pass) then 'Task build completato.', exit 0. 8) npm run dev:check: exit 0, JSON updated:[] conflicts:[] (all files skipped=in sync). 9) CRITICAL DRIFT TEST: sha256'd docs/GIT.md, copied to scratchpad, appended junk line (new hash confirmed different), ran npm run dev:check -> exit code 2, JSON conflicts:[\"docs/GIT.md\"] (raw: {\"ok\":true,\"action\":\"update\",\"added\":[],\"updated\":[],\"skipped\":[...9 files...],\"conflicts\":[\"docs/GIT.md\"],\"removed\":[],\"orphaned\":[]}). Restored docs/GIT.md from backup, re-sha256 matched original exactly (37bc7b43...). Get-ChildItem -Recurse -Filter *.new -> zero results (dry-run wrote nothing). Re-ran dev:check -> back to exit 0, conflicts:[]. DRIFT GATE IS REAL, NOT THEATRE. 10) .harness-manifest.json staged as A (tracked); npm pack --dry-run lists exactly 15 files: package.json, src/actions.mjs, src/cli.mjs, src/manifest.mjs, src/policies.mjs, and 10 template/* files - no root copies, no manifest, no test/, no .github/; no .tgz left on disk after dry-run. 11) .github/workflows/ci.yml: valid YAML, triggers on push+pull_request, runs-on ubuntu-latest, node-version 20, steps run npm ci, npm test, npm run dev:check as plain unguarded run steps (no continue-on-error, no || true) - dev:check exit 2 would fail the job. 12) .gitignore contains node_modules/, *.tgz, *.new. 13) CLAUDE.md exists at root (not under template/, not in package.json files:[src/,template/]); content covers all 5 required rules: edit template/ never root then dev:sync, seeded-once files repo-owned/separate from template, issues.json root=real data vs template seed, dev:check must be clean before commit, never --force at root (explains issues.json data loss risk). 14) git status --short shows zero changes under template/, src/, test/ - confirmed via grep filter, none found.",
+        "state": "pass"
       },
       "created_at": "2026-07-10T16:56:15Z",
-      "updated_at": "2026-07-10T16:56:15Z"
+      "updated_at": "2026-07-10T15:44:08Z"
     },
     {
       "id": "4a51c5c0-3527-4388-afc4-5af88d69de6e",
