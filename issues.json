@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-09T13:30:24Z",
+  "last_updated": "2026-07-10T17:06:03Z",
   "rules": {
     "single_active_issue": false
   },
@@ -17,5 +17,102 @@
     "documentation",
     "testing"
   ],
-  "issues": []
+  "issues": [
+    {
+      "id": "28fc023e-bca9-4947-ba53-0bef8a09cf62",
+      "title": "P0 - Scaffold pacchetto npm e cartella template/",
+      "description": "Fase 0 del piano 'Harness -> libreria npm @diemrt/harness'. Crea package.json (type module, bin harness -> src/cli.mjs, files [src/, template/, README.md, LICENSE], engines node >=18, publishConfig access public, scripts test/dev:sync/dev:check), stub di src/cli.mjs, src/manifest.mjs, src/actions.mjs. Sposta in template/ i file shippati: AGENTS.md, docs/ARCHITECTURE.md, docs/GIT.md, docs/ISSUES.md, issues.html, init.config.json e crea template/issues.json come seed vuoto (issues: []). I file .ps1 e le copie di root restano intatti in questa fase (verranno rigenerati in P6). Nessuna dipendenza.",
+      "status": "done",
+      "validation": {
+        "criteria": "1) package.json is valid JSON: name @diemrt/harness, type module, bin.harness=src/cli.mjs (file exists), engines.node >=18, publishConfig.access public, files=[src/,template/] present. 2) `npm pack --dry-run` tarball (11 files) contains only package.json, src/actions.mjs, src/cli.mjs, src/manifest.mjs, template/AGENTS.md, template/docs/{ARCHITECTURE,GIT,ISSUES}.md, template/init.config.json, template/issues.html, template/issues.json; no root AGENTS.md/docs//issues.json/issues.html/init.ps1/issue-manager.ps1/test/ present; no leftover .tgz on disk after dry-run (confirmed via ls *.tgz -> No such file). 3) template/ contains AGENTS.md, docs/ARCHITECTURE.md, docs/GIT.md, docs/ISSUES.md, issues.html, init.config.json, issues.json; template/issues.json parses with issues:[] (empty array, verified via Read). 4) `node --check src/cli.mjs`, `node --check src/manifest.mjs`, `node --check src/actions.mjs` all passed with no output/errors; src/cli.mjs first line is exactly '#!/usr/bin/env node' (verified via Read). 5) BUILD GATE: `.\\init.ps1 build` ran `node --test` (3/3 tests passed: package.json fields, files-listed-exist, template/issues.json empty seed) and printed \"Task 'build' completato.\" with $LASTEXITCODE=0. 6) Regression: `git diff --stat -- AGENTS.md docs/ARCHITECTURE.md docs/GIT.md docs/ISSUES.md init.ps1 issue-manager.ps1 issues.html` produced empty output and `git status --short` for the same paths produced empty output, confirming all 7 protected root files are byte-identical to HEAD/unmodified. Root issues.json and init.config.json are modified as expected/accepted (dev issues + npm install/test config). Accepted deviation confirmed: package.json files list omits README.md/LICENSE (not yet created, per plan for phase P7) and the build's smoke test (files-exist check) passes because of this.",
+        "state": "pass"
+      },
+      "created_at": "2026-07-10T16:56:15Z",
+      "updated_at": "2026-07-10T17:06:03Z"
+    },
+    {
+      "id": "fe10ec74-9663-4d7b-8d02-4c7753fd0f8f",
+      "title": "P1 - Port issue-manager.ps1 -> template/issue-manager.mjs",
+      "description": "Fase 1. Porta issue-manager.ps1 (455 righe) a Node ESM zero-dependency in template/issue-manager.mjs. Contratto invariato: stdout SEMPRE una sola riga JSON, {\"ok\":true,\"data\":...} exit 0 oppure {\"ok\":false,\"error\":...,\"code\":...} exit 1, mai nulla su stderr, --help unica eccezione (testo piano). Error code identici: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_INPUT, INVALID_JSON, NOT_FOUND, FILE_NOT_FOUND, MISSING_ARGS, UNKNOWN_COMMAND. Flag kebab-case: --help --get --get-all --insert --update --delete --issue-id --issue-data --issue-data-file --order --page --page-size --status. parseArgs da node:util con strict:false + validazione manuale. GUID via crypto.randomUUID(). Timestamp ISO senza millisecondi. Scrittura atomica di issues.json (write tmp + rename). Test in test/issue-manager.test.mjs con node:test. Dipende da P0.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "1) `node --test` verde sulla suite issue-manager. 2) Coperti per test: get, get-all con paginazione (totalCount/page/pageSize/issues), insert (id generato), update merge (campi omessi invariati) e validation:null esplicito che azzera, delete ({id,deleted}), help. 3) Coperti tutti gli error code: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_INPUT (campo sconosciuto, payload {} in update, pageSize<1), INVALID_JSON, NOT_FOUND, FILE_NOT_FOUND, MISSING_ARGS (issue-data + issue-data-file insieme), UNKNOWN_COMMAND. 4) Verificato che stderr resti vuoto e stdout sia una sola riga JSON parsabile in ogni caso, successo o errore. 5) Confronto a campione: stesso comando su .ps1 e .mjs produce la stessa forma di payload.",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-10T16:56:15Z",
+      "updated_at": "2026-07-10T16:56:15Z"
+    },
+    {
+      "id": "3aaa3541-9159-4ef9-9d9e-ad5aa6bc4d39",
+      "title": "P2 - Port init.ps1 -> template/init.mjs e config portabile",
+      "description": "Fase 2. Porta init.ps1 a template/init.mjs, Node ESM zero-dependency. Task posizionale (`node init.mjs setup|build`, default setup). Carica init.config.json accanto allo script via import.meta.url. Risolve workingDirectory relativa alla dir dello script. Esegue steps[].command con spawnSync(cmd, {shell:true, stdio:'inherit', cwd}), si ferma al primo exit != 0. Stessi messaggi di errore e exit 1 su: config mancante, config non parsabile, task inesistente, task senza step, step senza command. Aggiorna template/init.config.json sostituendo i default Write-Host con echo portabile. Test in test/init.test.mjs. Dipende da P0, indipendente da P1.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "1) `node init.mjs setup` e `node init.mjs build` eseguono gli step del rispettivo task e stampano [task] description. 2) Uno step forzato a exit code != 0 ferma il task, stampa un errore chiaro e termina con exit 1; gli step successivi NON vengono eseguiti. 3) exit 1 con messaggio chiaro su: init.config.json mancante, JSON non valido, task inesistente (elenca i task disponibili), step senza command. 4) Task senza step: warning + exit 0. 5) template/init.config.json non contiene piu Write-Host; i comandi di default girano sia su Windows sia su shell POSIX. 6) `node --test` verde.",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-10T16:56:15Z",
+      "updated_at": "2026-07-10T16:56:15Z"
+    },
+    {
+      "id": "df64edba-3ee7-46be-af4e-9581fd0967cd",
+      "title": "P3 - CLI init e scrittura manifest",
+      "description": "Fase 3. Implementa src/cli.mjs (comando init), src/manifest.mjs (sha256, policy, read/write manifest atomico) e src/actions.mjs (plan + apply della copia). `harness init [targetDir=.] [--force] [--dry-run] [--json]` copia flat ogni file di template/ nel targetDir e scrive .harness-manifest.json con {harnessVersion, generatedAt, files:{path:{sha256,policy}}}. Policy per file: managed = issue-manager.mjs, init.mjs, issues.html, docs/AGENTS-RULES.md, docs/GIT.md, docs/ISSUES.md; seeded-once = AGENTS.md, docs/ARCHITECTURE.md, init.config.json; data = issues.json. init rifiuta di sovrascrivere file preesistenti salvo --force. --dry-run non scrive nulla. --json emette una riga JSON {ok,action,added,updated,skipped,conflicts,removed}. Exit code: 0 pulito, 2 con conflitti, 1 fatale. Dipende da P0.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "1) init in una directory temporanea vuota crea tutti i file di template/ in layout flat (docs/ come unica sottocartella) piu .harness-manifest.json. 2) Il manifest contiene harnessVersion uguale alla version di package.json, generatedAt ISO, e una entry per ogni file con sha256 corretto (verificabile ricalcolando l'hash del file su disco) e la policy attesa. 3) init su una directory con un file gia esistente NON lo sovrascrive e lo riporta come skipped; con --force lo sovrascrive. 4) --dry-run non crea alcun file su disco ma stampa il piano. 5) --json emette una sola riga JSON parsabile. 6) `node --test` verde.",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-10T16:56:15Z",
+      "updated_at": "2026-07-10T16:56:15Z"
+    },
+    {
+      "id": "a63b75a5-e378-4eb8-af0a-6fd0cc060096",
+      "title": "P4 - CLI update, classificazione a hash e conflitti .new",
+      "description": "Fase 4. Implementa `harness update [targetDir=.] [--force] [--dry-run] [--json]`. Algoritmo per ogni entry del template nuovo: se policy seeded-once o data -> scrivi solo se assente su disco, altrimenti skip. Se policy managed -> assente su disco: scrivi (ADDED, o RECREATED se presente nel vecchio manifest); presente: diskHash == newHash -> skip; rec esiste e diskHash == rec.sha256 (intonso) -> sovrascrivi (UPDATED); altrimenti divergente -> con --force sovrascrivi (UPDATED), senza --force scrivi <file>.new e riporta CONFLICT lasciando l'originale intatto. File presente nel vecchio manifest ma assente dal template nuovo: managed e intonso -> cancella (REMOVED); managed e divergente -> lascia (ORPHANED); seeded/data -> lascia. In ogni caso l'entry sparisce dal manifest. Su CONFLICT il manifest registra newHash. update senza manifest esistente si comporta come init. Non interattivo. Exit 2 se ci sono conflitti. Dipende da P3.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "1) Test su directory temporanee che coprono ognuno dei casi: managed intonso -> sovrascritto in silenzio (UPDATED); managed identico al nuovo template -> skipped; managed divergente -> creato <file>.new con i byte nuovi, originale byte-identico a prima, esito CONFLICT, exit code 2; managed divergente con --force -> sovrascritto, nessun .new, exit 0. 2) seeded-once esistente e modificato -> mai toccato, nessun .new. 3) data (issues.json) con contenuto utente -> mai toccato. 4) File nuovo nel template assente dal vecchio manifest -> ADDED; se esiste gia con contenuto diverso -> CONFLICT. 5) File managed rimosso dal template: intonso -> cancellato (REMOVED); divergente -> lasciato su disco (ORPHANED); entry rimossa dal manifest in entrambi i casi. 6) File seeded/data rimosso dal template -> lasciato su disco. 7) Dopo update il manifest ha harnessVersion aggiornata e, sui conflitti, sha256 = hash del template nuovo. 8) --dry-run non modifica nulla. 9) `node --test` verde.",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-10T16:56:15Z",
+      "updated_at": "2026-07-10T16:56:15Z"
+    },
+    {
+      "id": "6631260f-e8d4-4c40-baea-1d8be257d3e7",
+      "title": "P5 - Split AGENTS.md e migrazione testi del template",
+      "description": "Fase 5. Estrai da template/AGENTS.md le regole invarianti (clock-in, regola 1-WIP per catena di dipendenza, overlap verifica->next, invarianti non negoziabili, clock-out, gate sul commit, sezione init/verifica ambiente) in template/docs/AGENTS-RULES.md (policy managed). template/AGENTS.md (policy seeded-once) resta un guscio: descrizione progetto 200-500 parole + rimando a docs/AGENTS-RULES.md + indice documenti. Migra ovunque i comandi: .\\issue-manager.ps1 -> node issue-manager.mjs, .\\init.ps1 setup|build -> node init.mjs setup|build. Flag: -getAll->--get-all, -get->--get, -insert->--insert, -update->--update, -delete->--delete, -help->--help, -issueId->--issue-id, -issueData->--issue-data, -issueDataFile->--issue-data-file, -status->--status, -order->--order, -page->--page, -pageSize->--page-size. Rilassa la riga 'esegui sempre comandi PowerShell' a cross-platform. Generalizza il clock-out togliendo il wording MSBuild/.NET: il gate di build e il task 'build' definito in init.config.json. In docs/ISSUES.md affianca agli esempi PowerShell una variante portabile. Aggiorna i tag dei code fence da powershell a bash/text dove il comando e ora node. docs/GIT.md e docs/ARCHITECTURE.md restano scheletri illustrativi. Dipende da P0.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "1) grep in template/ non trova piu alcuna occorrenza di 'issue-manager.ps1', 'init.ps1', ne dei flag PascalCase -getAll/-issueId/-issueData/-issueDataFile/-pageSize. 2) template/docs/AGENTS-RULES.md esiste e contiene tutte e sette le sezioni di regole elencate nella descrizione, senza perdita di contenuto rispetto all'AGENTS.md originale (confronto sezione per sezione). 3) template/AGENTS.md non contiene piu le regole operative, rimanda a docs/AGENTS-RULES.md e mantiene descrizione + indice documenti. 4) Nessun riferimento residuo a MSBuild, dotnet restore o configurazione Debug in AGENTS.md/AGENTS-RULES.md. 5) I link markdown interni risolvono a file esistenti dentro template/.",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-10T16:56:15Z",
+      "updated_at": "2026-07-10T16:56:15Z"
+    },
+    {
+      "id": "57ed2f0a-fe28-4855-9931-f9577ccbceea",
+      "title": "P6 - Dogfooding: materializza harness in root e drift check CI",
+      "description": "Fase 6. Il repo usa il proprio harness. `npm run dev:sync` (= node src/cli.mjs update .) materializza in root i file managed e seeded da template/, senza toccare il root issues.json (policy data, contiene i veri issue di sviluppo). Le copie di root vengono committate. Elimina i vecchi init.ps1 e issue-manager.ps1 dalla root: .mjs e l'unica fonte di verita. Aggiungi CLAUDE.md (non managed, non shippato) con la regola: 'edita template/, mai la copia di root; poi npm run dev:sync'. Aggiungi un job CI di drift check che esegue `npm run dev:check` (update . --dry-run --json) e fallisce se ci sono updated o conflicts su file managed. Aggiorna .gitignore per node_modules. Dipende da P1, P2, P4, P5.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "1) Dopo `npm run dev:sync` la root contiene issue-manager.mjs, init.mjs, issues.html, docs/AGENTS-RULES.md, docs/GIT.md, docs/ISSUES.md, AGENTS.md, docs/ARCHITECTURE.md, init.config.json, .harness-manifest.json. 2) Il root issues.json conserva le issue di sviluppo del repo: nessuna issue persa, confrontare totalCount prima e dopo dev:sync. 3) `node issue-manager.mjs --get-all --status backlog` in root risponde con l'envelope {ok:true,...}. 4) init.ps1 e issue-manager.ps1 non esistono piu in root ne in template/. 5) `npm run dev:check` esce 0 e riporta zero updated e zero conflicts. 6) `npm pack --dry-run` continua a NON includere le copie di root. 7) Il workflow CI di drift esiste ed esegue dev:check.",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-10T16:56:15Z",
+      "updated_at": "2026-07-10T16:56:15Z"
+    },
+    {
+      "id": "4a51c5c0-3527-4388-afc4-5af88d69de6e",
+      "title": "P7 - README, LICENSE e pipeline di publish su npm",
+      "description": "Fase 7. Aggiungi README.md (install via npx @diemrt/harness init, reference dei comandi init/update e dei flag, cosa finisce nel progetto con la lista flat + .harness-manifest.json, semantica di update: policy managed/seeded-once/data, file .new sui conflitti, exit code 0/1/2, requisito Node >=18, nessun node_modules nei progetti figli, nota che la portabilita dei comandi in init.config.json e responsabilita dell'utente). Aggiungi LICENSE (MIT, autore diemrt). Aggiungi .github/workflows/publish.yml su push di tag v*: checkout, setup-node 20 con registry-url npmjs, npm ci, npm test, npm publish --provenance --access public, env NODE_AUTH_TOKEN da secrets.NPM_TOKEN, permissions contents:read + id-token:write. Dipende da P6.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "1) `npm publish --dry-run` esce senza errori e il tarball contiene src/ e template/ ma non le copie di root, non test/, non .github/. 2) README documenta entrambi i comandi, tutti i flag (--force, --dry-run, --json), le tre policy, il meccanismo dei file .new e i tre exit code. 3) LICENSE presente e referenziata da package.json (campo license). 4) .github/workflows/publish.yml e YAML valido, si attiva su tags v*, esegue npm test prima di npm publish, usa --access public e --provenance, dichiara permissions id-token:write. 5) package.json ha i campi repository, homepage, bugs, description, keywords valorizzati.",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-10T16:56:15Z",
+      "updated_at": "2026-07-10T16:56:15Z"
+    }
+  ]
 }

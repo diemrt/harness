@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Issue Board</title>
+
+  <!-- Tailwind CSS (Play CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- daisyUI (component library, Tailwind-based, via CDN) -->
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+  <!-- Lucide icons (UMD CDN) -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['ui-sans-serif', 'system-ui', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    /* Preserve newlines in issue descriptions */
+    .preserve-newlines { white-space: pre-wrap; }
+    /* Smooth fade-in for rendered cards */
+    .issue-card { animation: fadeIn .18s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  </style>
+</head>
+<body class="min-h-screen bg-base-200 text-base-content">
+
+  <div class="max-w-6xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+
+    <!-- Header -->
+    <header class="mb-6">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <span class="grid place-items-center w-11 h-11 rounded-xl bg-primary text-primary-content shadow">
+            <i data-lucide="layout-list" class="w-6 h-6"></i>
+          </span>
+          <div>
+            <h1 id="projectTitle" class="text-2xl font-bold leading-tight">Issue Board</h1>
+            <p class="text-sm text-base-content/60">
+              <span id="lastUpdated">—</span>
+            </p>
+          </div>
+        </div>
+        <a class="btn btn-sm btn-ghost gap-2" href="issues.json" target="_blank" rel="noreferrer">
+          <i data-lucide="file-json" class="w-4 h-4"></i>
+          issues.json
+        </a>
+      </div>
+    </header>
+
+    <!-- Summary counters -->
+    <section id="counters" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+      <!-- populated by JS -->
+    </section>
+
+    <!-- Toolbar: search + status filters -->
+    <section class="flex flex-col gap-3 mb-6 lg:flex-row lg:items-center lg:justify-between">
+      <label class="input input-bordered flex items-center gap-2 w-full lg:max-w-sm">
+        <i data-lucide="search" class="w-4 h-4 opacity-60"></i>
+        <input id="searchInput" type="text" class="grow" placeholder="Cerca per titolo o descrizione…" autocomplete="off" />
+      </label>
+      <div id="statusFilters" role="tablist" class="tabs tabs-boxed bg-base-100 shadow-sm overflow-x-auto">
+        <!-- populated by JS -->
+      </div>
+    </section>
+
+    <!-- States -->
+    <div id="loadingState" class="flex flex-col items-center justify-center py-20 gap-3 text-base-content/60">
+      <span class="loading loading-spinner loading-lg text-primary"></span>
+      <p>Caricamento delle issue…</p>
+    </div>
+
+    <div id="errorState" class="hidden">
+      <div role="alert" class="alert alert-error">
+        <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+        <div>
+          <h3 class="font-bold">Impossibile caricare issues.json</h3>
+          <div id="errorDetail" class="text-sm opacity-90"></div>
+        </div>
+      </div>
+      <div class="mt-4 rounded-lg bg-base-100 p-4 text-sm shadow-sm">
+        <p class="font-semibold mb-1">Suggerimento</p>
+        <p class="text-base-content/70">
+          I browser bloccano <code>fetch()</code> sui file aperti via <code>file://</code>.
+          Avvia un server locale dalla cartella del progetto e apri la pagina da lì, ad esempio:
+        </p>
+        <pre class="mt-2 rounded bg-base-200 p-3 overflow-x-auto"><code>python -m http.server 8080</code></pre>
+        <p class="text-base-content/70 mt-1">poi apri <code>http://localhost:8080/issues.html</code></p>
+      </div>
+    </div>
+
+    <div id="emptyState" class="hidden flex-col items-center justify-center py-20 gap-3 text-base-content/60">
+      <i data-lucide="inbox" class="w-10 h-10"></i>
+      <p>Nessuna issue corrisponde ai filtri attuali.</p>
+    </div>
+
+    <!-- Issue list -->
+    <section id="issuesList" class="grid grid-cols-1 lg:grid-cols-2 gap-4"></section>
+
+  </div>
+
+  <script>
+    "use strict";
+
+    // --- Status presentation config -------------------------------------------------
+    const STATUS_META = {
+      backlog:     { label: "Backlog",     badge: "badge-neutral", text: "text-neutral",  icon: "circle-dashed", dot: "bg-neutral" },
+      in_progress: { label: "In Progress", badge: "badge-info",    text: "text-info",     icon: "loader",        dot: "bg-info" },
+      blocked:     { label: "Blocked",     badge: "badge-error",   text: "text-error",    icon: "ban",           dot: "bg-error" },
+      done:        { label: "Done",        badge: "badge-success", text: "text-success",  icon: "check-circle",  dot: "bg-success" },
+    };
+    const STATUS_ORDER = ["backlog", "in_progress", "blocked", "done"];
+    // WIP view: priorità di raggruppamento (prima "cosa non va", poi "in corso", poi "da fare").
+    const WIP_PRIORITY = { blocked: 0, in_progress: 1, backlog: 2 };
+
+    const VALIDATION_META = {
+      pass:    { badge: "badge-success", icon: "check", label: "pass" },
+      fail:    { badge: "badge-error",   icon: "x",     label: "fail" },
+      unknown: { badge: "badge-ghost",   icon: "help-circle", label: "unknown" },
+    };
+
+    // --- App state ------------------------------------------------------------------
+    const state = {
+      data: null,
+      issues: [],
+      activeStatus: "wip", // "wip" | "all" | one of STATUS_ORDER
+      query: "",
+    };
+
+    // --- DOM refs -------------------------------------------------------------------
+    const el = {
+      projectTitle: document.getElementById("projectTitle"),
+      lastUpdated:  document.getElementById("lastUpdated"),
+      counters:     document.getElementById("counters"),
+      statusFilters:document.getElementById("statusFilters"),
+      searchInput:  document.getElementById("searchInput"),
+      loadingState: document.getElementById("loadingState"),
+      errorState:   document.getElementById("errorState"),
+      errorDetail:  document.getElementById("errorDetail"),
+      emptyState:   document.getElementById("emptyState"),
+      issuesList:   document.getElementById("issuesList"),
+    };
+
+    // --- Helpers --------------------------------------------------------------------
+    function escapeHtml(value) {
+      if (value == null) return "";
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function formatDate(iso) {
+      if (!iso) return "—";
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return escapeHtml(iso);
+      return d.toLocaleString("it-IT", {
+        year: "numeric", month: "short", day: "2-digit",
+        hour: "2-digit", minute: "2-digit",
+      });
+    }
+
+    function statusMeta(status) {
+      return STATUS_META[status] || { label: status || "—", badge: "badge-ghost", text: "", icon: "circle", dot: "bg-base-300" };
+    }
+
+    function refreshIcons() {
+      if (window.lucide && typeof window.lucide.createIcons === "function") {
+        window.lucide.createIcons();
+      }
+    }
+
+    // --- Rendering: counters --------------------------------------------------------
+    function renderCounters() {
+      const counts = { all: state.issues.length };
+      for (const s of STATUS_ORDER) counts[s] = 0;
+      for (const it of state.issues) {
+        if (counts[it.status] != null) counts[it.status]++;
+      }
+
+      const cards = [];
+      cards.push(counterCard("all", "Totale", counts.all, "layers", "text-primary"));
+      for (const s of STATUS_ORDER) {
+        const meta = statusMeta(s);
+        cards.push(counterCard(s, meta.label, counts[s] || 0, meta.icon, meta.text));
+      }
+      el.counters.innerHTML = cards.join("");
+      refreshIcons();
+    }
+
+    function counterCard(key, label, value, icon, textClass) {
+      return `
+        <div class="rounded-xl bg-base-100 shadow-sm p-4 flex items-center gap-3">
+          <span class="grid place-items-center w-10 h-10 rounded-lg bg-base-200 ${textClass}">
+            <i data-lucide="${icon}" class="w-5 h-5"></i>
+          </span>
+          <div>
+            <div class="text-2xl font-bold leading-none">${value}</div>
+            <div class="text-xs text-base-content/60 mt-1">${escapeHtml(label)}</div>
+          </div>
+        </div>`;
+    }
+
+    // --- Rendering: status filter tabs ---------------------------------------------
+    function renderFilters() {
+      const tabs = [];
+      tabs.push(filterTab("wip", "WIP"));
+      for (const s of STATUS_ORDER) tabs.push(filterTab(s, statusMeta(s).label));
+      tabs.push(filterTab("all", "Tutti"));
+      el.statusFilters.innerHTML = tabs.join("");
+
+      el.statusFilters.querySelectorAll("[data-status]").forEach((node) => {
+        node.addEventListener("click", () => {
+          state.activeStatus = node.getAttribute("data-status");
+          renderFilters();
+          renderIssues();
+        });
+      });
+    }
+
+    function filterTab(status, label) {
+      const active = state.activeStatus === status ? "tab-active" : "";
+      return `<button type="button" role="tab" data-status="${status}" class="tab ${active} whitespace-nowrap">${escapeHtml(label)}</button>`;
+    }
+
+    // --- Filtering ------------------------------------------------------------------
+    function getFilteredIssues() {
+      const q = state.query.trim().toLowerCase();
+
+      const matchesQuery = (it) => {
+        if (!q) return true;
+        const haystack = `${it.title || ""}\n${it.description || ""}`.toLowerCase();
+        return haystack.includes(q);
+      };
+
+      // Vista WIP: solo blocked/in_progress/backlog, ordinate per priorità e
+      // a parità di stato per ordine di inserimento (indice originale nell'array).
+      if (state.activeStatus === "wip") {
+        return state.issues
+          .map((it, index) => ({ it, index }))
+          .filter(({ it }) => WIP_PRIORITY[it.status] != null && matchesQuery(it))
+          .sort((a, b) => {
+            const pa = WIP_PRIORITY[a.it.status];
+            const pb = WIP_PRIORITY[b.it.status];
+            if (pa !== pb) return pa - pb;
+            return a.index - b.index;
+          })
+          .map(({ it }) => it);
+      }
+
+      return state.issues.filter((it) => {
+        if (state.activeStatus !== "all" && it.status !== state.activeStatus) return false;
+        return matchesQuery(it);
+      });
+    }
+
+    // --- Rendering: issue cards -----------------------------------------------------
+    function renderIssues() {
+      const items = getFilteredIssues();
+
+      if (items.length === 0) {
+        el.issuesList.innerHTML = "";
+        el.emptyState.classList.remove("hidden");
+        el.emptyState.classList.add("flex");
+        return;
+      }
+      el.emptyState.classList.add("hidden");
+      el.emptyState.classList.remove("flex");
+
+      el.issuesList.innerHTML = items.map(issueCard).join("");
+      refreshIcons();
+    }
+
+    function issueCard(it) {
+      const meta = statusMeta(it.status);
+      const validation = it.validation || {};
+      const vMeta = VALIDATION_META[validation.state] || VALIDATION_META.unknown;
+
+      const validationBlock = (validation.criteria || validation.state) ? `
+        <div class="mt-3 rounded-lg bg-base-200/60 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <i data-lucide="clipboard-check" class="w-4 h-4 opacity-70"></i>
+            <span class="text-xs font-semibold uppercase tracking-wide opacity-70">Validazione</span>
+            <span class="badge badge-sm ${vMeta.badge} gap-1">
+              <i data-lucide="${vMeta.icon}" class="w-3 h-3"></i>${escapeHtml(vMeta.label)}
+            </span>
+          </div>
+          ${validation.criteria ? `<p class="text-sm opacity-80 preserve-newlines">${escapeHtml(validation.criteria)}</p>` : ""}
+        </div>` : "";
+
+      return `
+        <article class="issue-card card bg-base-100 shadow-sm border border-base-200 hover:shadow-md transition-shadow">
+          <div class="card-body p-5">
+            <div class="flex items-start justify-between gap-3">
+              <h2 class="card-title text-base leading-snug">${escapeHtml(it.title)}</h2>
+              <span class="badge ${meta.badge} gap-1 shrink-0">
+                <i data-lucide="${meta.icon}" class="w-3 h-3"></i>${escapeHtml(meta.label)}
+              </span>
+            </div>
+
+            ${it.description ? `<p class="text-sm text-base-content/80 mt-2 preserve-newlines">${escapeHtml(it.description)}</p>` : ""}
+
+            ${validationBlock}
+
+            <div class="mt-4 pt-3 border-t border-base-200 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/50">
+              <span class="inline-flex items-center gap-1" title="ID">
+                <i data-lucide="hash" class="w-3 h-3"></i><code>${escapeHtml(it.id)}</code>
+              </span>
+              <span class="inline-flex items-center gap-1" title="Creata">
+                <i data-lucide="calendar-plus" class="w-3 h-3"></i>${formatDate(it.created_at)}
+              </span>
+              <span class="inline-flex items-center gap-1" title="Aggiornata">
+                <i data-lucide="calendar-clock" class="w-3 h-3"></i>${formatDate(it.updated_at)}
+              </span>
+            </div>
+          </div>
+        </article>`;
+    }
+
+    // --- Boot -----------------------------------------------------------------------
+    function showError(message) {
+      el.loadingState.classList.add("hidden");
+      el.errorState.classList.remove("hidden");
+      el.errorDetail.textContent = message || "";
+      refreshIcons();
+    }
+
+    function bindSearch() {
+      el.searchInput.addEventListener("input", (e) => {
+        state.query = e.target.value;
+        renderIssues();
+      });
+    }
+
+    async function init() {
+      bindSearch();
+      try {
+        const res = await fetch("issues.json", { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+        const data = await res.json();
+
+        state.data = data;
+        state.issues = Array.isArray(data.issues) ? data.issues : [];
+
+        el.projectTitle.textContent = `${data.project || "Issue Board"} — Issue Board`;
+        el.lastUpdated.textContent = data.last_updated
+          ? `Ultimo aggiornamento: ${formatDate(data.last_updated)} · ${state.issues.length} issue`
+          : `${state.issues.length} issue`;
+
+        el.loadingState.classList.add("hidden");
+
+        renderCounters();
+        renderFilters();
+        renderIssues();
+      } catch (err) {
+        showError(err && err.message ? err.message : String(err));
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      refreshIcons();
+      init();
+    });
+  </script>
+</body>
+</html>

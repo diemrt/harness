@@ -5,8 +5,8 @@
       "workingDirectory": ".",
       "steps": [
         {
-          "description": "Install dependencies",
-          "command": "npm install"
+          "description": "Esempio: installazione delle dipendenze del progetto",
+          "command": "Write-Host 'Configura lo step di setup in init.config.json (es. npm install)'"
         }
       ]
     },
@@ -14,8 +14,8 @@
       "workingDirectory": ".",
       "steps": [
         {
-          "description": "Run test suite",
-          "command": "npm test"
+          "description": "Esempio: compilazione del progetto",
+          "command": "Write-Host 'Configura lo step di build in init.config.json (es. npm run build)'"
         }
       ]
     }

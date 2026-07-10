@@ -1,0 +1,25 @@
+{
+  "name": "@diemrt/harness",
+  "version": "0.1.0",
+  "description": "Controlled AI-agent development harness: issue tracker, task runner, and agent rules, installable with npx.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "harness": "src/cli.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "src/",
+    "template/"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "dev:sync": "node src/cli.mjs update .",
+    "dev:check": "node src/cli.mjs update . --dry-run --json"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
