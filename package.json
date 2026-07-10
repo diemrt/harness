@@ -4,6 +4,24 @@
   "description": "Controlled AI-agent development harness: issue tracker, task runner, and agent rules, installable with npx.",
   "type": "module",
   "license": "MIT",
+  "author": "diemrt",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/diemrt/harness.git"
+  },
+  "homepage": "https://github.com/diemrt/harness#readme",
+  "bugs": {
+    "url": "https://github.com/diemrt/harness/issues"
+  },
+  "keywords": [
+    "harness",
+    "ai-agent",
+    "scaffold",
+    "cli",
+    "issue-tracker",
+    "npx",
+    "boilerplate"
+  ],
   "bin": {
     "harness": "src/cli.mjs"
   },
@@ -12,7 +30,9 @@
   },
   "files": [
     "src/",
-    "template/"
+    "template/",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "test": "node --test",
