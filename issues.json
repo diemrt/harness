@@ -1,0 +1,21 @@
+{
+  "project": "MyProject",
+  "last_updated": "2026-07-09T13:30:24Z",
+  "rules": {
+    "single_active_issue": false
+  },
+  "status_legend": {
+    "backlog": "Work has not begun.",
+    "in_progress": "The issue is the current active task.",
+    "blocked": "Work cannot continue until a documented blocker is resolved.",
+    "done": "The issue has been completed and verified."
+  },
+  "tags": [
+    "feature",
+    "bug",
+    "chore",
+    "documentation",
+    "testing"
+  ],
+  "issues": []
+}
