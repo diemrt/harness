@@ -224,16 +224,33 @@ test("--json prints exactly one line of parsable JSON", (t) => {
   assert.doesNotThrow(() => JSON.parse(lines[0]));
 });
 
-test("update exits 1 with a clean error rather than a stack trace", (t) => {
+test("update on a dir with no manifest behaves like init", (t) => {
   const tmpDir = makeTmpDir();
   t.after(() => rmSync(tmpDir, { recursive: true, force: true }));
 
-  const result = runCli(["update", tmpDir]);
+  const result = runCli(["update", tmpDir, "--json"]);
+  assert.equal(result.status, 0, result.stderr);
+
+  const json = JSON.parse(result.stdout.trim());
+  assert.equal(json.action, "update");
+  assert.deepEqual(json.added, TEMPLATE_FILES);
+  assert.ok(existsSync(join(tmpDir, MANIFEST_FILE)));
+});
+
+test("a fatal error reports cleanly, with one line of JSON under --json", (t) => {
+  const tmpDir = makeTmpDir();
+  t.after(() => rmSync(tmpDir, { recursive: true, force: true }));
+
+  // A regular file where a target directory is expected is unrecoverable.
+  const notADir = join(tmpDir, "regular-file");
+  writeFileSync(notADir, "not a directory");
+
+  const result = runCli(["init", notADir]);
   assert.equal(result.status, 1);
   assert.doesNotMatch(result.stderr, /at .*\.mjs:\d+:\d+/, "stderr should not contain a stack trace");
   assert.doesNotMatch(result.stdout, /at .*\.mjs:\d+:\d+/, "stdout should not contain a stack trace");
 
-  const jsonResult = runCli(["update", tmpDir, "--json"]);
+  const jsonResult = runCli(["init", notADir, "--json"]);
   assert.equal(jsonResult.status, 1);
   const lines = jsonResult.stdout.trim().split("\n");
   assert.equal(lines.length, 1, "expected exactly one line of JSON on fatal error");

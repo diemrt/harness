@@ -36,13 +36,28 @@ function printHumanSummary(result, version) {
     ["skipped", result.skipped],
     ["conflicts", result.conflicts],
     ["removed", result.removed],
+    ["orphaned", result.orphaned || []],
   ];
   for (const [label, paths] of groups) {
     for (const p of paths) {
-      console.log(`  ${label.padEnd(9)} ${p}`);
+      if (label === "conflicts") {
+        console.log(
+          `  ${label.padEnd(9)} ${p} -- your version differs from the harness template; see ${p}.new (the incoming version); resolve manually, then re-run with --force or delete the .new file`
+        );
+      } else {
+        console.log(`  ${label.padEnd(9)} ${p}`);
+      }
     }
   }
-  console.log(`harness v${version}: ${result.action} complete`);
+
+  const conflictCount = result.conflicts ? result.conflicts.length : 0;
+  if (conflictCount > 0) {
+    console.log(
+      `harness v${version}: ${result.action} finished with ${conflictCount} conflict(s); resolve them and re-run (exit code 2).`
+    );
+  } else {
+    console.log(`harness v${version}: ${result.action} complete`);
+  }
 }
 
 async function main(argv) {
