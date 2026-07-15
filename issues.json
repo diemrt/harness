@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-15T21:04:02Z",
+  "last_updated": "2026-07-15T21:10:11Z",
   "rules": {
     "single_active_issue": false
   },
@@ -238,13 +238,13 @@
       "id": "34bf61e4-ed08-4830-ad67-e786302d1ad3",
       "title": "chore: convenzione log .harness/runs/ in .gitignore",
       "description": "Componente D del design external-worker. Standardizzare i log dei worker in .harness/runs/<issueId>-<timestamp>.log cosi l'orchestratore sa sempre dove leggere l'output del terminale separato (via `2>&1 | tee`) e i temporanei non finiscono mai in un commit. Creare template/.gitignore (nuovo file managed: auto-registrato come managed nel manifest alla prossima dev:sync, nessuna modifica a src/policies.mjs) contenente `.harness/runs/`. Aggiungere la stessa riga al .gitignore della radice (attualmente 3 righe: node_modules/, *.tgz, *.new) cosi anche questo repo non committa i temporanei. Piccola issue indipendente.",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "template/.gitignore esiste e contiene `.harness/runs/`; root .gitignore lo contiene; un file dummy sotto .harness/runs/ risulta ignorato da git status; .harness-manifest.json registra template/.gitignore con policy managed dopo dev:sync. npm run dev:check pulito.",
-        "state": "unknown"
+        "criteria": "build gate: node init.mjs build exit 0, 82/82 tests pass, 0 fail; dev:check: 0 updated, 0 conflicts, .gitignore listed in skipped, no .gitignore.new anywhere; template/.gitignore and root .gitignore both contain .harness/runs/ and are byte-identical (diff empty); .harness-manifest.json has .gitignore entry with policy=managed; dummy .harness/runs/verify.log created, git status --porcelain did NOT list it, git check-ignore .harness/runs/verify.log echoed the path; dummy file and empty .harness/ tree removed after verification",
+        "state": "pass"
       },
       "created_at": "2026-07-15T20:28:40Z",
-      "updated_at": "2026-07-15T20:28:40Z"
+      "updated_at": "2026-07-15T21:10:11Z"
     },
     {
       "id": "21a9bd3c-3aa7-4120-9691-fc657f8b979c",

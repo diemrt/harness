@@ -1,7 +1,11 @@
 {
   "harnessVersion": "0.2.0",
-  "generatedAt": "2026-07-15T20:58:06.600Z",
+  "generatedAt": "2026-07-15T21:06:59.941Z",
   "files": {
+    ".gitignore": {
+      "sha256": "5b9bb0741dfd18e8d1d458b812924abc448047121d315b414783b3796a1c1b04",
+      "policy": "managed"
+    },
     "AGENTS.md": {
       "sha256": "cd13234d1849059b6aa32a73eed1c6587d835ce3008f0f8d8aa383e8bc8ff3a3",
       "policy": "seeded-once"
