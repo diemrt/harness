@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-15T21:10:11Z",
+  "last_updated": "2026-07-15T21:15:58Z",
   "rules": {
     "single_active_issue": false
   },
@@ -250,13 +250,13 @@
       "id": "21a9bd3c-3aa7-4120-9691-fc657f8b979c",
       "title": "docs: EXTERNAL-WORKER.md gated + riga condizionale in AGENTS-RULES.md",
       "description": "Componente E del design external-worker (fulcro per il costo-contesto). Creare template/docs/EXTERNAL-WORKER.md (nuovo file managed, auto-registrato nel manifest). Contenuto: pattern di delega one-shot (invocazione, `2>&1 | tee .harness/runs/<id>-<ts>.log`, update robusti via --issue-data-file); descrizione del placeholder {promptFile} + 3 esempi di command da copiare e adattare (ollama / codex / copilot); ruolo di HARNESS_ROLE=worker e cosa i guard impediscono (issue role-guard issue-manager e pre-commit); template di prompt worker parametrico ({issueId}, {repoRoot}) coi vincoli rigidi gia scritti (no commit, no pass/done, no file fuori scope, stampa riassunto e fermati); nota ambiente ANTHROPIC_API_KEY (precede il login claude.ai); nota anti-conflitto con la regola 1-WIP: quando externalWorker.enabled il subagent-per-issue PUO essere un worker esterno, la verifica indipendente resta un agente distinto (worker != verificatore != orchestratore), nessuna regola invariante contraddetta. In template/docs/AGENTS-RULES.md aggiungere UNA sola riga condizionale (~dopo :34, prima del blocco INVARIATO :36): \"Se externalWorker.enabled in init.config.json, leggi docs/EXTERNAL-WORKER.md per il pattern di delega a worker esterno.\" I progetti con feature off non caricano mai la doc -> contesto base invariato. Editare template/, poi `npm run dev:sync`. Dipende dalle issue in_review, role-guard issue-manager, role-guard pre-commit, toggle/preflight (documenta stati/guard/comandi). NB: il repo dogfooda il pre-commit gate docs -> la modifica ai docs puo richiedere il relativo flusso di verifica.",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "docs/EXTERNAL-WORKER.md esiste, e managed in .harness-manifest.json, contiene i 3 esempi command (ollama/codex/copilot) e il template di prompt worker parametrico; AGENTS-RULES.md ha ESATTAMENTE una riga condizionale che punta alla doc; con externalWorker.enabled=false la doc non e lettura obbligatoria (costo-contesto zero). npm run dev:check pulito.",
-        "state": "unknown"
+        "criteria": "build: node init.mjs build exit 0, 82/82 test pass; dev:check: node src/cli.mjs update . --dry-run --json -> 0 updated, 0 conflicts, docs/EXTERNAL-WORKER.md in skipped; docs/EXTERNAL-WORKER.md esiste sia in root che in template/, byte-identici (diff vuoto), .harness-manifest.json ha l'entry docs/EXTERNAL-WORKER.md con policy=managed; contenuto copre i 3 esempi command (ollama launch claude, codex exec --file {promptFile}, copilot -p {promptFile}), il placeholder {promptFile} spiegato, HARNESS_ROLE=worker con i due guard (FORBIDDEN_ROLE su pass/done in issue-manager.mjs, blocco pre-commit.mjs), template di prompt worker parametrico con {issueId}/{repoRoot} e i vincoli rigidi (no commit, no pass/done max in_review, no file fuori scope, stampa riassunto e fermati), il pattern tee .harness/runs/<issueId>-<timestamp>.log, la nota su ANTHROPIC_API_KEY che precede il login interattivo, e la nota anti-conflitto (worker != verificatore != orchestratore invariato); docs/AGENTS-RULES.md contiene ESATTAMENTE 1 occorrenza di 'EXTERNAL-WORKER' (riga 36, nella sezione Regola 1-WIP, condizionata a externalWorker.enabled, non duplica gli invarianti elencati subito sotto); root e template di AGENTS-RULES.md identici.",
+        "state": "pass"
       },
       "created_at": "2026-07-15T20:28:40Z",
-      "updated_at": "2026-07-15T20:28:40Z"
+      "updated_at": "2026-07-15T21:15:58Z"
     },
     {
       "id": "eb641e21-e3cb-4e0d-bd86-6f0a68243d88",

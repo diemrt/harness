@@ -33,6 +33,8 @@ subagent di verifica indipendente** della precedente è **ancora in corso** (sov
 temporale), purché appartengano a catene compatibili con la regola sopra. Questo evita di
 restare fermi ad aspettare la verifica per task semplici.
 
+Se `externalWorker.enabled` in `init.config.json`, il subagent può essere un worker esterno: vedi [EXTERNAL-WORKER.md](/docs/EXTERNAL-WORKER.md) per il pattern di delega (worker ≠ verificatore ≠ orchestratore resta invariato).
+
 **INVARIATO (non negoziabile), qualunque sia il grado di parallelismo:**
 - **verifica indipendente da subagent su OGNI issue** (mai auto-verifica);
 - **commit SOLO dopo `validation.state = pass`** dato dal subagent;
