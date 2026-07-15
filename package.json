@@ -1,6 +1,6 @@
 {
   "name": "@diemrt/harness",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Controlled AI-agent development harness: issue tracker, task runner, and agent rules, installable with npx.",
   "type": "module",
   "license": "MIT",
