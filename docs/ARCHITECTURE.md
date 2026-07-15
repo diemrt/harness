@@ -59,6 +59,10 @@ herness-repository/
 │  ├─ issue-manager.mjs        # CLI dell'issue tracker
 │  ├─ issues.json              # seed vuoto (policy "data")
 │  ├─ issues.html              # viewer HTML delle issue
+│  ├─ hooks/                   # git hook del gate documentale pre-commit (managed)
+│  │  ├─ pre-commit            # shim POSIX -> node pre-commit.mjs
+│  │  ├─ pre-commit.mjs        # gate: blocca il commit finche' HARNESS_DOCS_VERIFIED=1
+│  │  └─ install.mjs           # installer idempotente: git config core.hooksPath hooks
 │  └─ docs/
 │     ├─ AGENTS-RULES.md       # regole operative invarianti (managed)
 │     ├─ ARCHITECTURE.md       # skeleton generico seeded-once

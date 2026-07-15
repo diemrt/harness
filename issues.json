@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-10T15:45:01Z",
+  "last_updated": "2026-07-15T10:50:45Z",
   "rules": {
     "single_active_issue": false
   },
@@ -106,13 +106,73 @@
       "id": "4a51c5c0-3527-4388-afc4-5af88d69de6e",
       "title": "P7 - README, LICENSE e pipeline di publish su npm",
       "description": "Fase 7. Aggiungi README.md (install via npx @diemrt/harness init, reference dei comandi init/update e dei flag, cosa finisce nel progetto con la lista flat + .harness-manifest.json, semantica di update: policy managed/seeded-once/data, file .new sui conflitti, exit code 0/1/2, requisito Node >=18, nessun node_modules nei progetti figli, nota che la portabilita dei comandi in init.config.json e responsabilita dell'utente). Aggiungi LICENSE (MIT, autore diemrt). Aggiungi .github/workflows/publish.yml su push di tag v*: checkout, setup-node 20 con registry-url npmjs, npm ci, npm test, npm publish --provenance --access public, env NODE_AUTH_TOKEN da secrets.NPM_TOKEN, permissions contents:read + id-token:write. Dipende da P6.",
-      "status": "in_progress",
+      "status": "done",
       "validation": {
         "criteria": "1) `npm publish --dry-run` esce senza errori e il tarball contiene src/ e template/ ma non le copie di root, non test/, non .github/. 2) README documenta entrambi i comandi, tutti i flag (--force, --dry-run, --json), le tre policy, il meccanismo dei file .new e i tre exit code. 3) LICENSE presente e referenziata da package.json (campo license). 4) .github/workflows/publish.yml e YAML valido, si attiva su tags v*, esegue npm test prima di npm publish, usa --access public e --provenance, dichiara permissions id-token:write. 5) package.json ha i campi repository, homepage, bugs, description, keywords valorizzati.",
-        "state": "unknown"
+        "state": "pass"
       },
       "created_at": "2026-07-10T16:56:15Z",
       "updated_at": "2026-07-10T15:45:01Z"
+    },
+    {
+      "id": "1b10437e-fc98-4c52-b0a8-399dbaec43e9",
+      "title": "feat: git hook pre-commit come gate di verifica docs/AGENTS.md",
+      "description": "Aggiungere in template/hooks/ lo script del git hook pre-commit cross-platform (zero dipendenze, solo API node:* + binario git). File: template/hooks/pre-commit (shim POSIX #!/bin/sh che fa `exec node \"$(dirname \"$0\")/pre-commit.mjs\" \"$@\"`, eseguibile anche su Git for Windows tramite la sh integrata) e template/hooks/pre-commit.mjs (logica del gate). Comportamento: se process.env.HARNESS_DOCS_VERIFIED === '1' esce 0 (bypass anti-loop); altrimenti raccoglie i file in stage con `git diff --cached --name-only` (via child_process.execFileSync), stampa su stderr un'istruzione strutturata all'agente (verificare con un subagent se sono state sviluppate nuove funzionalita e se docs/ o AGENTS.md vanno aggiornati, aggiornarli e metterli in stage, poi ri-committare con HARNESS_DOCS_VERIFIED=1), include la lista dei file in stage e le istruzioni di bypass per uso umano, ed esce 1. Contesto: un git hook e un processo OS separato e non puo iniettare un turno nella sessione dell'agente; l'intento si ottiene con un gate bloccante il cui output viene letto dall'agente come istruzione, coerente con la sezione 'Gate sul commit' di AGENTS-RULES.md. Vincoli: nessuna dipendenza runtime; template/ e l'unica copia autorata; i nuovi file hooks/* ricadono nel default policy 'managed' (policies.mjs invariato).",
+      "status": "done",
+      "validation": {
+        "criteria": "template/hooks/pre-commit + pre-commit.mjs both exist. HARNESS_DOCS_VERIFIED=1 node pre-commit.mjs -> exit 0, no block. Without env var -> exit 1, stderr cites all 4 tokens: subagent, docs/AGENTS.md, ricommit instruction, and HARNESS_DOCS_VERIFIED. Only import is node:child_process (node:* only); package.json has no dependencies/devDependencies. BUILD GATE PASS: node init.mjs build -> npm test 62/62 pass, 0 fail, exit 0 (prior test/cli.test.mjs hardcoded-dirs failure fixed).",
+        "state": "pass"
+      },
+      "created_at": "2026-07-15T10:37:21Z",
+      "updated_at": "2026-07-15T10:43:40Z"
+    },
+    {
+      "id": "8868a652-6768-4246-91f4-d5d3f803d446",
+      "title": "feat: installer del hook pre-commit (core.hooksPath) e wiring nel setup",
+      "description": "Aggiungere template/hooks/install.mjs, installer idempotente (zero dipendenze, solo node:* + git) che imposta `git config core.hooksPath hooks` e rende eseguibile il hook (fs.chmodSync a 0o755, no-op innocuo su Windows). Se la cartella .git non esiste, stampa un avviso ed esce 0 senza far fallire il setup. Aggiungere inoltre uno step { description, command: 'node hooks/install.mjs' } al task 'setup' di template/init.config.json, dopo l'install delle dipendenze, cosi il hook viene installato in fase di clock-in (node init.mjs setup). Nota: core.hooksPath e configurazione git locale per clone, quindi va reimpostata a ogni setup; l'operazione deve essere idempotente. Dipende dalla issue del hook pre-commit (i file hooks/pre-commit e pre-commit.mjs devono esistere).",
+      "status": "done",
+      "validation": {
+        "criteria": "template/hooks/install.mjs uses only node:child_process and node:fs (no third-party deps); template/init.config.json is valid JSON and setup task contains step command \"node hooks/install.mjs\". In a fresh git repo, first run set core.hooksPath=hooks (exit 0), second run idempotent (exit 0, core.hooksPath still hooks). In a dir without .git, script exited 0 and printed WARNING: no .git directory found, skipping git hooks installation. Build gate: node init.mjs build -> npm test 64/64 pass, exit 0.",
+        "state": "pass"
+      },
+      "created_at": "2026-07-15T10:37:21Z",
+      "updated_at": "2026-07-15T10:47:19Z"
+    },
+    {
+      "id": "d9d73f60-6cc3-4082-88d4-a8b06730ec92",
+      "title": "docs: regola del gate pre-commit di verifica docs in AGENTS-RULES.md",
+      "description": "Aggiungere una nuova sezione a template/docs/AGENTS-RULES.md (file managed) che documenta il gate pre-commit e il flusso obbligatorio dell'agente. La sezione deve spiegare: (1) che al `git commit` il hook pre-commit blocca il commit (exit != 0) e stampa un'istruzione; (2) che l'agente deve trattare quell'output come un ulteriore prompt e agire: avviare un subagent di verifica documentale che controlla se sono state sviluppate nuove funzionalita e se i file in docs/ o AGENTS.md vanno aggiornati; (3) se servono aggiornamenti, applicarli e metterli in stage; (4) ri-committare impostando HARNESS_DOCS_VERIFIED=1 (bypass anti-loop). Includere esempi di come impostare la env var inline per le tre shell: bash/sh (`HARNESS_DOCS_VERIFIED=1 git commit -m ...`), PowerShell (`$env:HARNESS_DOCS_VERIFIED=1; git commit -m ...`) e cmd (`set HARNESS_DOCS_VERIFIED=1 && git commit -m ...`). Integrare la sezione con la 'Gate sul commit' gia presente. Dipende dalla issue del hook pre-commit (comportamento da documentare). Essendo AGENTS-RULES.md un file managed, la modifica va fatta in template/ e poi sincronizzata alla radice con dev:sync (coperto dalla issue di dogfooding).",
+      "status": "done",
+      "validation": {
+        "criteria": "Nuova sezione \"Gate documentale sul pre-commit (hook)\" aggiunta in template/docs/AGENTS-RULES.md subito dopo \"Gate sul commit\": documenta trigger (ogni git commit), flow del subagent di verifica documentale, e bypass HARNESS_DOCS_VERIFIED=1. Verificati i 3 esempi shell (bash/sh, PowerShell, cmd) con grep, tutti corretti. Diff isolato e puramente additivo (solo questa sezione toccata nel file). Nome env var coerente con template/hooks/pre-commit.mjs. Build gate: node init.mjs build -> exit 0, 64/64 test pass, 0 fail.",
+        "state": "pass"
+      },
+      "created_at": "2026-07-15T10:37:22Z",
+      "updated_at": "2026-07-15T10:47:37Z"
+    },
+    {
+      "id": "8131660b-a822-454a-a5be-da639a344c26",
+      "title": "test: copertura del git hook pre-commit (bypass e blocco)",
+      "description": "Aggiungere test/pre-commit-hook.test.mjs (node:test + node:assert) che esegue template/hooks/pre-commit.mjs come subprocess (child_process) in una directory temporanea con un repo git di prova e file in stage. Casi: (1) con env HARNESS_DOCS_VERIFIED=1 il processo esce 0 e non blocca; (2) senza la env var il processo esce 1 e il messaggio su stderr contiene le chiavi attese (riferimento a subagent, a docs/AGENTS.md, all'istruzione di ri-commit e al nome della variabile HARNESS_DOCS_VERIFIED). I test devono essere eseguiti da `npm test` (node --test). Nota: la suite esistente e data-driven (cli.test walka il template reale) o usa template temporanei isolati, quindi l'aggiunta di file al template non la rompe; verificare comunque l'intera suite verde. Dipende dalla issue del hook pre-commit.",
+      "status": "done",
+      "validation": {
+        "criteria": "test/pre-commit-hook.test.mjs exists, spawns template/hooks/pre-commit.mjs via node:child_process.spawnSync in a throwaway git repo with one staged file (node:* imports only). Bypass case: HARNESS_DOCS_VERIFIED=1 asserts status===0 with no gate output. Block case: no env var asserts status===1 and stderr matches subagent, AGENTS.md, Ricommitta (re-commit instruction) and HARNESS_DOCS_VERIFIED. node --test test/pre-commit-hook.test.mjs: 2/2 pass. Full build gate (node init.mjs build -> npm test): 64/64 pass, exit 0, including the 2 new hook tests.",
+        "state": "pass"
+      },
+      "created_at": "2026-07-15T10:37:22Z",
+      "updated_at": "2026-07-15T10:47:44Z"
+    },
+    {
+      "id": "d5964195-48a3-494d-83b8-21c55612e5ad",
+      "title": "chore: dogfooding del gate pre-commit alla radice e aggiornamento ARCHITECTURE",
+      "description": "Materializzare il gate pre-commit anche in questo repository (dogfooding). Passi: (1) eseguire `npm run dev:sync` (node src/cli.mjs update .) per portare alla radice la cartella hooks/ e l'AGENTS-RULES.md aggiornato (file managed); (2) aggiungere lo step `node hooks/install.mjs` al task setup di init.config.json alla radice (file seeded-once, di proprieta del repo, va editato a mano); (3) aggiornare docs/ARCHITECTURE.md (root, seeded-once) e template/docs/ARCHITECTURE.md (generico, seeded-once) menzionando la cartella hooks/ nella struttura del codice: sono file separati e vanno editati singolarmente. Attenzione: una volta installato il hook in questo repo, i commit del lavoro vanno fatti con HARNESS_DOCS_VERIFIED=1 per non auto-bloccarsi. Non usare mai --force alla radice. Dipende dalle issue del hook, dell'installer, della regola AGENTS-RULES e dei test.",
+      "status": "done",
+      "validation": {
+        "criteria": "dev:check: node src/cli.mjs update . --dry-run --json -> EXIT=0, updated:[], conflicts:[] (skipped:13 incl. hooks/*). hooks/pre-commit, hooks/pre-commit.mjs, hooks/install.mjs sha256-identical to template/hooks counterparts. Root init.config.json setup task: step1 npm install, step2 node hooks/install.mjs; build task: npm test (unchanged). docs/ARCHITECTURE.md (root, line62) and template/docs/ARCHITECTURE.md (line18) both mention hooks/. git config core.hooksPath = hooks. Build gate: node init.mjs build -> npm test 64/64 pass, exit 0.",
+        "state": "pass"
+      },
+      "created_at": "2026-07-15T10:37:22Z",
+      "updated_at": "2026-07-15T10:50:45Z"
     }
   ]
 }

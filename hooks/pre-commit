@@ -1,0 +1,5 @@
+#!/bin/sh
+# Cross-platform pre-commit shim. Delegates to the Node gate so all logic
+# lives in pre-commit.mjs (zero dependencies, node:* only). Works on POSIX
+# shells and on Git for Windows via its bundled sh.
+exec node "$(dirname "$0")/pre-commit.mjs" "$@"

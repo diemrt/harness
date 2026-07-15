@@ -7,6 +7,10 @@
         {
           "description": "Install dependencies",
           "command": "npm install"
+        },
+        {
+          "description": "Install git hooks",
+          "command": "node hooks/install.mjs"
         }
       ]
     },
