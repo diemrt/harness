@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-15T21:20:57Z",
+  "last_updated": "2026-07-15T21:29:41Z",
   "rules": {
     "single_active_issue": false
   },
@@ -262,13 +262,13 @@
       "id": "eb641e21-e3cb-4e0d-bd86-6f0a68243d88",
       "title": "chore: dogfood external-worker e dev:check drift gate",
       "description": "Componente F del design external-worker: integrazione finale e dogfood. Verificare che l'intera feature sia coerente sul repo che dogfooda se stesso. Tutti i file managed nuovi/modificati (init.mjs, issue-manager.mjs, issues.html, hooks/pre-commit.mjs, docs/AGENTS-RULES.md, docs/EXTERNAL-WORKER.md, template/.gitignore) devono essere autorati in template/ e propagati alla radice via `npm run dev:sync`; il blocco externalWorker deve essere presente in ENTRAMBE le copie seeded-once di init.config.json (root e template/, separatamente); il manifest deve essere rigenerato con le nuove registrazioni managed. Eseguire il flusso d'uso end-to-end del paragrafo 5 del design: worker on -> edit externalWorker.command -> worker check (READY) -> delega di una issue con HARNESS_ROLE=worker e tee su .harness/runs/ -> worker porta a in_review/unknown (non puo pass/done ne committare) -> verifica indipendente (subagent distinto, node init.mjs build) -> done/pass -> commit solo dopo pass. Dipende da TUTTE le 6 issue precedenti. MAI --force alla radice (protegge le issue reali in issues.json).",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "npm run dev:check esce pulito (0 updated, 0 conflicts); node init.mjs build -> npm test interamente verde; flusso paragrafo 5 percorribile a mano senza contraddire l'invariante worker!=verificatore!=orchestratore; le issue reali preesistenti in issues.json intatte (nessuna sovrascrittura, conteggio done invariato). Copre integralmente i Criteri di completamento del paragrafo 7 del design.",
-        "state": "unknown"
+        "criteria": "dev:check clean (0 updated, 0 conflicts); build exit0 + 82/82 tests green; in_review present in --help, FORBIDDEN_ROLE guards verified (worker blocked from done/pass, allowed up to in_review, non-worker done+pass ok), temp issue round-tripped with issues.json unchanged after; pre-commit.mjs exits 1 under HARNESS_ROLE=worker; worker on/check(stub PASS)/off toggled and init.config.json restored byte-identical (git diff empty); docs/EXTERNAL-WORKER.md present at root+template and registered managed in .harness-manifest.json; .gitignore has .harness/runs/ at root+template; real issues intact: done=21, in_progress=1 (only eb641e21), backlog=0, in_review=0, blocked=0, total=22; config pristine, only issues.json differs in git diff --stat, dev:check re-run clean.",
+        "state": "pass"
       },
       "created_at": "2026-07-15T20:28:40Z",
-      "updated_at": "2026-07-15T20:28:40Z"
+      "updated_at": "2026-07-15T21:29:41Z"
     },
     {
       "id": "81ea3be7-a90b-4485-ba64-4d6242bc8b43",
