@@ -7,6 +7,10 @@
         {
           "description": "Esempio: installazione delle dipendenze del progetto",
           "command": "echo Configure the setup step in init.config.json for example npm install"
+        },
+        {
+          "description": "Install git hooks",
+          "command": "node hooks/install.mjs"
         }
       ]
     },
