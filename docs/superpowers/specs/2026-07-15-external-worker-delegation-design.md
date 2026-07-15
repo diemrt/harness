@@ -66,8 +66,7 @@ feature è attiva). Tutto il resto è codice, che non pesa sulla finestra di con
 ```json
 "externalWorker": {
   "enabled": false,
-  "command": "ollama launch claude --model gemma4:31b-cloud -- -p {promptFile} --dangerously-skip-permissions",
-  "model": "gemma4:31b-cloud"
+  "command": "ollama launch claude --model gemma4:31b-cloud -- -p {promptFile} --dangerously-skip-permissions"
 }
 ```
 
@@ -76,9 +75,6 @@ feature è attiva). Tutto il resto è codice, che non pesa sulla finestra di con
   - `{promptFile}` (**obbligatorio**) — path al file che contiene il prompt del worker. Il prompt è
     **sempre file-based**: elimina alla radice l'inferno di quoting a 3 livelli visto nell'esperimento
     (§5.6). Il template stesso non contiene quoting dinamico, solo una sostituzione di path.
-  - `{model}` (opzionale) — comodità per non ripetere il modello; può anche essere hardcoded nel
-    `command`.
-- `model` (string, opzionale) — valore sostituito in `{model}` e usato dal preflight.
 
 `init.mjs` acquisisce un **dispatcher di sottocomandi harness-generici**, valutato *prima* del
 percorso task-runner esistente. Tre sottocomandi:
@@ -152,7 +148,7 @@ Questo è il fulcro per il problema del contesto (punto 3).
 - Nuova doc **managed** `docs/EXTERNAL-WORKER.md`. Contenuto:
   - pattern di delega one-shot (invocazione, `tee` su `.harness/runs/`, `--issue-data-file` per gli
     update robusti);
-  - descrizione dei placeholder (`{promptFile}`, `{model}`) e **3 esempi di `command`**
+  - descrizione dei placeholder (`{promptFile}`) e **3 esempi di `command`**
     (ollama / codex / copilot) da copiare e adattare;
   - ruolo di `HARNESS_ROLE=worker` e cosa i guard impediscono;
   - **template di prompt worker parametrico** (`{issueId}`, `{repoRoot}`) con i vincoli rigidi già
@@ -228,5 +224,4 @@ Coerente con le regole di sviluppo del repo (`CLAUDE.md`):
   `pre-commit`, preflight modello (reso generico via `worker check`), convenzione log.
 - **Stato `in_review`:** incluso, con rendering in `issues.html`.
 - **Doc:** doc separata gated + 1 riga condizionale in `AGENTS-RULES.md` (costo-contesto zero se off).
-- **Config comando:** command template string con `{promptFile}` file-based (+ `{model}` opzionale),
-  nessun adapter registry.
+- **Config comando:** command template string con `{promptFile}` file-based, nessun adapter registry.
