@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-15T21:15:58Z",
+  "last_updated": "2026-07-15T21:20:57Z",
   "rules": {
     "single_active_issue": false
   },
@@ -274,13 +274,13 @@
       "id": "81ea3be7-a90b-4485-ba64-4d6242bc8b43",
       "title": "docs: documenta lo stato in_review nei doc gestiti (ISSUES.md)",
       "description": "Il feat in_review ha aggiunto un nuovo stato del ciclo di vita ma i doc managed che enumerano gli stati sono rimasti fermi a 4 valori. Aggiornare (editando template/, poi npm run dev:sync): 1) template/docs/ISSUES.md — schema canonico dei campi (blocco status: \"backlog|in_progress|blocked|done\"), tabella 'Campi richiesti nel payload' (riga status, colonna Valori validi), tabella Errori (riga INVALID_STATUS che elenca i valori ammessi): aggiungere in_review ovunque compaia l'enumerazione dei 4 stati, con una riga di semantica minima (il worker imposta in_review a fine lavoro, il verificatore indipendente passa poi a done/pass o blocked/fail). 2) Verificare che AGENTS-RULES.md (managed) non enumeri gli stati in modo ora incompleto; se sì, allinearlo. Non duplicare la spiegazione tra ISSUES.md e AGENTS-RULES.md. Non toccare le copie root a mano. AGGIUNTA (feat role guard): documentare in template/docs/ISSUES.md la nuova entry FORBIDDEN_ROLE nella tabella Errori (quando: HARNESS_ROLE=worker tenta status=done o validation.state=pass) e una nota sul ruolo HARNESS_ROLE=worker (self-validation vietata tecnicamente). Non duplicare con EXTERNAL-WORKER.md (issue dedicata): ISSUES.md documenta solo il contratto error-code, EXTERNAL-WORKER.md il pattern d'uso.",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "template/docs/ISSUES.md elenca in_review in tutti i punti che enumerano gli stati (schema, tabella payload, tabella errori INVALID_STATUS) con semantica minima; nessun doc managed enumera piu gli stati in modo incompleto; npm run dev:sync propagato e npm run dev:check pulito. Controllare che tutti i file siano stati aggiornati, che sia stato usato meno testo possibile, che non siano state introdotte delle ripetizioni in documenti diversi",
-        "state": "unknown"
+        "criteria": "build node init.mjs build exit0 82/82 tests green; npm run dev:check clean (0 updated, 0 conflicts, root==template already in sync); docs/ISSUES.md (root, byte-identical to template/) has in_review in: schema line (status: backlog|in_progress|in_review|blocked|done), payload table Valori validi row, INVALID_STATUS errors-table row; plus a 2-line in_review semantics note (worker sets in_review/unknown, verifier moves to done/pass or blocked/fail); FORBIDDEN_ROLE row added to Errori table, wording matches issue-manager.mjs enforceRolePolicy() which fails with code FORBIDDEN_ROLE exactly when HARNESS_ROLE=worker and payload requests status=done or validation.state=pass; grepped docs/AGENTS-RULES.md, docs/GIT.md, docs/EXTERNAL-WORKER.md, issues.html for stale status enumerations - none found (issues.html STATUS_ORDER already includes in_review; other docs only reference individual statuses as CLI examples, not full enums); no repetition introduced - EXTERNAL-WORKER.md keeps the delegation workflow/prompt-template prose, ISSUES.md carries only the data-contract facts (schema/table/error-code), added text is minimal (2 lines + 2 table-cell edits + 1 new table row).",
+        "state": "pass"
       },
       "created_at": "2026-07-15T20:41:29Z",
-      "updated_at": "2026-07-15T20:49:49Z"
+      "updated_at": "2026-07-15T21:20:57Z"
     }
   ]
 }

@@ -151,7 +151,7 @@ Una issue ha i seguenti campi (schema canonico):
   "id": "<guid>",
   "title": "<string>",
   "description": "<string>",
-  "status": "backlog|in_progress|blocked|done",
+  "status": "backlog|in_progress|in_review|blocked|done",
   "validation": {
     "criteria": "<string>",
     "state": "unknown|pass|fail"
@@ -166,6 +166,9 @@ Una issue ha i seguenti campi (schema canonico):
 > **Semantica di `validation`:** `criteria` descrive cosa rende la issue valida/accettabile.
 > - **Alla creazione**: impostare `criteria` con i criteri di accettazione e `state: "unknown"`.
 > - **Alla chiusura**: aggiornare `criteria` con l'evidenza della verifica effettuata e `state: "pass"` o `"fail"`.
+>
+> **Stato `in_review`:** il worker imposta `in_review` a fine lavoro (con `validation.state=unknown`);
+> il verificatore indipendente porta poi la issue a `done`/`pass` o `blocked`/`fail`.
 
 ### Campi gestiti automaticamente dallo script
 
@@ -183,7 +186,7 @@ Una issue ha i seguenti campi (schema canonico):
 |---------------|------------------|-----------|-----------|----------------------------------------|
 | `title`       | string           | ✅ Sì      | Opzionale | Non vuoto                              |
 | `description` | string           | ✅ Sì      | Opzionale | Non vuoto                              |
-| `status`      | string           | ✅ Sì      | Opzionale | `backlog`, `in_progress`, `blocked`, `done` |
+| `status`      | string           | ✅ Sì      | Opzionale | `backlog`, `in_progress`, `in_review`, `blocked`, `done` |
 | `validation`  | object \| null   | Opzionale | Opzionale | `null` oppure oggetto (vedi sotto)     |
 
 In `--update` i campi omessi restano invariati (merge), ma un campo **presente** deve comunque
@@ -205,7 +208,7 @@ Il campo `code` è stabile: usalo per la logica, il `messaggio` è per la lettur
 | `code`           | Quando                                                                          |
 |------------------|-----------------------------------------------------------------------------------|
 | `INVALID_ID`     | `--issue-id` non è un GUID valido                                                |
-| `INVALID_STATUS` | `status` con valore fuori da `backlog`, `in_progress`, `blocked`, `done`        |
+| `INVALID_STATUS` | `status` con valore fuori da `backlog`, `in_progress`, `in_review`, `blocked`, `done` |
 | `INVALID_STATE`  | `validation.state` fuori da `unknown`, `pass`, `fail`                           |
 | `INVALID_INPUT`  | campo sconosciuto, campo obbligatorio mancante o vuoto, payload `{}` in `--update`, `page-size` < 1 |
 | `INVALID_JSON`   | il payload non è JSON valido                                                    |
@@ -213,6 +216,7 @@ Il campo `code` è stabile: usalo per la logica, il `messaggio` è per la lettur
 | `FILE_NOT_FOUND` | `--issue-data-file` inesistente, oppure `issues.json` mancante                  |
 | `MISSING_ARGS`   | flag richiesto assente, o `--issue-data` e `--issue-data-file` passati insieme  |
 | `UNKNOWN_COMMAND`| nessun comando riconosciuto (vedi `--help`)                                     |
+| `FORBIDDEN_ROLE` | con `HARNESS_ROLE=worker`, tentativo di impostare `status=done` o `validation.state=pass` (self-validation vietata al ruolo worker) |
 
 ## Help
 

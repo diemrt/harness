@@ -1,6 +1,6 @@
 {
   "harnessVersion": "0.2.0",
-  "generatedAt": "2026-07-15T21:13:36.204Z",
+  "generatedAt": "2026-07-15T21:18:00.666Z",
   "files": {
     ".gitignore": {
       "sha256": "5b9bb0741dfd18e8d1d458b812924abc448047121d315b414783b3796a1c1b04",
@@ -27,7 +27,7 @@
       "policy": "managed"
     },
     "docs/ISSUES.md": {
-      "sha256": "3fb978e55bd1b703296446c3ef866636b7200fb649a0890022104791aed67a2b",
+      "sha256": "71184a30436e1471a6155363f84fe089cd6f242b1672ff0db71a9051e6181723",
       "policy": "managed"
     },
     "hooks/install.mjs": {
