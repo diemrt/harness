@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-15T11:01:40Z",
+  "last_updated": "2026-07-15T20:28:40Z",
   "rules": {
     "single_active_issue": false
   },
@@ -185,6 +185,90 @@
       },
       "created_at": "2026-07-15T10:58:33Z",
       "updated_at": "2026-07-15T11:01:40Z"
+    },
+    {
+      "id": "740defaf-3883-4c9c-bf68-e4ba2081f5b9",
+      "title": "feat: stato in_review in issue-manager e issues.html",
+      "description": "Componente B del design external-worker (docs/superpowers/specs/2026-07-15-external-worker-delegation-design.md). Aggiungere lo stato `in_review` al ciclo di vita delle issue. In template/issue-manager.mjs: aggiungere \"in_review\" all'array validStatuses (:104) e aggiornare le 3 stringhe di help/schema che elencano gli stati (:29, :251, :278) piu i commenti di schema. In template/issues.html: aggiungere l'entry in_review a STATUS_META (:115) con badge/icona dedicati, aggiungerlo a STATUS_ORDER (:121) per counters e filtri; valutare l'inclusione in WIP_PRIORITY (:123). Semantica: il worker, completato il lavoro, imposta status=in_review + validation.state=unknown; il verificatore indipendente poi porta a done/pass oppure blocked/fail. Rende il passaggio worker->verificatore esplicito e query-abile. Editare solo template/, poi `npm run dev:sync` per propagare alla radice; mai editare a mano le copie root managed. Issue di fondazione, nessuna dipendenza.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "node issue-manager.mjs --insert con status:\"in_review\" accettato (no INVALID_STATUS); --get-all --status in_review filtra correttamente; --help elenca in_review in tutte e 3 le sezioni (:29/:251/:278); issues.html mostra badge dedicato e tab filtro in_review nei counters. BUILD GATE: node init.mjs build -> npm test verde (aggiornati eventuali test su validateStatus). npm run dev:check pulito (0 updated, 0 conflicts).",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-15T20:28:40Z",
+      "updated_at": "2026-07-15T20:28:40Z"
+    },
+    {
+      "id": "25cc7ac3-d2b1-42fa-824e-17b9823f6e6f",
+      "title": "feat: role guard worker in issue-manager.mjs (no self-validation)",
+      "description": "Componente C.1 del design external-worker. Enforcement tecnico basato su HARNESS_ROLE. In template/issue-manager.mjs: se process.env.HARNESS_ROLE === \"worker\" e un --update/--insert tenta di impostare validation.state=\"pass\" OPPURE status=\"done\", rifiutare con exit 1 e codice d'errore chiaro FORBIDDEN_ROLE (allineato agli altri error code: INVALID_STATUS, NOT_FOUND, ...). Il worker puo impostare al massimo status=in_review / validation.state=unknown. Il guard va nel path di validazione write (vicino a validateIssueInput :168-172; set status insert :355, update :389). Rende la self-validation impossibile, non solo vietata a parole. Editare solo template/, poi `npm run dev:sync`. Dipende dalla issue 'feat: stato in_review' (lo stato in_review e la destinazione consentita al worker).",
+      "status": "backlog",
+      "validation": {
+        "criteria": "HARNESS_ROLE=worker node issue-manager.mjs --update ... con validation.state=pass -> exit 1 code FORBIDDEN_ROLE; stesso con status=done -> exit 1 FORBIDDEN_ROLE; HARNESS_ROLE=worker con status=in_review / state=unknown -> ok exit 0; senza HARNESS_ROLE comportamento invariato. BUILD GATE: node init.mjs build -> npm test verde con nuovi test per il guard. npm run dev:check pulito.",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-15T20:28:40Z",
+      "updated_at": "2026-07-15T20:28:40Z"
+    },
+    {
+      "id": "3c3d9be5-5483-4de0-8520-d2138f79f0b3",
+      "title": "feat: role guard worker in pre-commit hook (blocco commit)",
+      "description": "Componente C.2 del design external-worker. In template/hooks/pre-commit.mjs: se process.env.HARNESS_ROLE === \"worker\" bloccare il commit in modo assoluto (exit 1, messaggio \"i worker non possono committare\"). Il controllo va inserito tra la riga :17 (import execFileSync) e :19, cioe PRIMA del bypass HARNESS_DOCS_VERIFIED (:19-22): il guard worker non e bypassabile, e un invariante piu forte del gate documentale. Editare solo template/, poi `npm run dev:sync` (il file esiste identico anche in root). Indipendente, puo procedere in parallelo.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "HARNESS_ROLE=worker node hooks/pre-commit.mjs -> exit 1 ANCHE con HARNESS_DOCS_VERIFIED=1 settato (guard precede il bypass); senza HARNESS_ROLE comportamento invariato (HARNESS_DOCS_VERIFIED=1 -> exit 0, senza -> exit 1 gate docs). BUILD GATE: node init.mjs build -> npm test verde. npm run dev:check pulito.",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-15T20:28:40Z",
+      "updated_at": "2026-07-15T20:28:40Z"
+    },
+    {
+      "id": "5ac51d73-9064-4b79-8210-6002bbc6aa89",
+      "title": "feat: toggle e preflight worker on|off|check in init.mjs",
+      "description": "Componente A del design external-worker. Aggiungere a init.config.json (root E template/, separatamente: e seeded-once, file separati non sincronizzati) un blocco opzionale externalWorker = { \"enabled\": false, \"command\": \"<command template con {promptFile}>\" } come nuovo sibling top-level di tasks. Placeholder supportato: {promptFile} (obbligatorio) = path al file che contiene il prompt del worker (prompt sempre file-based, elimina il quoting a 3 livelli). In template/init.mjs aggiungere un dispatcher di sottocomandi harness-generici valutato PRIMA del lookup tasks[task] (:51, dopo il parse di task a :29): `worker on` -> enabled=true, `worker off` -> enabled=false, `worker check` -> preflight CLI-agnostico che scrive un file di smoke prompt temporaneo (\"Reply exactly READY. Use no tools.\"), sostituisce {promptFile}, esegue il command via spawnSync({shell:true}) (gia in uso :84) e verifica exit 0 e/o output contenente READY. setup/build restano invariati (sottocomandi intercettati prima della ricerca in config.tasks). Editare template/init.mjs + `npm run dev:sync`; init.config.json a mano su entrambe le copie. Indipendente.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "node init.mjs worker on scrive externalWorker.enabled=true in init.config.json; worker off -> false; worker check con un command reale accessibile -> exit 0 / output READY, e fallisce con messaggio chiaro su CLI non accessibile (testato su almeno un command reale); node init.mjs setup e build invariati. BUILD GATE: node init.mjs build -> npm test verde. npm run dev:check pulito.",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-15T20:28:40Z",
+      "updated_at": "2026-07-15T20:28:40Z"
+    },
+    {
+      "id": "34bf61e4-ed08-4830-ad67-e786302d1ad3",
+      "title": "chore: convenzione log .harness/runs/ in .gitignore",
+      "description": "Componente D del design external-worker. Standardizzare i log dei worker in .harness/runs/<issueId>-<timestamp>.log cosi l'orchestratore sa sempre dove leggere l'output del terminale separato (via `2>&1 | tee`) e i temporanei non finiscono mai in un commit. Creare template/.gitignore (nuovo file managed: auto-registrato come managed nel manifest alla prossima dev:sync, nessuna modifica a src/policies.mjs) contenente `.harness/runs/`. Aggiungere la stessa riga al .gitignore della radice (attualmente 3 righe: node_modules/, *.tgz, *.new) cosi anche questo repo non committa i temporanei. Piccola issue indipendente.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "template/.gitignore esiste e contiene `.harness/runs/`; root .gitignore lo contiene; un file dummy sotto .harness/runs/ risulta ignorato da git status; .harness-manifest.json registra template/.gitignore con policy managed dopo dev:sync. npm run dev:check pulito.",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-15T20:28:40Z",
+      "updated_at": "2026-07-15T20:28:40Z"
+    },
+    {
+      "id": "21a9bd3c-3aa7-4120-9691-fc657f8b979c",
+      "title": "docs: EXTERNAL-WORKER.md gated + riga condizionale in AGENTS-RULES.md",
+      "description": "Componente E del design external-worker (fulcro per il costo-contesto). Creare template/docs/EXTERNAL-WORKER.md (nuovo file managed, auto-registrato nel manifest). Contenuto: pattern di delega one-shot (invocazione, `2>&1 | tee .harness/runs/<id>-<ts>.log`, update robusti via --issue-data-file); descrizione del placeholder {promptFile} + 3 esempi di command da copiare e adattare (ollama / codex / copilot); ruolo di HARNESS_ROLE=worker e cosa i guard impediscono (issue role-guard issue-manager e pre-commit); template di prompt worker parametrico ({issueId}, {repoRoot}) coi vincoli rigidi gia scritti (no commit, no pass/done, no file fuori scope, stampa riassunto e fermati); nota ambiente ANTHROPIC_API_KEY (precede il login claude.ai); nota anti-conflitto con la regola 1-WIP: quando externalWorker.enabled il subagent-per-issue PUO essere un worker esterno, la verifica indipendente resta un agente distinto (worker != verificatore != orchestratore), nessuna regola invariante contraddetta. In template/docs/AGENTS-RULES.md aggiungere UNA sola riga condizionale (~dopo :34, prima del blocco INVARIATO :36): \"Se externalWorker.enabled in init.config.json, leggi docs/EXTERNAL-WORKER.md per il pattern di delega a worker esterno.\" I progetti con feature off non caricano mai la doc -> contesto base invariato. Editare template/, poi `npm run dev:sync`. Dipende dalle issue in_review, role-guard issue-manager, role-guard pre-commit, toggle/preflight (documenta stati/guard/comandi). NB: il repo dogfooda il pre-commit gate docs -> la modifica ai docs puo richiedere il relativo flusso di verifica.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "docs/EXTERNAL-WORKER.md esiste, e managed in .harness-manifest.json, contiene i 3 esempi command (ollama/codex/copilot) e il template di prompt worker parametrico; AGENTS-RULES.md ha ESATTAMENTE una riga condizionale che punta alla doc; con externalWorker.enabled=false la doc non e lettura obbligatoria (costo-contesto zero). npm run dev:check pulito.",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-15T20:28:40Z",
+      "updated_at": "2026-07-15T20:28:40Z"
+    },
+    {
+      "id": "eb641e21-e3cb-4e0d-bd86-6f0a68243d88",
+      "title": "chore: dogfood external-worker e dev:check drift gate",
+      "description": "Componente F del design external-worker: integrazione finale e dogfood. Verificare che l'intera feature sia coerente sul repo che dogfooda se stesso. Tutti i file managed nuovi/modificati (init.mjs, issue-manager.mjs, issues.html, hooks/pre-commit.mjs, docs/AGENTS-RULES.md, docs/EXTERNAL-WORKER.md, template/.gitignore) devono essere autorati in template/ e propagati alla radice via `npm run dev:sync`; il blocco externalWorker deve essere presente in ENTRAMBE le copie seeded-once di init.config.json (root e template/, separatamente); il manifest deve essere rigenerato con le nuove registrazioni managed. Eseguire il flusso d'uso end-to-end del paragrafo 5 del design: worker on -> edit externalWorker.command -> worker check (READY) -> delega di una issue con HARNESS_ROLE=worker e tee su .harness/runs/ -> worker porta a in_review/unknown (non puo pass/done ne committare) -> verifica indipendente (subagent distinto, node init.mjs build) -> done/pass -> commit solo dopo pass. Dipende da TUTTE le 6 issue precedenti. MAI --force alla radice (protegge le issue reali in issues.json).",
+      "status": "backlog",
+      "validation": {
+        "criteria": "npm run dev:check esce pulito (0 updated, 0 conflicts); node init.mjs build -> npm test interamente verde; flusso paragrafo 5 percorribile a mano senza contraddire l'invariante worker!=verificatore!=orchestratore; le issue reali preesistenti in issues.json intatte (nessuna sovrascrittura, conteggio done invariato). Copre integralmente i Criteri di completamento del paragrafo 7 del design.",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-15T20:28:40Z",
+      "updated_at": "2026-07-15T20:28:40Z"
     }
   ]
 }
