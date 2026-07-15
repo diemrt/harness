@@ -103,10 +103,17 @@ test("init into an empty dir creates every template file plus the manifest", (t)
     assert.ok(existsSync(destPath), `expected ${relPath} to exist`);
   }
 
-  // only subdirectory should be docs/
+  // subdirectories should be exactly those implied by the template layout
+  const expectedDirs = [
+    ...new Set(
+      TEMPLATE_FILES.filter((p) => p.includes("/")).map((p) =>
+        p.slice(0, p.indexOf("/"))
+      )
+    ),
+  ].sort();
   const entries = walkAllEntries(tmpDir);
   const dirs = entries.filter((e) => e.isDirectory).map((e) => e.path);
-  assert.deepEqual(dirs.sort(), ["docs"]);
+  assert.deepEqual(dirs.sort(), expectedDirs);
 
   const manifestPath = join(tmpDir, MANIFEST_FILE);
   assert.ok(existsSync(manifestPath), "manifest should exist");
