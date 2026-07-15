@@ -19,7 +19,13 @@
 // Exception: --help prints plain text.
 //
 // Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_INPUT, INVALID_JSON,
-//              NOT_FOUND, FILE_NOT_FOUND, MISSING_ARGS, UNKNOWN_COMMAND.
+//              NOT_FOUND, FILE_NOT_FOUND, MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE.
+//
+// Role guard: when the HARNESS_ROLE environment variable is set to "worker", a worker process
+// cannot self-validate its own work. Any --insert/--update payload that sets
+// validation.state === "pass" or status === "done" is rejected with FORBIDDEN_ROLE. A worker may
+// still move status up to "in_review" and validation.state up to "unknown". Any other/unset
+// HARNESS_ROLE leaves behavior unchanged.
 
 // Every issue in the issues.json file should have the following structure:
 // {
@@ -204,6 +210,34 @@ function validateIssueInput(issue, partial = false) {
   }
 }
 
+// Helper: technical role guard — a worker process must never be able to mark its own work as
+// validated/done. Reads HARNESS_ROLE from the environment; when it is "worker", reject any
+// insert/update payload that requests validation.state === "pass" or status === "done". This is
+// evaluated against the payload's requested values (for --update, only the fields actually
+// present in the incoming payload), not the stored issue. Any other/unset HARNESS_ROLE is a no-op.
+function enforceRolePolicy(payload) {
+  if (process.env.HARNESS_ROLE !== "worker") {
+    return;
+  }
+  if (hasProp(payload, "status") && payload.status === "done") {
+    fail(
+      "Role 'worker' cannot set status to 'done' (self-validation is forbidden). A worker may set status up to 'in_review'; closing an issue requires a non-worker role.",
+      "FORBIDDEN_ROLE"
+    );
+  }
+  if (
+    hasProp(payload, "validation") &&
+    payload.validation !== null &&
+    typeof payload.validation === "object" &&
+    payload.validation.state === "pass"
+  ) {
+    fail(
+      "Role 'worker' cannot set validation.state to 'pass' (self-validation is forbidden). A worker may set validation.state up to 'unknown'; recording a pass requires a non-worker role.",
+      "FORBIDDEN_ROLE"
+    );
+  }
+}
+
 // Helper: validate that issue id is a valid GUID (accepts the same shapes .NET's [guid]::TryParse
 // does for a plain hyphenated string, which is the only shape this script ever produces or is fed)
 const GUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -259,7 +293,11 @@ function showHelp() {
     "Nothing is written to stderr: pipe stdout to JSON.parse in both cases.",
     "",
     "Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_INPUT, INVALID_JSON,",
-    "             NOT_FOUND, FILE_NOT_FOUND, MISSING_ARGS, UNKNOWN_COMMAND",
+    "             NOT_FOUND, FILE_NOT_FOUND, MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE",
+    "",
+    "Role guard: when env var HARNESS_ROLE=worker, --insert/--update requests that set",
+    "status=done or validation.state=pass are rejected with FORBIDDEN_ROLE (no self-validation).",
+    "A worker may still set status up to in_review and validation.state up to unknown.",
     "",
     "data payload per command:",
     "  --get       : the issue object",
@@ -343,6 +381,7 @@ function insertIssue(issueData) {
   const newIssue = parseIssueData(issueData);
 
   validateIssueInput(newIssue, false);
+  enforceRolePolicy(newIssue);
 
   const data = readIssuesFile();
   const now = nowTimestamp();
@@ -370,6 +409,7 @@ function updateIssue(issueId, issueData) {
   const updatedIssue = parseIssueData(issueData);
 
   validateIssueInput(updatedIssue, true);
+  enforceRolePolicy(updatedIssue);
 
   const data = readIssuesFile();
   const issues = Array.isArray(data.issues) ? [...data.issues] : [];

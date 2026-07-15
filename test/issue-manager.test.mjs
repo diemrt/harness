@@ -473,3 +473,148 @@ test("UNKNOWN_COMMAND: no recognized command flag", () => {
     cleanup(dir);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Role guard (HARNESS_ROLE=worker cannot self-validate)
+// ---------------------------------------------------------------------------
+
+// Same as run(), but forwards an explicit HARNESS_ROLE env var (or its absence) to the subprocess
+// instead of relying on whatever happens to be set in the parent test-runner's environment.
+function runWithRole(scriptPath, args, role) {
+  const env = { ...process.env };
+  if (role === undefined) {
+    delete env.HARNESS_ROLE;
+  } else {
+    env.HARNESS_ROLE = role;
+  }
+  return spawnSync(process.execPath, [scriptPath, ...args], {
+    encoding: "utf8",
+    env,
+  });
+}
+
+test("FORBIDDEN_ROLE: worker cannot --update status to done", () => {
+  const { dir, scriptPath } = setupTempProject();
+  try {
+    const payload = JSON.stringify({ status: "done" });
+    const result = runWithRole(
+      scriptPath,
+      ["--update", "--issue-id", ID_ONE, "--issue-data", payload],
+      "worker"
+    );
+    assertFail(result, "FORBIDDEN_ROLE");
+
+    // Confirm nothing was persisted: the issue must still be in its original status
+    const getResult = run(scriptPath, ["--get", "--issue-id", ID_ONE]);
+    const data = assertOk(getResult);
+    assert.equal(data.status, "backlog");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("FORBIDDEN_ROLE: worker cannot --update validation.state to pass", () => {
+  const { dir, scriptPath } = setupTempProject();
+  try {
+    const payload = JSON.stringify({ validation: { criteria: "x", state: "pass" } });
+    const result = runWithRole(
+      scriptPath,
+      ["--update", "--issue-id", ID_ONE, "--issue-data", payload],
+      "worker"
+    );
+    assertFail(result, "FORBIDDEN_ROLE");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("FORBIDDEN_ROLE: worker cannot --insert an issue with status done", () => {
+  const { dir, scriptPath } = setupTempProject();
+  try {
+    const payload = JSON.stringify({ title: "t", description: "d", status: "done" });
+    const result = runWithRole(scriptPath, ["--insert", "--issue-data", payload], "worker");
+    assertFail(result, "FORBIDDEN_ROLE");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("FORBIDDEN_ROLE: worker cannot --insert an issue with validation.state pass", () => {
+  const { dir, scriptPath } = setupTempProject();
+  try {
+    const payload = JSON.stringify({
+      title: "t",
+      description: "d",
+      status: "backlog",
+      validation: { criteria: "x", state: "pass" },
+    });
+    const result = runWithRole(scriptPath, ["--insert", "--issue-data", payload], "worker");
+    assertFail(result, "FORBIDDEN_ROLE");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("worker MAY set status up to in_review", () => {
+  const { dir, scriptPath } = setupTempProject();
+  try {
+    const payload = JSON.stringify({ status: "in_review" });
+    const result = runWithRole(
+      scriptPath,
+      ["--update", "--issue-id", ID_ONE, "--issue-data", payload],
+      "worker"
+    );
+    const data = assertOk(result);
+    assert.equal(data.status, "in_review");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("worker MAY set validation.state up to unknown", () => {
+  const { dir, scriptPath } = setupTempProject();
+  try {
+    const payload = JSON.stringify({ validation: { criteria: "x", state: "unknown" } });
+    const result = runWithRole(
+      scriptPath,
+      ["--update", "--issue-id", ID_ONE, "--issue-data", payload],
+      "worker"
+    );
+    const data = assertOk(result);
+    assert.deepEqual(data.validation, { criteria: "x", state: "unknown" });
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("no HARNESS_ROLE set: status=done via --update behaves unchanged (allowed)", () => {
+  const { dir, scriptPath } = setupTempProject();
+  try {
+    const payload = JSON.stringify({ status: "done" });
+    const result = runWithRole(
+      scriptPath,
+      ["--update", "--issue-id", ID_ONE, "--issue-data", payload],
+      undefined
+    );
+    const data = assertOk(result);
+    assert.equal(data.status, "done");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("HARNESS_ROLE set to a non-worker value: status=done is unaffected", () => {
+  const { dir, scriptPath } = setupTempProject();
+  try {
+    const payload = JSON.stringify({ status: "done" });
+    const result = runWithRole(
+      scriptPath,
+      ["--update", "--issue-id", ID_ONE, "--issue-data", payload],
+      "reviewer"
+    );
+    const data = assertOk(result);
+    assert.equal(data.status, "done");
+  } finally {
+    cleanup(dir);
+  }
+});

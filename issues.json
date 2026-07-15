@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-15T20:41:29Z",
+  "last_updated": "2026-07-15T20:49:49Z",
   "rules": {
     "single_active_issue": false
   },
@@ -202,13 +202,13 @@
       "id": "25cc7ac3-d2b1-42fa-824e-17b9823f6e6f",
       "title": "feat: role guard worker in issue-manager.mjs (no self-validation)",
       "description": "Componente C.1 del design external-worker. Enforcement tecnico basato su HARNESS_ROLE. In template/issue-manager.mjs: se process.env.HARNESS_ROLE === \"worker\" e un --update/--insert tenta di impostare validation.state=\"pass\" OPPURE status=\"done\", rifiutare con exit 1 e codice d'errore chiaro FORBIDDEN_ROLE (allineato agli altri error code: INVALID_STATUS, NOT_FOUND, ...). Il worker puo impostare al massimo status=in_review / validation.state=unknown. Il guard va nel path di validazione write (vicino a validateIssueInput :168-172; set status insert :355, update :389). Rende la self-validation impossibile, non solo vietata a parole. Editare solo template/, poi `npm run dev:sync`. Dipende dalla issue 'feat: stato in_review' (lo stato in_review e la destinazione consentita al worker).",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "HARNESS_ROLE=worker node issue-manager.mjs --update ... con validation.state=pass -> exit 1 code FORBIDDEN_ROLE; stesso con status=done -> exit 1 FORBIDDEN_ROLE; HARNESS_ROLE=worker con status=in_review / state=unknown -> ok exit 0; senza HARNESS_ROLE comportamento invariato. BUILD GATE: node init.mjs build -> npm test verde con nuovi test per il guard. npm run dev:check pulito.",
-        "state": "unknown"
+        "criteria": "Verified: node init.mjs build exit 0, 72 tests pass (baseline 64 + 8 new guard tests: worker blocked on update status=done, update validation.state=pass, insert status=done, insert validation.state=pass; worker allowed status up to in_review and validation.state up to unknown; unset/non-worker role unaffected). npm run dev:check clean: 0 updated, 0 conflicts. Manual repro on root copy with a temp scratch issue: HARNESS_ROLE=worker --update status=done -> ok:false FORBIDDEN_ROLE exit 1; HARNESS_ROLE=worker --update validation.state=pass -> ok:false FORBIDDEN_ROLE exit 1; HARNESS_ROLE=worker --update status=in_review -> ok:true exit 0; HARNESS_ROLE=worker --insert status=done -> ok:false FORBIDDEN_ROLE exit 1; HARNESS_ROLE unset --update status=done -> ok:true exit 0 (unchanged); HARNESS_ROLE=verifier (non-worker) --update status=done -> ok:true exit 0 (guard fires only for role exactly worker). Temp issue deleted; issues.json diff vs HEAD limited to last_updated bump and this issue's own status/updated_at churn, no leftover temp issue.",
+        "state": "pass"
       },
       "created_at": "2026-07-15T20:28:40Z",
-      "updated_at": "2026-07-15T20:28:40Z"
+      "updated_at": "2026-07-15T20:49:12Z"
     },
     {
       "id": "3c3d9be5-5483-4de0-8520-d2138f79f0b3",
@@ -273,14 +273,14 @@
     {
       "id": "81ea3be7-a90b-4485-ba64-4d6242bc8b43",
       "title": "docs: documenta lo stato in_review nei doc gestiti (ISSUES.md)",
-      "description": "Il feat in_review ha aggiunto un nuovo stato del ciclo di vita ma i doc managed che enumerano gli stati sono rimasti fermi a 4 valori. Aggiornare (editando template/, poi npm run dev:sync): 1) template/docs/ISSUES.md — schema canonico dei campi (blocco status: \"backlog|in_progress|blocked|done\"), tabella 'Campi richiesti nel payload' (riga status, colonna Valori validi), tabella Errori (riga INVALID_STATUS che elenca i valori ammessi): aggiungere in_review ovunque compaia l'enumerazione dei 4 stati, con una riga di semantica minima (il worker imposta in_review a fine lavoro, il verificatore indipendente passa poi a done/pass o blocked/fail). 2) Verificare che AGENTS-RULES.md (managed) non enumeri gli stati in modo ora incompleto; se sì, allinearlo. Non duplicare la spiegazione tra ISSUES.md e AGENTS-RULES.md. Non toccare le copie root a mano.",
+      "description": "Il feat in_review ha aggiunto un nuovo stato del ciclo di vita ma i doc managed che enumerano gli stati sono rimasti fermi a 4 valori. Aggiornare (editando template/, poi npm run dev:sync): 1) template/docs/ISSUES.md — schema canonico dei campi (blocco status: \"backlog|in_progress|blocked|done\"), tabella 'Campi richiesti nel payload' (riga status, colonna Valori validi), tabella Errori (riga INVALID_STATUS che elenca i valori ammessi): aggiungere in_review ovunque compaia l'enumerazione dei 4 stati, con una riga di semantica minima (il worker imposta in_review a fine lavoro, il verificatore indipendente passa poi a done/pass o blocked/fail). 2) Verificare che AGENTS-RULES.md (managed) non enumeri gli stati in modo ora incompleto; se sì, allinearlo. Non duplicare la spiegazione tra ISSUES.md e AGENTS-RULES.md. Non toccare le copie root a mano. AGGIUNTA (feat role guard): documentare in template/docs/ISSUES.md la nuova entry FORBIDDEN_ROLE nella tabella Errori (quando: HARNESS_ROLE=worker tenta status=done o validation.state=pass) e una nota sul ruolo HARNESS_ROLE=worker (self-validation vietata tecnicamente). Non duplicare con EXTERNAL-WORKER.md (issue dedicata): ISSUES.md documenta solo il contratto error-code, EXTERNAL-WORKER.md il pattern d'uso.",
       "status": "backlog",
       "validation": {
         "criteria": "template/docs/ISSUES.md elenca in_review in tutti i punti che enumerano gli stati (schema, tabella payload, tabella errori INVALID_STATUS) con semantica minima; nessun doc managed enumera piu gli stati in modo incompleto; npm run dev:sync propagato e npm run dev:check pulito. Controllare che tutti i file siano stati aggiornati, che sia stato usato meno testo possibile, che non siano state introdotte delle ripetizioni in documenti diversi",
         "state": "unknown"
       },
       "created_at": "2026-07-15T20:41:29Z",
-      "updated_at": "2026-07-15T20:41:29Z"
+      "updated_at": "2026-07-15T20:49:49Z"
     }
   ]
 }
