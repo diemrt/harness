@@ -160,6 +160,60 @@ etc.). In short:
   `updated`/`conflicts` before you commit; CI enforces the same check.
 - `npm test` runs the `node:test` suite (`node --test`).
 
+### Releasing a new version
+
+The recurring release loop: prove it green locally, cut a tag, verify what shipped.
+
+**1. Before releasing — local green + real-artifact smoke test.**
+
+```sh
+npm test && npm run dev:check          # both clean (dev:check is what CI runs)
+npm pack                               # builds the exact tarball npm would publish
+```
+
+Then, in an empty directory *outside* the repo, install from that tarball and exercise
+it — this is the truest test because it respects the `files` field (unlike `npm link`):
+
+```sh
+npx --yes --package="<path-to-.tgz>" harness init
+node issue-manager.mjs --help          # scripts run without npm install
+node init.mjs setup
+npx --yes --package="<path-to-.tgz>" harness update   # pristine dir: exit 0
+# dirty a managed file, re-run update: expect <file>.new + exit code 2
+```
+
+Delete the `.tgz` afterwards — never commit it. Windows gotcha: with a *local* tarball
+`--package` is mandatory (`npx <path>.tgz init` fails, the `.tgz` opens in an app); from
+the public registry `npx @diemrt/harness init` just works.
+
+**2. Cut the release — version and tag must match.** `publish.yml` ships the version in
+`package.json`, but only fires on a `v*` tag; a mismatch publishes the wrong version.
+
+```sh
+# first release (package.json already at the target version):
+git tag v0.1.0 && git push origin v0.1.0
+
+# later releases — npm version bumps + commits + tags coherently:
+npm version patch|minor|major
+git push && git push --tags
+```
+
+`ci.yml` runs on every push/PR (`npm ci` → `npm test` → `dev:check`); `publish.yml` runs
+only on a `v*` tag (`npm test` → `npm publish --provenance --access public`). A plain push
+never publishes — tagging is the explicit, separate act. (One-time prerequisites — a
+public GitHub repo and the `NPM_TOKEN` secret — are assumed already in place.)
+
+**3. Verify after publish.**
+
+```sh
+# GitHub → Actions → "Publish" workflow is green, then:
+npm view @diemrt/harness version       # prints the version you just tagged
+npx @diemrt/harness@latest init        # smoke-test from the registry in an empty dir
+```
+
+Use `@latest` (or a pinned `@0.1.0`) to defeat npx's cache, then repeat the step-1 sanity
+checks against the published version.
+
 ## License
 
 MIT
