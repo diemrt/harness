@@ -77,6 +77,48 @@ indipendente ha impostato `validation.state = pass`. **Nessun commit** di una is
 `done` / `pass` non verificata dal subagent, né di una issue `blocked`: se la verifica
 fallisce, nessun commit finché la issue non viene ripresa, corretta e riverificata `pass`.
 
+### Gate documentale sul pre-commit (hook)
+
+Il gate descritto sopra ("commit solo dopo `pass` del subagent") è un vincolo di
+**processo**, applicato dall'agente. A questo si aggiunge un **secondo livello, a livello
+git**, indipendente dal primo: l'hook `pre-commit` dell'harness (`hooks/pre-commit.mjs`),
+che scatta su **ogni** `git commit`, anche quando il gate sopra è già stato rispettato.
+
+1. Al momento del commit, l'hook `pre-commit` blocca l'operazione (`exit` diverso da `0`)
+   e stampa su stderr un'istruzione strutturata, insieme all'elenco dei file in stage.
+2. L'agente **deve** trattare quell'output come un ulteriore prompt a cui reagire, non come
+   un errore da ignorare o da bypassare meccanicamente: avvia un **subagent di verifica
+   documentale** che controlli, alla luce dei file in stage, se sono state sviluppate
+   **nuove funzionalità** e se di conseguenza vanno aggiornati i file sotto `docs/` o
+   `AGENTS.md`.
+3. Se il subagent rileva che serve un aggiornamento, applicalo e mettilo in stage
+   (`git add`).
+4. Ricommitta impostando la variabile d'ambiente `HARNESS_DOCS_VERIFIED=1` (bypass
+   anti-loop): con questa variabile impostata, l'hook lascia passare il commit senza
+   bloccarlo di nuovo, evitando un ciclo infinito di blocchi.
+
+Esempi di impostazione della variabile per le shell più comuni:
+
+```bash
+# bash/sh
+HARNESS_DOCS_VERIFIED=1 git commit -m "..."
+```
+
+```powershell
+# PowerShell
+$env:HARNESS_DOCS_VERIFIED=1; git commit -m "..."
+```
+
+```bat
+:: cmd
+set HARNESS_DOCS_VERIFIED=1 && git commit -m "..."
+```
+
+Questo gate **non sostituisce** quello descritto in "Gate sul commit": lo snapshot commit
+per issue avviene comunque solo dopo il `pass` del subagent di verifica indipendente; il
+gate a livello hook è un controllo aggiuntivo, automatico e non bypassabile per errore, che
+si applica a ogni commit indipendentemente dal fatto che riguardi una issue tracciata.
+
 ## Init / verifica ambiente (init.mjs)
 
 Lo script `init.mjs` è il punto unico di setup e verifica dell'ambiente ed è **generico e
