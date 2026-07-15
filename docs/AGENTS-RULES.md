@@ -87,15 +87,24 @@ che scatta su **ogni** `git commit`, anche quando il gate sopra è già stato ri
 1. Al momento del commit, l'hook `pre-commit` blocca l'operazione (`exit` diverso da `0`)
    e stampa su stderr un'istruzione strutturata, insieme all'elenco dei file in stage.
 2. L'agente **deve** trattare quell'output come un ulteriore prompt a cui reagire, non come
-   un errore da ignorare o da bypassare meccanicamente: avvia un **subagent di verifica
-   documentale** che controlli, alla luce dei file in stage, se sono state sviluppate
-   **nuove funzionalità** e se di conseguenza vanno aggiornati i file sotto `docs/` o
-   `AGENTS.md`.
-3. Se il subagent rileva che serve un aggiornamento, applicalo e mettilo in stage
-   (`git add`).
+   un errore da ignorare o da bypassare meccanicamente. **Valuta**, sulla base delle issue
+   lavorate e dei file in stage, se sono state sviluppate **nuove funzionalità** e se di
+   conseguenza vanno aggiornati i file sotto `docs/` o `AGENTS.md`.
+3. Se serve un aggiornamento, **non modificare i docs adesso**: crea invece una **nuova
+   issue di docs** con `node issue-manager.mjs --insert`. La sua **descrizione** deve
+   contenere la lista dei file da aggiornare e, per ciascuno, cosa cambiare. La
+   `validation.criteria` deve contenere i criteri specifici **più** la frase fissa, con
+   `validation.state: "unknown"`:
+
+   > Controllare che tutti i file siano stati aggiornati, che sia stato usato meno testo
+   > possibile, che non siano state introdotte delle ripetizioni in documenti diversi
+
+   Il lavoro documentale resta così **tracciato e deferito** a quella issue, gestita poi col
+   normale workflow (clock-in, verifica indipendente, gate sul commit).
 4. Ricommitta impostando la variabile d'ambiente `HARNESS_DOCS_VERIFIED=1` (bypass
-   anti-loop): con questa variabile impostata, l'hook lascia passare il commit senza
-   bloccarlo di nuovo, evitando un ciclo infinito di blocchi.
+   anti-loop): il commit del codice **prosegue subito** e l'hook non blocca di nuovo,
+   evitando un ciclo infinito. Se non serve alcun aggiornamento docs, ricommitta
+   direttamente con la stessa variabile.
 
 Esempi di impostazione della variabile per le shell più comuni:
 

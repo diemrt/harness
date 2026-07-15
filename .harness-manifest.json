@@ -1,17 +1,17 @@
 {
   "harnessVersion": "0.1.0",
-  "generatedAt": "2026-07-15T10:48:41.116Z",
+  "generatedAt": "2026-07-15T11:00:04.606Z",
   "files": {
     "AGENTS.md": {
       "sha256": "cd13234d1849059b6aa32a73eed1c6587d835ce3008f0f8d8aa383e8bc8ff3a3",
       "policy": "seeded-once"
     },
     "docs/AGENTS-RULES.md": {
-      "sha256": "5f55ae034ca0341e5353119c2b1b9d2d6ff71b697680f0812ff179391d0c8bff",
+      "sha256": "b7f90335ded7fae80736a263668e9165877b6f7a3548f571b038a122ee85c791",
       "policy": "managed"
     },
     "docs/ARCHITECTURE.md": {
-      "sha256": "77742261f5cf3e9ebd660ab69c03bf9331046f57e5656dd94e83d371370b5191",
+      "sha256": "1e8962570def8a801def1b2023e3a92df27e857e10cd64b6f4c7d8a5ffbed6da",
       "policy": "seeded-once"
     },
     "docs/GIT.md": {
@@ -31,7 +31,7 @@
       "policy": "managed"
     },
     "hooks/pre-commit.mjs": {
-      "sha256": "87706a2d01363fa14663c889b25942925fd7ff64db4855defa0aec9fa35892c3",
+      "sha256": "012cce31cc05f0aeb18370c8b7b5e88eace7b97b40fc22fb8ad45c199a3e565c",
       "policy": "managed"
     },
     "init.config.json": {

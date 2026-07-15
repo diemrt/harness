@@ -66,9 +66,12 @@ test("block: without HARNESS_DOCS_VERIFIED the commit is blocked with instructio
   });
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /subagent/);
+  // The gate now instructs the agent to FILE a new docs issue rather than
+  // edit docs inline; assert the message reflects that flow.
+  assert.match(result.stderr, /nuova issue/i);
+  assert.match(result.stderr, /issue-manager\.mjs --insert/);
+  assert.match(result.stderr, /meno testo possibile/);
   assert.match(result.stderr, /AGENTS\.md/);
-  assert.match(result.stderr, /Ricommitta/);
   assert.match(result.stderr, /HARNESS_DOCS_VERIFIED/);
   assert.match(result.stderr, /file\.txt/);
 });

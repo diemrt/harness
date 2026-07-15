@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-15T10:50:45Z",
+  "last_updated": "2026-07-15T11:01:40Z",
   "rules": {
     "single_active_issue": false
   },
@@ -173,6 +173,18 @@
       },
       "created_at": "2026-07-15T10:37:22Z",
       "updated_at": "2026-07-15T10:50:45Z"
+    },
+    {
+      "id": "8581b202-d672-45ea-ade7-17f7b24801e3",
+      "title": "feat: pre-commit gate crea una issue di docs invece di editare i docs inline",
+      "description": "Cambiare il flusso del gate documentale pre-commit: invece di far modificare all'agente i file di docs/AGENTS inline prima di ricommittare, il messaggio del hook deve istruire l'agente a (1) valutare, sulla base delle issue lavorate e dei file in stage, se sono state sviluppate nuove funzionalita' e se docs/ o AGENTS.md vanno aggiornati; (2) se SI', creare una NUOVA issue di docs con `node issue-manager.mjs --insert` la cui descrizione contiene la lista dei file modificati e, per ciascuno, cosa andare a cambiare; (3) la validation.criteria della nuova issue deve sempre contenere i criteri specifici PIU' la frase fissa 'Controllare che tutti i file siano stati aggiornati, che sia stato usato meno testo possibile, che non siano state introdotte delle ripetizioni in documenti diversi', con state unknown; (4) poi ricommittare con HARNESS_DOCS_VERIFIED=1 (il commit del codice prosegue subito, il lavoro docs resta tracciato nella issue creata). File: template/hooks/pre-commit.mjs (solo la stringa message; logica bypass/exit e zero-deps invariate), template/docs/AGENTS-RULES.md (riscrivere la sezione 'Gate documentale sul pre-commit (hook)' col nuovo flusso a issue, mantenendo i 3 esempi shell e la coerenza con 'Gate sul commit'), test/pre-commit-hook.test.mjs (aggiornare i token del caso block). Poi dogfooding con dev:sync alla radice (mai --force) e dev:check pulito.",
+      "status": "done",
+      "validation": {
+        "criteria": "1) template/hooks/pre-commit.mjs imports only node:child_process; HARNESS_DOCS_VERIFIED=1 -> exit 0 no output; unset+block -> exit 1, stderr has all 4 tokens (nuova issue, issue-manager.mjs --insert, meno testo possibile, HARNESS_DOCS_VERIFIED) plus staged-file list and 3 shell bypass examples (bash/sh, PowerShell, cmd). 2) template/docs/AGENTS-RULES.md \"Gate documentale sul pre-commit (hook)\" section (lines 80-129) fully describes file-an-issue flow: evaluate -> issue-manager.mjs --insert with description=files+changes, validation.criteria=specifics+fixed phrase+state unknown -> re-commit HARNESS_DOCS_VERIFIED=1, commit proceeds; 3 shell examples present; explicitly reconciled with \"Gate sul commit\". Fixed phrase verbatim confirmed. 3) node --test test/pre-commit-hook.test.mjs -> 2/2 pass; block test asserts all 4 new tokens via real regex assertions (not stubs). 4) node init.mjs build -> npm test: 64/64 pass, exit 0. 5) node src/cli.mjs update . --dry-run --json -> exit 0, updated:[] conflicts:[]; sha256 of hooks/pre-commit.mjs and docs/AGENTS-RULES.md identical to template/ counterparts (verified byte-for-byte).",
+        "state": "pass"
+      },
+      "created_at": "2026-07-15T10:58:33Z",
+      "updated_at": "2026-07-15T11:01:40Z"
     }
   ]
 }
