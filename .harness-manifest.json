@@ -1,6 +1,6 @@
 {
   "harnessVersion": "0.2.0",
-  "generatedAt": "2026-07-15T20:51:17.711Z",
+  "generatedAt": "2026-07-15T20:58:06.600Z",
   "files": {
     "AGENTS.md": {
       "sha256": "cd13234d1849059b6aa32a73eed1c6587d835ce3008f0f8d8aa383e8bc8ff3a3",
@@ -35,11 +35,11 @@
       "policy": "managed"
     },
     "init.config.json": {
-      "sha256": "31cc1cd8965bf2f100f401069a3a4d65daf7df648fb5b710d20ca49e1f7a65e7",
+      "sha256": "8214dd71fa2c28653359f5400ab0e3d11015768e6c409961f878f7f5d1d09f4f",
       "policy": "seeded-once"
     },
     "init.mjs": {
-      "sha256": "d995711d2b7ed099c6310c54c98050d8d05fc772ba2ba90df028a5341e23b571",
+      "sha256": "e711b489b83f638a6d8a8a3ea16c521012b8d0006e71c2cffac247a9d6a7f50a",
       "policy": "managed"
     },
     "issue-manager.mjs": {

@@ -23,5 +23,9 @@
         }
       ]
     }
+  },
+  "externalWorker": {
+    "enabled": false,
+    "command": "ollama launch claude --model gemma4:31b-cloud -- -p {promptFile} --dangerously-skip-permissions"
   }
 }

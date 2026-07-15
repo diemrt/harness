@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-15T20:54:40Z",
+  "last_updated": "2026-07-15T21:04:02Z",
   "rules": {
     "single_active_issue": false
   },
@@ -226,13 +226,13 @@
       "id": "5ac51d73-9064-4b79-8210-6002bbc6aa89",
       "title": "feat: toggle e preflight worker on|off|check in init.mjs",
       "description": "Componente A del design external-worker. Aggiungere a init.config.json (root E template/, separatamente: e seeded-once, file separati non sincronizzati) un blocco opzionale externalWorker = { \"enabled\": false, \"command\": \"<command template con {promptFile}>\" } come nuovo sibling top-level di tasks. Placeholder supportato: {promptFile} (obbligatorio) = path al file che contiene il prompt del worker (prompt sempre file-based, elimina il quoting a 3 livelli). In template/init.mjs aggiungere un dispatcher di sottocomandi harness-generici valutato PRIMA del lookup tasks[task] (:51, dopo il parse di task a :29): `worker on` -> enabled=true, `worker off` -> enabled=false, `worker check` -> preflight CLI-agnostico che scrive un file di smoke prompt temporaneo (\"Reply exactly READY. Use no tools.\"), sostituisce {promptFile}, esegue il command via spawnSync({shell:true}) (gia in uso :84) e verifica exit 0 e/o output contenente READY. setup/build restano invariati (sottocomandi intercettati prima della ricerca in config.tasks). Editare template/init.mjs + `npm run dev:sync`; init.config.json a mano su entrambe le copie. Indipendente.",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "node init.mjs worker on scrive externalWorker.enabled=true in init.config.json; worker off -> false; worker check con un command reale accessibile -> exit 0 / output READY, e fallisce con messaggio chiaro su CLI non accessibile (testato su almeno un command reale); node init.mjs setup e build invariati. BUILD GATE: node init.mjs build -> npm test verde. npm run dev:check pulito.",
-        "state": "unknown"
+        "criteria": "build: node init.mjs build exit 0, 82 tests green (up from 73). dev:check: npm run dev:check exit 0, 0 updated, 0 conflicts; init.config.json listed under skipped (seeded-once), not conflict. Config block: externalWorker {enabled:false, command with {promptFile}} present identically in root init.config.json and template/init.config.json; root tasks setup/build intact. Toggle: node init.mjs worker on -> externalWorker.enabled=true (verified by reading file); node init.mjs worker off -> enabled=false, command preserved. Preflight PASS: command set to node -e readFileSync {promptFile} echo -> worker check exit 0, PASS message, output shows READY prompt. Preflight FAIL: command set to this-cli-does-not-exist {promptFile} -> worker check exit 1, clear FAIL message listing possible causes (CLI not installed/PATH, wrong args, model unavailable). Config restored: command and enabled:false restored exactly; git diff init.config.json shows only the added externalWorker block vs HEAD, no other diffs. setup: node init.mjs setup exit 0. Re-ran dev:check after restore: still clean.",
+        "state": "pass"
       },
       "created_at": "2026-07-15T20:28:40Z",
-      "updated_at": "2026-07-15T20:28:40Z"
+      "updated_at": "2026-07-15T21:04:02Z"
     },
     {
       "id": "34bf61e4-ed08-4830-ad67-e786302d1ad3",

@@ -9,24 +9,37 @@
 // `init.config.json`, senza toccare questo script.
 //
 // Uso:
-//   node init.mjs setup   # Esegue gli step del task "setup" (install librerie, preparazione ambiente, ...).
-//   node init.mjs build   # Esegue gli step del task "build" (compilazione, packaging, ...).
+//   node init.mjs setup          # Esegue gli step del task "setup" (install librerie, preparazione ambiente, ...).
+//   node init.mjs build          # Esegue gli step del task "build" (compilazione, packaging, ...).
+//   node init.mjs worker on      # Abilita l'external worker (externalWorker.enabled = true).
+//   node init.mjs worker off     # Disabilita l'external worker (externalWorker.enabled = false).
+//   node init.mjs worker check   # Preflight CLI-agnostico: verifica che externalWorker.command funzioni.
 //
 // Formato di init.config.json:
 //   {
 //     "tasks": {
 //       "setup": { "workingDirectory": ".", "steps": [ { "description": "...", "command": "..." } ] },
 //       "build": { "workingDirectory": ".", "steps": [ { "description": "...", "command": "..." } ] }
+//     },
+//     "externalWorker": {
+//       "enabled": false,
+//       "command": "<comando con il placeholder obbligatorio {promptFile}>"
 //     }
 //   }
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const task = process.argv[2] || "setup";
+
+const DEFAULT_EXTERNAL_WORKER_COMMAND =
+  "ollama launch claude --model gemma4:31b-cloud -- -p {promptFile} --dangerously-skip-permissions";
+const PROMPT_FILE_PLACEHOLDER = "{promptFile}";
+const SMOKE_PROMPT = "Reply exactly READY. Use no tools.";
 
 // 0. Localizza e carica il file di configurazione accanto allo script.
 const configPath = join(scriptDir, "init.config.json");
@@ -43,6 +56,13 @@ try {
 } catch (err) {
   console.error(`Errore: impossibile leggere/parsare init.config.json: ${err.message}`);
   process.exit(1);
+}
+
+// 0.5 Dispatcher per sottocomandi harness-generici e indipendenti dallo stack,
+// valutato PRIMA della lookup in config.tasks cosi 'setup'/'build' restano intatti.
+if (task === "worker") {
+  handleWorkerCommand(process.argv[3]);
+  // handleWorkerCommand termina sempre il processo (process.exit).
 }
 
 // 1. Recupera la definizione del task richiesto.
@@ -101,3 +121,124 @@ for (const step of steps) {
 
 console.log(`Task '${task}' completato.`);
 process.exit(0);
+
+// --- Sottocomando 'worker' -------------------------------------------------
+//
+// Toggle opt-in + preflight CLI-agnostico per un external worker (qualunque
+// CLI a riga di comando in grado di ricevere un prompt da file: Claude Code,
+// Ollama, o altro). Nessuna dipendenza da uno stack specifico: il comando e'
+// interamente definito da `externalWorker.command` in init.config.json.
+
+/**
+ * Gestisce `node init.mjs worker <on|off|check>`. Termina sempre il processo
+ * con process.exit (non ritorna mai al chiamante).
+ * @param {string|undefined} subcommand
+ */
+function handleWorkerCommand(subcommand) {
+  if (subcommand === "on") {
+    setExternalWorkerEnabled(true);
+  } else if (subcommand === "off") {
+    setExternalWorkerEnabled(false);
+  } else if (subcommand === "check") {
+    runExternalWorkerCheck();
+  } else {
+    console.error(`Sottocomando 'worker' non valido: '${subcommand ?? ""}'.`);
+    console.error("Uso: node init.mjs worker on|off|check");
+    process.exit(1);
+  }
+}
+
+/**
+ * Garantisce che config.externalWorker esista, creandolo con la forma di
+ * default (enabled=false + comando placeholder) se mancante. Ritorna il
+ * blocco (possibilmente appena creato).
+ */
+function ensureExternalWorkerBlock() {
+  if (!config.externalWorker || typeof config.externalWorker !== "object") {
+    config.externalWorker = {
+      enabled: false,
+      command: DEFAULT_EXTERNAL_WORKER_COMMAND,
+    };
+  }
+  return config.externalWorker;
+}
+
+function writeConfigBack() {
+  writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+}
+
+/**
+ * @param {boolean} enabled
+ */
+function setExternalWorkerEnabled(enabled) {
+  const externalWorker = ensureExternalWorkerBlock();
+  externalWorker.enabled = enabled;
+  writeConfigBack();
+  console.log(
+    `External worker ${enabled ? "abilitato" : "disabilitato"} (externalWorker.enabled = ${enabled}) in ${configPath}.`
+  );
+  process.exit(0);
+}
+
+/**
+ * Preflight CLI-agnostico: verifica che externalWorker.command sia
+ * configurato correttamente e che il CLI sottostante risponda a un prompt di
+ * smoke test scritto su file temporaneo.
+ */
+function runExternalWorkerCheck() {
+  const externalWorker = config.externalWorker;
+  const commandTemplate = externalWorker && externalWorker.command;
+
+  if (typeof commandTemplate !== "string" || !commandTemplate.includes(PROMPT_FILE_PLACEHOLDER)) {
+    console.error(
+      `Errore: 'externalWorker.command' mancante o privo del placeholder obbligatorio '${PROMPT_FILE_PLACEHOLDER}' in ${configPath}.`
+    );
+    console.error(
+      `Esempio valido: "some-cli -p ${PROMPT_FILE_PLACEHOLDER}" (il placeholder viene sostituito con il path di un file di prompt).`
+    );
+    process.exit(1);
+  }
+
+  const promptFilePath = join(tmpdir(), `harness-worker-check-${process.pid}-${Date.now()}.txt`);
+  writeFileSync(promptFilePath, SMOKE_PROMPT, "utf8");
+
+  try {
+    const command = commandTemplate.split(PROMPT_FILE_PLACEHOLDER).join(promptFilePath);
+    console.log(`[worker check] Esecuzione: ${command}`);
+
+    const result = spawnSync(command, { shell: true, encoding: "utf8" });
+
+    if (result.error) {
+      console.error(`Errore: il comando dell'external worker ha sollevato un'eccezione: ${result.error.message}`);
+      process.exit(1);
+    }
+
+    const combinedOutput = `${result.stdout || ""}${result.stderr || ""}`;
+    const statusOk = result.status === 0;
+    const containsReady = combinedOutput.includes("READY");
+
+    if (statusOk || containsReady) {
+      console.log("[worker check] PASS: l'external worker ha risposto correttamente.");
+      if (combinedOutput.trim() !== "") {
+        console.log("--- output ---");
+        console.log(combinedOutput);
+      }
+      process.exit(0);
+    }
+
+    console.error(
+      `[worker check] FAIL: l'external worker non ha risposto come atteso (exit code ${result.status}, nessun 'READY' nell'output).`
+    );
+    console.error("Possibili cause: CLI non installato/non nel PATH, comando/argomenti errati, modello non disponibile.");
+    console.error("--- output ---");
+    console.error(combinedOutput || "(nessun output)");
+    process.exit(1);
+  } finally {
+    try {
+      unlinkSync(promptFilePath);
+    } catch {
+      // Best-effort cleanup: se il file temporaneo non esiste piu' o non e'
+      // rimovibile non e' un errore fatale per il preflight.
+    }
+  }
+}

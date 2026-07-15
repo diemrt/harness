@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, copyFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, copyFileSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -190,6 +190,144 @@ test("a task with zero steps prints a warning and exits with code 0", () => {
     const result = runInit(initPath, ["setup"]);
     assert.equal(result.status, 0);
     assert.match(result.stderr, /non ha step da eseguire/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- Sottocomando 'worker' --------------------------------------------------
+
+function baseConfig(externalWorker) {
+  return {
+    tasks: {
+      setup: { workingDirectory: ".", steps: [] },
+      build: { workingDirectory: ".", steps: [] },
+    },
+    ...(externalWorker !== undefined ? { externalWorker } : {}),
+  };
+}
+
+function readConfig(dir) {
+  return JSON.parse(readFileSync(join(dir, "init.config.json"), "utf8"));
+}
+
+test("worker on sets externalWorker.enabled to true, creating the block if missing", () => {
+  const { dir, initPath } = createHarness(baseConfig());
+  try {
+    const result = runInit(initPath, ["worker", "on"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /abilitato/);
+    const config = readConfig(dir);
+    assert.equal(config.externalWorker.enabled, true);
+    assert.match(config.externalWorker.command, /\{promptFile\}/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("worker off sets externalWorker.enabled to false and preserves the existing command", () => {
+  const { dir, initPath } = createHarness(
+    baseConfig({ enabled: true, command: "my-cli -p {promptFile}" })
+  );
+  try {
+    const result = runInit(initPath, ["worker", "off"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /disabilitato/);
+    const config = readConfig(dir);
+    assert.equal(config.externalWorker.enabled, false);
+    assert.equal(config.externalWorker.command, "my-cli -p {promptFile}");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("worker check fails clearly when externalWorker.command is missing the {promptFile} placeholder", () => {
+  const { dir, initPath } = createHarness(
+    baseConfig({ enabled: true, command: "some-cli-without-placeholder" })
+  );
+  try {
+    const result = runInit(initPath, ["worker", "check"]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /\{promptFile\}/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("worker check fails clearly when externalWorker block is entirely absent", () => {
+  const { dir, initPath } = createHarness(baseConfig());
+  try {
+    const result = runInit(initPath, ["worker", "check"]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /externalWorker\.command/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("worker check passes when the underlying command echoes the smoke prompt (contains READY)", () => {
+  const echoPromptCommand =
+    `"${process.execPath}"` +
+    ' -e "process.stdout.write(require(\'fs\').readFileSync(process.argv[1],\'utf8\'))" {promptFile}';
+  const { dir, initPath } = createHarness(
+    baseConfig({ enabled: true, command: echoPromptCommand })
+  );
+  try {
+    const result = runInit(initPath, ["worker", "check"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /PASS/);
+    assert.match(result.stdout, /READY/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("worker check fails clearly when the underlying CLI does not exist", () => {
+  const { dir, initPath } = createHarness(
+    baseConfig({ enabled: true, command: "this-cli-does-not-exist {promptFile}" })
+  );
+  try {
+    const result = runInit(initPath, ["worker", "check"]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /FAIL/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("unknown worker subcommand exits with code 1 and prints usage", () => {
+  const { dir, initPath } = createHarness(baseConfig());
+  try {
+    const result = runInit(initPath, ["worker", "bogus"]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /worker on\|off\|check/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("worker with no subcommand exits with code 1 and prints usage", () => {
+  const { dir, initPath } = createHarness(baseConfig());
+  try {
+    const result = runInit(initPath, ["worker"]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /worker on\|off\|check/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the 'worker' dispatcher does not interfere with 'setup' and 'build' tasks", () => {
+  const { dir, initPath } = createHarness({
+    tasks: {
+      setup: { workingDirectory: ".", steps: [{ description: "s", command: 'node -e "process.exit(0)"' }] },
+      build: { workingDirectory: ".", steps: [{ description: "b", command: 'node -e "process.exit(0)"' }] },
+    },
+    externalWorker: { enabled: false, command: "some-cli {promptFile}" },
+  });
+  try {
+    assert.equal(runInit(initPath, ["setup"]).status, 0);
+    assert.equal(runInit(initPath, ["build"]).status, 0);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
