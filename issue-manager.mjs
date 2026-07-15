@@ -26,7 +26,7 @@
 //     "id": "<guid>",
 //     "title": "<string>",
 //     "description": "<string>",
-//     "status": "<backlog|in_progress|blocked|done>",
+//     "status": "<backlog|in_progress|in_review|blocked|done>",
 //     "validation": { "criteria": "<string>", "state": "<unknown|pass|fail>" }|null,
 //     "created_at": "<datetime>",
 //     "updated_at": "<datetime>"
@@ -101,10 +101,10 @@ function nowTimestamp() {
 
 // Helper: validate the provided status value
 function validateStatus(status) {
-  const validStatuses = ["backlog", "in_progress", "blocked", "done"];
+  const validStatuses = ["backlog", "in_progress", "in_review", "blocked", "done"];
   if (!validStatuses.includes(status)) {
     fail(
-      `Invalid status value '${status}'. Valid values are: backlog, in_progress, blocked, done.`,
+      `Invalid status value '${status}'. Valid values are: backlog, in_progress, in_review, blocked, done.`,
       "INVALID_STATUS"
     );
   }
@@ -248,7 +248,7 @@ function showHelp() {
     "Usage:",
     "node issue-manager.mjs --help",
     "node issue-manager.mjs --get --issue-id <id>",
-    "node issue-manager.mjs --get-all [--order asc|desc] [--page 0] [--page-size 10] [--status backlog|in_progress|blocked|done]",
+    "node issue-manager.mjs --get-all [--order asc|desc] [--page 0] [--page-size 10] [--status backlog|in_progress|in_review|blocked|done]",
     "node issue-manager.mjs --insert (--issue-data '<json>' | --issue-data-file <path>)",
     "node issue-manager.mjs --update --issue-id <id> (--issue-data '<json>' | --issue-data-file <path>)",
     "node issue-manager.mjs --delete --issue-id <id>",
@@ -275,7 +275,7 @@ function showHelp() {
     "Allowed input fields for --insert/--update: title, description, status, validation",
     "  title        : non-empty string",
     "  description  : non-empty string",
-    "  status       : backlog | in_progress | blocked | done",
+    "  status       : backlog | in_progress | in_review | blocked | done",
     "  validation   : null OR { criteria: <non-empty string>, state: unknown|pass|fail }",
     "                 Set criteria at creation (state=unknown); update with evidence at closure (state=pass|fail).",
     "--insert requires title, description and status.",

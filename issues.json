@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-15T20:28:40Z",
+  "last_updated": "2026-07-15T20:41:29Z",
   "rules": {
     "single_active_issue": false
   },
@@ -190,13 +190,13 @@
       "id": "740defaf-3883-4c9c-bf68-e4ba2081f5b9",
       "title": "feat: stato in_review in issue-manager e issues.html",
       "description": "Componente B del design external-worker (docs/superpowers/specs/2026-07-15-external-worker-delegation-design.md). Aggiungere lo stato `in_review` al ciclo di vita delle issue. In template/issue-manager.mjs: aggiungere \"in_review\" all'array validStatuses (:104) e aggiornare le 3 stringhe di help/schema che elencano gli stati (:29, :251, :278) piu i commenti di schema. In template/issues.html: aggiungere l'entry in_review a STATUS_META (:115) con badge/icona dedicati, aggiungerlo a STATUS_ORDER (:121) per counters e filtri; valutare l'inclusione in WIP_PRIORITY (:123). Semantica: il worker, completato il lavoro, imposta status=in_review + validation.state=unknown; il verificatore indipendente poi porta a done/pass oppure blocked/fail. Rende il passaggio worker->verificatore esplicito e query-abile. Editare solo template/, poi `npm run dev:sync` per propagare alla radice; mai editare a mano le copie root managed. Issue di fondazione, nessuna dipendenza.",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "node issue-manager.mjs --insert con status:\"in_review\" accettato (no INVALID_STATUS); --get-all --status in_review filtra correttamente; --help elenca in_review in tutte e 3 le sezioni (:29/:251/:278); issues.html mostra badge dedicato e tab filtro in_review nei counters. BUILD GATE: node init.mjs build -> npm test verde (aggiornati eventuali test su validateStatus). npm run dev:check pulito (0 updated, 0 conflicts).",
-        "state": "unknown"
+        "criteria": "VERIFIED: node init.mjs build exit 0, 64/64 tests pass (test suite green, incl. INVALID_STATUS test with in_review now valid). npm run dev:check clean: added=[] updated=[] conflicts=[] (root/template in sync). node issue-manager.mjs --help lists in_review in all 3 status enumerations: header/schema comment (:29), --get-all usage line (:251), field-doc line (:278). Functional smoke: --insert with status:in_review accepted (no INVALID_STATUS, id 009295d3...), --get-all --status in_review returned exactly that issue (totalCount:1), --delete removed it; git diff --stat issues.json after cleanup identical to pre-test baseline (3 insertions/3 deletions, only last_updated timestamp churn, no temp issue leftover). issues.html (root + template, in sync): STATUS_META has in_review entry with dedicated badge/label/icon (badge-warning, 'In review', icon 'eye', dot bg-warning) at line 118; STATUS_ORDER includes in_review at line 122 (drives counters + filter tabs); also added to WIP_PRIORITY as a bonus. All criteria pass.",
+        "state": "pass"
       },
       "created_at": "2026-07-15T20:28:40Z",
-      "updated_at": "2026-07-15T20:28:40Z"
+      "updated_at": "2026-07-15T20:40:06Z"
     },
     {
       "id": "25cc7ac3-d2b1-42fa-824e-17b9823f6e6f",
@@ -269,6 +269,18 @@
       },
       "created_at": "2026-07-15T20:28:40Z",
       "updated_at": "2026-07-15T20:28:40Z"
+    },
+    {
+      "id": "81ea3be7-a90b-4485-ba64-4d6242bc8b43",
+      "title": "docs: documenta lo stato in_review nei doc gestiti (ISSUES.md)",
+      "description": "Il feat in_review ha aggiunto un nuovo stato del ciclo di vita ma i doc managed che enumerano gli stati sono rimasti fermi a 4 valori. Aggiornare (editando template/, poi npm run dev:sync): 1) template/docs/ISSUES.md — schema canonico dei campi (blocco status: \"backlog|in_progress|blocked|done\"), tabella 'Campi richiesti nel payload' (riga status, colonna Valori validi), tabella Errori (riga INVALID_STATUS che elenca i valori ammessi): aggiungere in_review ovunque compaia l'enumerazione dei 4 stati, con una riga di semantica minima (il worker imposta in_review a fine lavoro, il verificatore indipendente passa poi a done/pass o blocked/fail). 2) Verificare che AGENTS-RULES.md (managed) non enumeri gli stati in modo ora incompleto; se sì, allinearlo. Non duplicare la spiegazione tra ISSUES.md e AGENTS-RULES.md. Non toccare le copie root a mano.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "template/docs/ISSUES.md elenca in_review in tutti i punti che enumerano gli stati (schema, tabella payload, tabella errori INVALID_STATUS) con semantica minima; nessun doc managed enumera piu gli stati in modo incompleto; npm run dev:sync propagato e npm run dev:check pulito. Controllare che tutti i file siano stati aggiornati, che sia stato usato meno testo possibile, che non siano state introdotte delle ripetizioni in documenti diversi",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-15T20:41:29Z",
+      "updated_at": "2026-07-15T20:41:29Z"
     }
   ]
 }

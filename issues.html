@@ -115,12 +115,13 @@
     const STATUS_META = {
       backlog:     { label: "Backlog",     badge: "badge-neutral", text: "text-neutral",  icon: "circle-dashed", dot: "bg-neutral" },
       in_progress: { label: "In Progress", badge: "badge-info",    text: "text-info",     icon: "loader",        dot: "bg-info" },
+      in_review:   { label: "In review",   badge: "badge-warning", text: "text-warning",  icon: "eye",           dot: "bg-warning" },
       blocked:     { label: "Blocked",     badge: "badge-error",   text: "text-error",    icon: "ban",           dot: "bg-error" },
       done:        { label: "Done",        badge: "badge-success", text: "text-success",  icon: "check-circle",  dot: "bg-success" },
     };
-    const STATUS_ORDER = ["backlog", "in_progress", "blocked", "done"];
-    // WIP view: priorità di raggruppamento (prima "cosa non va", poi "in corso", poi "da fare").
-    const WIP_PRIORITY = { blocked: 0, in_progress: 1, backlog: 2 };
+    const STATUS_ORDER = ["backlog", "in_progress", "in_review", "blocked", "done"];
+    // WIP view: priorità di raggruppamento (prima "cosa non va", poi "in corso", poi "in review", poi "da fare").
+    const WIP_PRIORITY = { blocked: 0, in_progress: 1, in_review: 2, backlog: 3 };
 
     const VALIDATION_META = {
       pass:    { badge: "badge-success", icon: "check", label: "pass" },
@@ -244,7 +245,7 @@
         return haystack.includes(q);
       };
 
-      // Vista WIP: solo blocked/in_progress/backlog, ordinate per priorità e
+      // Vista WIP: solo blocked/in_progress/in_review/backlog, ordinate per priorità e
       // a parità di stato per ordine di inserimento (indice originale nell'array).
       if (state.activeStatus === "wip") {
         return state.issues
