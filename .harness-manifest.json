@@ -1,6 +1,6 @@
 {
   "harnessVersion": "0.2.0",
-  "generatedAt": "2026-07-15T20:44:12.567Z",
+  "generatedAt": "2026-07-15T20:51:17.711Z",
   "files": {
     "AGENTS.md": {
       "sha256": "cd13234d1849059b6aa32a73eed1c6587d835ce3008f0f8d8aa383e8bc8ff3a3",
@@ -31,7 +31,7 @@
       "policy": "managed"
     },
     "hooks/pre-commit.mjs": {
-      "sha256": "012cce31cc05f0aeb18370c8b7b5e88eace7b97b40fc22fb8ad45c199a3e565c",
+      "sha256": "d80b94ef683d9be65db64f310c79de1ef2c5eb8cbac6b6e75d663a9fd1535370",
       "policy": "managed"
     },
     "init.config.json": {

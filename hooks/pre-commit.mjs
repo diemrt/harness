@@ -16,6 +16,15 @@
 
 import { execFileSync } from "node:child_process";
 
+// Ruolo worker: invariante piu' forte del gate docs, quindi valutata PRIMA del
+// bypass HARNESS_DOCS_VERIFIED qui sotto e non disattivabile tramite di esso.
+if (process.env.HARNESS_ROLE === "worker") {
+  process.stderr.write(
+    "HARNESS PRE-COMMIT GATE: i worker non possono committare (HARNESS_ROLE=worker).\n",
+  );
+  process.exit(1);
+}
+
 // Anti-loop bypass: the verification has already happened, let the commit through.
 if (process.env.HARNESS_DOCS_VERIFIED === "1") {
   process.exit(0);

@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-15T20:49:49Z",
+  "last_updated": "2026-07-15T20:54:40Z",
   "rules": {
     "single_active_issue": false
   },
@@ -214,13 +214,13 @@
       "id": "3c3d9be5-5483-4de0-8520-d2138f79f0b3",
       "title": "feat: role guard worker in pre-commit hook (blocco commit)",
       "description": "Componente C.2 del design external-worker. In template/hooks/pre-commit.mjs: se process.env.HARNESS_ROLE === \"worker\" bloccare il commit in modo assoluto (exit 1, messaggio \"i worker non possono committare\"). Il controllo va inserito tra la riga :17 (import execFileSync) e :19, cioe PRIMA del bypass HARNESS_DOCS_VERIFIED (:19-22): il guard worker non e bypassabile, e un invariante piu forte del gate documentale. Editare solo template/, poi `npm run dev:sync` (il file esiste identico anche in root). Indipendente, puo procedere in parallelo.",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "HARNESS_ROLE=worker node hooks/pre-commit.mjs -> exit 1 ANCHE con HARNESS_DOCS_VERIFIED=1 settato (guard precede il bypass); senza HARNESS_ROLE comportamento invariato (HARNESS_DOCS_VERIFIED=1 -> exit 0, senza -> exit 1 gate docs). BUILD GATE: node init.mjs build -> npm test verde. npm run dev:check pulito.",
-        "state": "unknown"
+        "criteria": "BUILD GATE: node init.mjs build -> exit 0, 73/73 tests pass (grown from baseline 72, incl. worker-role guard tests). dev:check: 0 updated, 0 conflicts. Source: HARNESS_ROLE===\"worker\" guard (hooks/pre-commit.mjs lines 19-26) appears textually BEFORE the HARNESS_DOCS_VERIFIED===\"1\" bypass (lines 28-31), confirmed not bypassable. Behavior: HARNESS_ROLE=worker alone -> exit 1; HARNESS_ROLE=worker + HARNESS_DOCS_VERIFIED=1 -> exit 1 (guard beats docs bypass); HARNESS_DOCS_VERIFIED=1 alone (no role) -> exit 0; no env vars -> exit 1 (baseline docs gate unchanged). All 4 exit codes match spec.",
+        "state": "pass"
       },
       "created_at": "2026-07-15T20:28:40Z",
-      "updated_at": "2026-07-15T20:28:40Z"
+      "updated_at": "2026-07-15T20:54:40Z"
     },
     {
       "id": "5ac51d73-9064-4b79-8210-6002bbc6aa89",

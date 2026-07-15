@@ -52,6 +52,21 @@ test("bypass: HARNESS_DOCS_VERIFIED=1 lets the commit through with no gate outpu
   assert.doesNotMatch(result.stdout, /HARNESS PRE-COMMIT GATE/);
 });
 
+test("worker role: HARNESS_ROLE=worker blocks the commit even with HARNESS_DOCS_VERIFIED=1", (t) => {
+  const tmpRepo = createStagedRepo();
+  t.after(() => rmSync(tmpRepo, { recursive: true, force: true }));
+
+  const result = spawnSync(process.execPath, [hookPath], {
+    cwd: tmpRepo,
+    encoding: "utf8",
+    env: { ...process.env, HARNESS_ROLE: "worker", HARNESS_DOCS_VERIFIED: "1" },
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /worker/i);
+  assert.doesNotMatch(result.stderr, /HARNESS PRE-COMMIT GATE — verifica documentazione/);
+});
+
 test("block: without HARNESS_DOCS_VERIFIED the commit is blocked with instructions", (t) => {
   const tmpRepo = createStagedRepo();
   t.after(() => rmSync(tmpRepo, { recursive: true, force: true }));
