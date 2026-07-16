@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-15T21:29:41Z",
+  "last_updated": "2026-07-16T07:55:27Z",
   "rules": {
     "single_active_issue": false
   },
@@ -281,6 +281,18 @@
       },
       "created_at": "2026-07-15T20:41:29Z",
       "updated_at": "2026-07-15T21:20:57Z"
+    },
+    {
+      "id": "af96239e-384f-44d2-821a-43cb73fc4938",
+      "title": "issues.html: la griglia dei contatori taglia la card Done (6 card in 5 colonne)",
+      "description": "La sezione contatori di issues.html renderizza 6 card: una \"Totale\" piu' una per ciascuno dei 5 status di STATUS_ORDER (backlog, in_progress, in_review, blocked, done). Il container pero' dichiara lg:grid-cols-5 (template/issues.html:61), quindi al breakpoint lg la sesta card (Done) va a capo da sola su una seconda riga. Causa: in_review e' stato aggiunto a STATUS_META/STATUS_ORDER senza aggiornare la classe della griglia, corretta quando gli status erano 4.\n\nFix: in template/issues.html (unica copia autorata, vedi CLAUDE.md) cambiare la classe del container #counters da lg:grid-cols-5 a lg:grid-cols-6. I breakpoint minori restano validi: grid-cols-2 (3 righe) e sm:grid-cols-3 (2 righe piene). Propagare poi alla copia materializzata alla radice con `npm run dev:sync` (= node src/cli.mjs update .). Non editare a mano issues.html alla radice e non usare mai --force.",
+      "status": "done",
+      "validation": {
+        "criteria": "1) template/issues.html:61 -> <section id=\"counters\" class=\"grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6\"> confermato, nessun residuo lg:grid-cols-5, altre classi (grid, grid-cols-2, sm:grid-cols-3, gap-3, mb-6) intatte. 2) issues.html alla radice riga 61 identica a template (stesso hash sorgente); diff limitato alla sola classe lg:grid-cols-5 -> lg:grid-cols-6 in entrambi i file. 3) npm run dev:check: {\"ok\":true,\"action\":\"update\",\"added\":[],\"updated\":[],\"conflicts\":[],\"removed\":[],\"orphaned\":[]} - zero updated, zero conflicts. 4) node init.mjs build (HARNESS_ROLE non impostato): 82/82 test passati, 0 fail, 'Task build completato.'. 5) git status --porcelain mostra solo: .harness-manifest.json (rigenerato da dev:sync: solo generatedAt e hash di issues.html), init.config.json (PRE-ESISTENTE, diff limitato al blocco externalWorker: enabled false->true, non toccato dal worker oltre a quello), issues.html (fix grid), issues.json (solo last_updated + record di questa issue, dati tracking normali), template/issues.html (fix grid). Nessun file fuori scope.",
+        "state": "pass"
+      },
+      "created_at": "2026-07-16T07:49:41Z",
+      "updated_at": "2026-07-16T07:55:27Z"
     }
   ]
 }
