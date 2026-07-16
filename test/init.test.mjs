@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, copyFileSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, copyFileSync, writeFileSync, readFileSync, existsSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -102,7 +102,7 @@ test("a failing step halts the run and later steps do not execute", () => {
         steps: [
           { description: "ok-step", command: 'node -e "process.exit(0)"' },
           { description: "failing-step", command: 'node -e "process.exit(3)"' },
-          { description: "never-runs-step", command: 'node -e "console.log(\'SHOULD_NOT_APPEAR\')"' },
+          { description: "never-runs-step", command: 'node -e "console.log(\'SHOULD_NOT_APPEAR\')" ' },
         ],
       },
     },
@@ -267,7 +267,7 @@ test("worker check fails clearly when externalWorker block is entirely absent", 
 
 test("worker check passes when the underlying command echoes the smoke prompt (contains READY)", () => {
   const echoPromptCommand =
-    `"${process.execPath}"` +
+    "\"" + process.execPath + "\"" +
     ' -e "process.stdout.write(require(\'fs\').readFileSync(process.argv[1],\'utf8\'))" {promptFile}';
   const { dir, initPath } = createHarness(
     baseConfig({ enabled: true, command: echoPromptCommand })
@@ -328,6 +328,97 @@ test("the 'worker' dispatcher does not interfere with 'setup' and 'build' tasks"
   try {
     assert.equal(runInit(initPath, ["setup"]).status, 0);
     assert.equal(runInit(initPath, ["build"]).status, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- tests for 'worker run' ---------------------------------------------------
+
+test("worker run creates .harness/runs/ directory and logs resolved command and output", () => {
+  const { dir, initPath } = createHarness(
+    baseConfig({ enabled: true, command: 'node -e "console.log(\'WORKER_OUTPUT\')" {promptFile}' })
+  );
+  const promptPath = join(dir, "prompt.txt");
+  writeFileSync(promptPath, "hello", "utf8");
+
+  try {
+    const result = runInit(initPath, ["worker", "run", "--issue", "test-issue", "--prompt", promptPath]);
+    assert.equal(result.status, 0);
+
+    const runsDir = join(dir, ".harness", "runs");
+    assert.ok(existsSync(runsDir), ".harness/runs/ should exist");
+
+    const files = readdirSync(runsDir);
+    assert.equal(files.length, 1);
+    const logFile = join(runsDir, files[0]);
+    const logContent = readFileSync(logFile, "utf8");
+
+    assert.ok(logContent.includes(promptPath), "log should contain prompt path");
+    assert.ok(logContent.includes("WORKER_OUTPUT"), "log should contain worker output");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("worker run ensures child process receives HARNESS_ROLE=worker", () => {
+  const { dir, initPath } = createHarness(
+    baseConfig({ enabled: true, command: 'node -e "console.log(process.env.HARNESS_ROLE)" {promptFile}' })
+  );
+  const promptPath = join(dir, "prompt.txt");
+  writeFileSync(promptPath, "hello", "utf8");
+
+  try {
+    runInit(initPath, ["worker", "run", "--issue", "role-test", "--prompt", promptPath]);
+    const runsDir = join(dir, ".harness", "runs");
+    const files = readdirSync(runsDir);
+    const logContent = readFileSync(join(runsDir, files[0]), "utf8");
+    assert.match(logContent, /worker/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("worker run exits with 1 when externalWorker.enabled is false", () => {
+  const { dir, initPath } = createHarness(
+    baseConfig({ enabled: false, command: 'node -e "process.exit(0)" {promptFile}' })
+  );
+  const promptPath = join(dir, "prompt.txt");
+  writeFileSync(promptPath, "hello", "utf8");
+
+  try {
+    const result = runInit(initPath, ["worker", "run", "--issue", "disabled-test", "--prompt", promptPath]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /disabilitato/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("worker run exits with 1 when prompt file does not exist", () => {
+  const { dir, initPath } = createHarness(
+    baseConfig({ enabled: true, command: 'node -e "process.exit(0)" {promptFile}' })
+  );
+
+  try {
+    const result = runInit(initPath, ["worker", "run", "--issue", "missing-prompt", "--prompt", "non-existent.txt"]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /non trovato/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("worker run propagates the exit code of the child process", () => {
+  const { dir, initPath } = createHarness(
+    baseConfig({ enabled: true, command: 'node -e "process.exit(42)" {promptFile}' })
+  );
+  const promptPath = join(dir, "prompt.txt");
+  writeFileSync(promptPath, "hello", "utf8");
+
+  try {
+    const result = runInit(initPath, ["worker", "run", "--issue", "exit-code-test", "--prompt", promptPath]);
+    assert.equal(result.status, 42);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

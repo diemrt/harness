@@ -14,6 +14,7 @@
 //   node init.mjs worker on      # Abilita l'external worker (externalWorker.enabled = true).
 //   node init.mjs worker off     # Disabilita l'external worker (externalWorker.enabled = false).
 //   node init.mjs worker check   # Preflight CLI-agnostico: verifica che externalWorker.command funzioni.
+//   node init.mjs worker run     # Lancia un external worker per una specifica issue.
 //
 // Formato di init.config.json:
 //   {
@@ -26,8 +27,8 @@
 //       "command": "<comando con il placeholder obbligatorio {promptFile}>"
 //     }
 //   }
-
-import { readFileSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
+//
+import { readFileSync, existsSync, writeFileSync, unlinkSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -130,7 +131,7 @@ process.exit(0);
 // interamente definito da `externalWorker.command` in init.config.json.
 
 /**
- * Gestisce `node init.mjs worker <on|off|check>`. Termina sempre il processo
+ * Gestisce `node init.mjs worker <on|off|check|run>`. Termina sempre il processo
  * con process.exit (non ritorna mai al chiamante).
  * @param {string|undefined} subcommand
  */
@@ -141,9 +142,11 @@ function handleWorkerCommand(subcommand) {
     setExternalWorkerEnabled(false);
   } else if (subcommand === "check") {
     runExternalWorkerCheck();
+  } else if (subcommand === "run") {
+    runExternalWorker();
   } else {
     console.error(`Sottocomando 'worker' non valido: '${subcommand ?? ""}'.`);
-    console.error("Uso: node init.mjs worker on|off|check");
+    console.error("Uso: node init.mjs worker on|off|check|run");
     process.exit(1);
   }
 }
@@ -241,4 +244,80 @@ function runExternalWorkerCheck() {
       // rimovibile non e' un errore fatale per il preflight.
     }
   }
+}
+
+/**
+ * Lancia l'external worker con log e HARNESS_ROLE garantiti.
+ * Uso: node init.mjs worker run --issue <issueId> --prompt <promptFile>
+ */
+function runExternalWorker() {
+  const externalWorker = config.externalWorker;
+
+  // 1. Validazione Config
+  if (!externalWorker || externalWorker.enabled === false) {
+    console.error("Errore: external worker disabilitato in init.config.json.");
+    process.exit(1);
+  }
+
+  const commandTemplate = externalWorker.command;
+  if (typeof commandTemplate !== "string" || !commandTemplate.includes(PROMPT_FILE_PLACEHOLDER)) {
+    console.error(`Errore: 'externalWorker.command' privo di ${PROMPT_FILE_PLACEHOLDER} in ${configPath}.`);
+    process.exit(1);
+  }
+
+  // 2. Validazione Argomenti
+  const args = process.argv.slice(4);
+  const issueIdx = args.indexOf("--issue");
+  const promptIdx = args.indexOf("--prompt");
+
+  if (issueIdx === -1 || promptIdx === -1) {
+    console.error("Errore: mancano gli argomenti obbligatori --issue e --prompt.");
+    console.error("Uso: node init.mjs worker run --issue <issueId> --prompt <promptFile>");
+    process.exit(1);
+  }
+
+  const issueId = args[issueIdx + 1];
+  const promptFile = args[promptIdx + 1];
+
+  if (!issueId || !promptFile) {
+    console.error("Errore: valori mancanti per --issue o --prompt.");
+    process.exit(1);
+  }
+
+  if (!existsSync(promptFile)) {
+    console.error(`Errore: file di prompt non trovato: ${promptFile}`);
+    process.exit(1);
+  }
+
+  // 3. Setup Log
+  const runsDir = join(scriptDir, ".harness", "runs");
+  mkdirSync(runsDir, { recursive: true });
+
+  const timestamp = Date.now();
+  const logFileName = `${issueId}-${timestamp}.log`;
+  const logPath = join(runsDir, logFileName);
+
+  // 4. Risoluzione Comando
+  const resolvedCommand = commandTemplate.split(PROMPT_FILE_PLACEHOLDER).join(promptFile);
+
+  // Scrive comando in testa al log e a video
+  const header = `Command: ${resolvedCommand}\n`;
+  process.stdout.write(header);
+  writeFileSync(logPath, header, "utf8");
+
+  // 5. Esecuzione
+  const result = spawnSync(resolvedCommand, {
+    shell: true,
+    encoding: "utf8",
+    env: { ...process.env, HARNESS_ROLE: "worker" },
+  });
+
+  // 6. Logging Output
+  const output = `${result.stdout || ""}${result.stderr || ""}`;
+  process.stdout.write(output);
+  writeFileSync(logPath, output, { flag: "a" }); // append
+
+  // 7. Propagazione Exit Code
+  const code = result.status === null ? 1 : result.status;
+  process.exit(code);
 }
