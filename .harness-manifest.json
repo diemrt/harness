@@ -1,6 +1,6 @@
 {
   "harnessVersion": "0.2.0",
-  "generatedAt": "2026-07-16T08:27:56.795Z",
+  "generatedAt": "2026-07-16T08:36:40.092Z",
   "files": {
     ".gitignore": {
       "sha256": "97cfd8789112c2af22ba553b5942f351a785c9717fa1a0b32e7bda1e6a5a37e3",
@@ -19,7 +19,7 @@
       "policy": "seeded-once"
     },
     "docs/EXTERNAL-WORKER.md": {
-      "sha256": "6aeb76a5de1e845d8344b6f50975c2493e88c4fc7a1f0621c1ee2434c709932b",
+      "sha256": "4e0b5f9d95170a21bd0eb14569aaab681201600b80d89c526639b3c8752c92a2",
       "policy": "managed"
     },
     "docs/GIT.md": {

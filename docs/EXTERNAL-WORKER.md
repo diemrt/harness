@@ -23,15 +23,18 @@ node init.mjs worker check   # preflight: verifica che il comando configurato ri
 
 1. L'orchestratore scrive il prompt del worker in un file (il prompt è **sempre
    file-based**, mai passato inline: evita ogni problema di quoting).
-2. Lancia il `command` configurato in `externalWorker.command`, con `HARNESS_ROLE=worker`
-   **nell'environment del processo**, redirigendo l'output per poterlo osservare:
+2. Lancia:
 
    ```bash
-   HARNESS_ROLE=worker <command> 2>&1 | tee .harness/runs/<issueId>-<timestamp>.log
+   node init.mjs worker run --issue <issueId> --prompt <promptFile>
    ```
 
-   `.harness/runs/` è git-ignored: convenzione di log per non far finire i temporanei in un
-   commit.
+   Lo script, non l'orchestratore, si occupa di tutto il resto: crea `.harness/runs/` se
+   manca (git-ignored: convenzione di log per non far finire i temporanei in un commit),
+   imposta `HARNESS_ROLE=worker` nell'environment del processo figlio, stampa a video e
+   scrive in testa a `.harness/runs/<issueId>-<timestamp>.log` la riga di comando risolta
+   (placeholder `{promptFile}` sostituito), appende l'output del worker allo stesso log e
+   propaga l'exit code del processo figlio.
 3. Gli aggiornamenti della issue da parte del worker usano `--issue-data-file`, non
    `--issue-data` inline:
 
@@ -41,7 +44,29 @@ node init.mjs worker check   # preflight: verifica che il comando configurato ri
 
    Robusto: nessun quoting di JSON dentro la shell del worker.
 
-## 3. Config e placeholder
+## 3. Prerequisito: permessi per la delega autonoma
+
+Perché `worker run` sia lanciabile senza approvazione interattiva a ogni issue, serve una
+allow rule nelle settings di Claude Code, es. `Bash(node init.mjs worker run:*)`. Senza,
+ogni lancio richiede conferma manuale e la delega non è autonoma.
+
+Quella regola non autorizza solo `worker run`: autorizza l'intera catena, incluse le
+eventuali flag di bypass dei permessi presenti nel `command` configurato (es.
+`--dangerously-skip-permissions` negli esempi in §4). Il classifier dei permessi vede solo
+la stringa `node init.mjs worker run`, **non** ispeziona `externalWorker.command` né il
+comando che lo script risolve ed esegue.
+
+Conseguenza diretta: modificare `externalWorker.command` cambia cosa si è di fatto
+autorizzato, senza che venga richiesta una nuova conferma — la allow rule resta la stessa
+stringa, il comando dietro può cambiare arbitrariamente. Rivedere il blocco `externalWorker`
+sia al momento di concedere la regola sia a ogni sua modifica successiva.
+
+Per non far viaggiare un permission-bypass insieme al repository, mettere la allow rule nel
+file di settings locale e non committato (`.claude/settings.local.json`, già in
+`.gitignore`) piuttosto che in `.claude/settings.json` (vedi anche [GIT.md](/docs/GIT.md)
+§5 sui file di configurazione).
+
+## 4. Config e placeholder
 
 Blocco `externalWorker` in `init.config.json`:
 
@@ -75,7 +100,7 @@ installata. Il preflight `node init.mjs worker check` è **CLI-agnostico**: scri
 di smoke test su file, sostituisce `{promptFile}`, esegue il `command` e valida `exit 0` e/o
 un output contenente `READY` — funziona con qualunque template, senza codice per-adapter.
 
-## 4. `HARNESS_ROLE=worker` e i guard
+## 5. `HARNESS_ROLE=worker` e i guard
 
 Lanciare il worker con `HARNESS_ROLE=worker` nell'environment attiva due guard tecnici (non
 solo disciplina di prompt):
@@ -88,11 +113,10 @@ solo disciplina di prompt):
   a prescindere da tutto il resto — controllo valutato **prima** del bypass
   `HARNESS_DOCS_VERIFIED`, quindi non aggirabile per errore.
 
-**Limite noto:** il guard è efficace solo se l'orchestratore imposta la variabile nel
-lancio del processo worker. Per worker esterni (riga di comando scriptata) questo è
-affidabile: la variabile è sempre presente nell'invocazione.
+`node init.mjs worker run` imposta sempre la variabile nell'environment del processo
+figlio: il guard non dipende dalla disciplina di chi lancia.
 
-## 5. Template di prompt worker
+## 6. Template di prompt worker
 
 Da riempire con `{issueId}` e `{repoRoot}` prima di scriverlo nel file passato al worker:
 
@@ -110,15 +134,15 @@ Vincoli rigidi:
 ```
 
 Questi vincoli sono una seconda linea di difesa scritta nel prompt, in aggiunta (non in
-sostituzione) ai guard tecnici della sezione 4.
+sostituzione) ai guard tecnici della sezione 5.
 
-## 6. Nota ambiente
+## 7. Nota ambiente
 
 Se la CLI del worker legge `ANTHROPIC_API_KEY` dall'environment, questa **precede** il
 login interattivo (es. claude.ai) e può alterare il comportamento della sessione: verificare
 quale credenziale è effettivamente attiva prima di lanciare il worker.
 
-## 7. Nota anti-conflitto con la regola 1-WIP
+## 8. Nota anti-conflitto con la regola 1-WIP
 
 Quando `externalWorker.enabled` è `true`, il "subagent per issue" richiesto dalla regola
 1-WIP (vedi [AGENTS-RULES.md](/docs/AGENTS-RULES.md)) può essere un worker esterno lanciato
