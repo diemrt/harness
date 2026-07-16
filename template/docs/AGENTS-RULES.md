@@ -91,7 +91,7 @@ che scatta su **ogni** `git commit`, anche quando il gate sopra è già stato ri
 2. L'agente **deve** trattare quell'output come un ulteriore prompt a cui reagire, non come
    un errore da ignorare o da bypassare meccanicamente. **Valuta**, sulla base delle issue
    lavorate e dei file in stage, se sono state sviluppate **nuove funzionalità** e se di
-   conseguenza vanno aggiornati i file sotto `docs/` o `AGENTS.md`.
+   conseguenza vanno aggiornati i file sotto `docs/`, `AGENTS.md` o `README.md` (se presente).
 3. Se serve un aggiornamento, **non modificare i docs adesso**: crea invece una **nuova
    issue di docs** con `node issue-manager.mjs --insert`. La sua **descrizione** deve
    contenere la lista dei file da aggiornare e, per ciascuno, cosa cambiare. La

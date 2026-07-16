@@ -7,9 +7,10 @@
  * a structured instruction on stderr that the agent is expected to read and
  * act on, consistent with the "Gate sul commit" section of AGENTS-RULES.md.
  *
- * Anti-loop bypass: once the agent (or a human) has verified that docs/ and
- * AGENTS.md are up to date, re-run the commit with HARNESS_DOCS_VERIFIED=1
- * set in the environment and this gate exits 0 without blocking.
+ * Anti-loop bypass: once the agent (or a human) has verified that docs/,
+ * AGENTS.md, and README.md (if present) are up to date, re-run the commit with
+ * HARNESS_DOCS_VERIFIED=1 set in the environment and this gate exits 0 without
+ * blocking.
  *
  * Zero runtime dependencies: only node:* builtins plus the git binary.
  */
@@ -63,7 +64,8 @@ ulteriore prompt e agire prima di ricommittare.
 ISTRUZIONE PER L'AGENTE:
   1. Valuta, sulla base delle issue lavorate e dei file in stage qui sotto,
      cosa e' stato modificato e se sono state sviluppate NUOVE FUNZIONALITA'
-     che richiedono un aggiornamento dei file in docs/ o di AGENTS.md.
+     che richiedono un aggiornamento dei file in docs/, di AGENTS.md o di
+     README.md (se presente nel progetto).
   2. Se SERVE un aggiornamento: NON modificare i docs adesso. Crea invece una
      NUOVA issue di docs con:
         node issue-manager.mjs --insert --issue-data-file <file>
