@@ -79,9 +79,14 @@ function setupTempProject(seed = baseSeed()) {
   return { dir, scriptPath };
 }
 
+// Role-neutral by design: HARNESS_ROLE is dropped so the suite behaves the same whether or not the
+// test-runner itself was launched as a worker. Tests that need a role use runWithRole() instead.
 function run(scriptPath, args) {
+  const env = { ...process.env };
+  delete env.HARNESS_ROLE;
   return spawnSync(process.execPath, [scriptPath, ...args], {
     encoding: "utf8",
+    env,
   });
 }
 

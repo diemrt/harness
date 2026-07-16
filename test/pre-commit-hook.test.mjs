@@ -41,10 +41,13 @@ test("bypass: HARNESS_DOCS_VERIFIED=1 lets the commit through with no gate outpu
   const tmpRepo = createStagedRepo();
   t.after(() => rmSync(tmpRepo, { recursive: true, force: true }));
 
+  const env = { ...process.env, HARNESS_DOCS_VERIFIED: "1" };
+  delete env.HARNESS_ROLE;
+
   const result = spawnSync(process.execPath, [hookPath], {
     cwd: tmpRepo,
     encoding: "utf8",
-    env: { ...process.env, HARNESS_DOCS_VERIFIED: "1" },
+    env,
   });
 
   assert.equal(result.status, 0);
@@ -73,6 +76,7 @@ test("block: without HARNESS_DOCS_VERIFIED the commit is blocked with instructio
 
   const env = { ...process.env };
   delete env.HARNESS_DOCS_VERIFIED;
+  delete env.HARNESS_ROLE;
 
   const result = spawnSync(process.execPath, [hookPath], {
     cwd: tmpRepo,
