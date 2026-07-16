@@ -26,7 +26,7 @@ dell'ambiente). È `managed`: viene mantenuto sincronizzato da `harness update` 
 **Una sola issue può essere `in_progress` per ciascuna catena di dipendenza.** Issue
 **scorrelate** (catene di dipendenza distinte) possono invece essere `in_progress` **in
 parallelo**. All'interno di una stessa catena si procede in ordine di dipendenza, una alla
-volta. **Avvia un subagent per issue.** Usa un modello con un consumo di token medio, come Sonnet.
+volta. **Avvia un subagent per issue.** Scegli il modello secondo la rubrica in "Scelta del modello per subagent".
 
 **Overlap verifica → next:** puoi avviare il lavoro sulla issue successiva **mentre il
 subagent di verifica indipendente** della precedente è **ancora in corso** (sovrapposizione
@@ -40,6 +40,27 @@ Se `externalWorker.enabled` in `init.config.json`, il subagent può essere un wo
 - **commit SOLO dopo `validation.state = pass`** dato dal subagent;
 - **nessun `pass` auto-assegnato** dall'agente che ha svolto il lavoro.
 
+## Scelta del modello per subagent
+
+L'harness non pinna modelli per nome: definisce tier operativi che l'orchestratore mappa
+sui modelli disponibili nella sessione. A parita' di esito atteso, scegli il tier che
+consuma meno token.
+
+- **Economico:** lavoro meccanico, deterministico, a basso rischio.
+- **Standard:** default; implementazione ordinaria con decisioni locali limitate.
+- **Reasoning:** ragionamento esteso, giudizio architetturale o trade-off critici.
+
+Segnali di classificazione:
+- numero di file da toccare e superficie di impatto;
+- ambiguita' nella `description` e nei `validation.criteria`;
+- prevalenza di esecuzione meccanica vs decisioni di design;
+- posizione nella catena di dipendenza (bloccante o terminale);
+- presenza di trade-off in conflitto tra obiettivi.
+
+Se sei in dubbio fra due tier, sali: un fail in verifica costa piu' della differenza di
+token. Il subagent di verifica indipendente deve usare un tier **>=** a quello del worker,
+mai inferiore. Questa e' una policy di efficienza, non un invariante.
+
 ## Prima della fine di ogni sessione (clock out)
 
 > **Principio anti self-validation bias:** l'agente che ha svolto il lavoro **non** può
@@ -52,7 +73,8 @@ di dipendenza; issue scorrelate in parallelo):
 1. Concludi il lavoro sulla issue e raccogli gli artefatti prodotti (file modificati,
    output dei comandi rilevanti).
 2. **Avvia un subagent di verifica indipendente** (vedi `ISSUES.md` → "Verifica
-   indipendente (subagent)"). Il subagent:
+   indipendente (subagent)" e "Scelta del modello per subagent": tier del verificatore
+   **>=** tier del worker). Il subagent:
    - controlla i `validation.criteria` della issue contro gli artefatti reali;
    - esegue `node init.mjs build` (i comandi effettivi sono quelli definiti dal task
      `build` in `init.config.json`, qualunque sia lo stack del progetto) per confermare che
