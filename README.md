@@ -38,7 +38,10 @@ docs/
 hooks/
   install.mjs               # git hook installer (harness-managed)
   pre-commit                # git pre-commit entrypoint (harness-managed)
-  pre-commit.mjs            # git pre-commit implementation (harness-managed)
+  pre-commit.mjs            # worker-role commit guard (harness-managed)
+  post-commit               # git post-commit entrypoint (harness-managed)
+  post-commit.mjs           # docs-issue post-commit automation (harness-managed)
+  match.mjs                 # glob matcher for docsGate include/exclude (harness-managed)
 issue-manager.mjs           # issue tracker CLI (harness-managed)
 init.mjs                    # stack-agnostic setup/build runner (harness-managed)
 init.config.json            # your setup/build commands (project-owned)
@@ -111,7 +114,8 @@ Every file the harness distributes has exactly one **policy**, defined once in
   template for as long as you haven't touched them: `issue-manager.mjs`, `init.mjs`,
   `issues.html`, `docs/AGENTS-RULES.md`, `docs/EXTERNAL-WORKER.md`, `docs/GIT.md`,
   `docs/ISSUES.md`, `hooks/install.mjs`, `hooks/pre-commit`,
-  `hooks/pre-commit.mjs`, `.gitignore`.
+  `hooks/pre-commit.mjs`, `hooks/post-commit`, `hooks/post-commit.mjs`,
+  `hooks/match.mjs`, `.gitignore`.
 - **`seeded-once`** — written once by `init`, then yours forever. `update` never
   overwrites these even if the template's version has changed, because you're expected
   to customize them for your project: `AGENTS.md`, `docs/ARCHITECTURE.md`,

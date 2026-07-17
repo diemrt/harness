@@ -101,56 +101,26 @@ indipendente ha impostato `validation.state = pass`. **Nessun commit** di una is
 `done` / `pass` non verificata dal subagent, né di una issue `blocked`: se la verifica
 fallisce, nessun commit finché la issue non viene ripresa, corretta e riverificata `pass`.
 
-### Gate documentale sul pre-commit (hook)
+### Gate documentale sul post-commit (hook)
 
-Il gate descritto sopra ("commit solo dopo `pass` del subagent") è un vincolo di
-**processo**, applicato dall'agente. A questo si aggiunge un **secondo livello, a livello
-git**, indipendente dal primo: l'hook `pre-commit` dell'harness (`hooks/pre-commit.mjs`),
-che scatta su **ogni** `git commit`, anche quando il gate sopra è già stato rispettato.
+Il gate descritto sopra ("commit solo dopo `pass` del subagent") resta un vincolo di
+**processo**, applicato dall'agente. In aggiunta, l'hook `post-commit`
+(`hooks/post-commit.mjs`) automatizza l'apertura della issue docs:
 
-1. Al momento del commit, l'hook `pre-commit` blocca l'operazione (`exit` diverso da `0`)
-   e stampa su stderr un'istruzione strutturata, insieme all'elenco dei file in stage.
-2. L'agente **deve** trattare quell'output come un ulteriore prompt a cui reagire, non come
-   un errore da ignorare o da bypassare meccanicamente. **Valuta**, sulla base delle issue
-   lavorate e dei file in stage, se sono state sviluppate **nuove funzionalità** e se di
-   conseguenza vanno aggiornati i file sotto `docs/`, `AGENTS.md` o `README.md` (se presente).
-3. Se serve un aggiornamento, **non modificare i docs adesso**: crea invece una **nuova
-   issue di docs** con `node issue-manager.mjs --insert`. La sua **descrizione** deve
-   contenere la lista dei file da aggiornare e, per ciascuno, cosa cambiare. La
-   `validation.criteria` deve contenere i criteri specifici **più** la frase fissa, con
-   `validation.state: "unknown"`:
+1. legge i file modificati nel commit `HEAD` e applica i glob
+   `docsGate.include` / `docsGate.exclude` da `init.config.json`;
+2. se trova file di codice, crea automaticamente una issue docs via
+   `node issue-manager.mjs --insert` e stampa un warning con l'id;
+3. l'agente non fa nulla al momento del commit: lavora poi la issue creata col normale
+   workflow (clock-in, verifica indipendente, gate sul commit);
+4. `issues.json` aggiornato dall'hook resta unstaged e va committato dopo.
 
-   > Controllare che tutti i file siano stati aggiornati, che sia stato usato meno testo
-   > possibile, che non siano state introdotte delle ripetizioni in documenti diversi
+Questo hook non blocca mai il commit: per costruzione git ignora l'exit code del
+`post-commit`, e lo script termina comunque con `exit 0` anche in caso di errore
+(warning a console).
 
-   Il lavoro documentale resta così **tracciato e deferito** a quella issue, gestita poi col
-   normale workflow (clock-in, verifica indipendente, gate sul commit).
-4. Ricommitta impostando la variabile d'ambiente `HARNESS_DOCS_VERIFIED=1` (bypass
-   anti-loop): il commit del codice **prosegue subito** e l'hook non blocca di nuovo,
-   evitando un ciclo infinito. Se non serve alcun aggiornamento docs, ricommitta
-   direttamente con la stessa variabile.
-
-Esempi di impostazione della variabile per le shell più comuni:
-
-```bash
-# bash/sh
-HARNESS_DOCS_VERIFIED=1 git commit -m "..."
-```
-
-```powershell
-# PowerShell
-$env:HARNESS_DOCS_VERIFIED=1; git commit -m "..."
-```
-
-```bat
-:: cmd
-set HARNESS_DOCS_VERIFIED=1 && git commit -m "..."
-```
-
-Questo gate **non sostituisce** quello descritto in "Gate sul commit": lo snapshot commit
-per issue avviene comunque solo dopo il `pass` del subagent di verifica indipendente; il
-gate a livello hook è un controllo aggiuntivo, automatico e non bypassabile per errore, che
-si applica a ogni commit indipendentemente dal fatto che riguardi una issue tracciata.
+L'hook `pre-commit` resta solo come guard di ruolo: con `HARNESS_ROLE=worker` esce con
+`exit 1`, senza bypass.
 
 ## Init / verifica ambiente (init.mjs)
 

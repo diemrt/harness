@@ -59,9 +59,12 @@ herness-repository/
 │  ├─ issue-manager.mjs        # CLI dell'issue tracker
 │  ├─ issues.json              # seed vuoto (policy "data")
 │  ├─ issues.html              # viewer HTML delle issue
-│  ├─ hooks/                   # git hook del gate documentale pre-commit (managed)
+│  ├─ hooks/                   # git hook harness (managed): docs post-commit + guard ruolo worker
 │  │  ├─ pre-commit            # shim POSIX -> node pre-commit.mjs
-│  │  ├─ pre-commit.mjs        # gate: blocca il commit finche' HARNESS_DOCS_VERIFIED=1
+│  │  ├─ pre-commit.mjs        # blocca commit solo con HARNESS_ROLE=worker
+│  │  ├─ post-commit           # shim POSIX -> node post-commit.mjs
+│  │  ├─ post-commit.mjs       # crea issue docs automatiche (warning, non blocca)
+│  │  ├─ match.mjs             # matcher glob include/exclude per docsGate
 │  │  └─ install.mjs           # installer idempotente: git config core.hooksPath hooks
 │  └─ docs/
 │     ├─ AGENTS-RULES.md       # regole operative invarianti (managed)

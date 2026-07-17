@@ -109,9 +109,7 @@ solo disciplina di prompt):
   update che tenti `status = done` o `validation.state = pass`. Il worker può arrivare al
   massimo a `status = in_review` / `validation.state = unknown`: la self-validation diventa
   tecnicamente impossibile, non solo vietata a parole.
-- **`hooks/pre-commit.mjs`** blocca **ogni** commit quando `HARNESS_ROLE=worker` è impostato,
-  a prescindere da tutto il resto — controllo valutato **prima** del bypass
-  `HARNESS_DOCS_VERIFIED`, quindi non aggirabile per errore.
+- **`hooks/pre-commit.mjs`** blocca **ogni** commit quando `HARNESS_ROLE=worker` è impostato.
 
 `node init.mjs worker run` imposta sempre la variabile nell'environment del processo
 figlio: il guard non dipende dalla disciplina di chi lancia.

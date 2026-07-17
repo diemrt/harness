@@ -1,6 +1,6 @@
 {
   "harnessVersion": "0.4.0",
-  "generatedAt": "2026-07-17T09:20:51.480Z",
+  "generatedAt": "2026-07-17T09:30:39.290Z",
   "files": {
     ".gitignore": {
       "sha256": "97cfd8789112c2af22ba553b5942f351a785c9717fa1a0b32e7bda1e6a5a37e3",
@@ -11,15 +11,15 @@
       "policy": "seeded-once"
     },
     "docs/AGENTS-RULES.md": {
-      "sha256": "3135b24f1b91c31ae347c1530483569c6be538089d80edf13048f7552811beb1",
+      "sha256": "e30fd4bf5821ed06077f5e2248856c84ab581cabfd1c7419d1a9efddac67ce13",
       "policy": "managed"
     },
     "docs/ARCHITECTURE.md": {
-      "sha256": "1e8962570def8a801def1b2023e3a92df27e857e10cd64b6f4c7d8a5ffbed6da",
+      "sha256": "bb43387a45f647dfc690f93849adc42ff199025e639afbdb421f1e06b61eb638",
       "policy": "seeded-once"
     },
     "docs/EXTERNAL-WORKER.md": {
-      "sha256": "4e0b5f9d95170a21bd0eb14569aaab681201600b80d89c526639b3c8752c92a2",
+      "sha256": "6650a50fa7d8e9b4cb14afb6697b5f9ea2eafff212f552737a3ef33e2db4fddd",
       "policy": "managed"
     },
     "docs/GIT.md": {
