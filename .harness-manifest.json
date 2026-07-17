@@ -1,6 +1,6 @@
 {
-  "harnessVersion": "0.3.0",
-  "generatedAt": "2026-07-16T09:23:25.073Z",
+  "harnessVersion": "0.4.0",
+  "generatedAt": "2026-07-17T09:12:07.579Z",
   "files": {
     ".gitignore": {
       "sha256": "97cfd8789112c2af22ba553b5942f351a785c9717fa1a0b32e7bda1e6a5a37e3",
@@ -34,12 +34,16 @@
       "sha256": "e8640ac65b2d98c732f9320338daa3d20a9c801ae75537c4e6ee48c275366a1c",
       "policy": "managed"
     },
+    "hooks/match.mjs": {
+      "sha256": "7f33d84beb5a3f0efcce5c66217a9de00de9fc1c2fcb88db1759b549594f5c18",
+      "policy": "managed"
+    },
     "hooks/pre-commit": {
       "sha256": "95c0822eb010cc5e831052311460db375434edc1fd48dd231114df41e224bad0",
       "policy": "managed"
     },
     "hooks/pre-commit.mjs": {
-      "sha256": "1a912f495333495c5a26799f38b260f8e94b0e25982728e857667880a8d37e78",
+      "sha256": "9dc29c5b005745ace618e4fae2118560d46707bab48a80d38d4409d597ca23aa",
       "policy": "managed"
     },
     "init.config.json": {
