@@ -1,0 +1,5 @@
+#!/bin/sh
+# Cross-platform post-commit shim. Delegates to the Node hook so all logic
+# lives in post-commit.mjs (zero dependencies, node:* only). Works on POSIX
+# shells and on Git for Windows via its bundled sh.
+exec node "$(dirname "$0")/post-commit.mjs" "$@"

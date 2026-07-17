@@ -15,6 +15,7 @@ import { chmodSync, existsSync } from "node:fs";
 
 const HOOKS_DIR = "hooks";
 const PRE_COMMIT_HOOK = "hooks/pre-commit";
+const POST_COMMIT_HOOK = "hooks/post-commit";
 
 function hasGitDir() {
   if (existsSync(".git")) {
@@ -46,11 +47,13 @@ try {
 
 // Best-effort: mark the hook as executable. chmod is a no-op on Windows and
 // must never fail the installer.
-try {
-  chmodSync(PRE_COMMIT_HOOK, 0o755);
-} catch {
-  // ignore: harmless on platforms without POSIX permission bits, or if the
-  // hook file does not exist yet.
+for (const hookPath of [PRE_COMMIT_HOOK, POST_COMMIT_HOOK]) {
+  try {
+    chmodSync(hookPath, 0o755);
+  } catch {
+    // ignore: harmless on platforms without POSIX permission bits, or if the
+    // hook file does not exist yet.
+  }
 }
 
 console.log(`Git hooks installed: core.hooksPath=${HOOKS_DIR}`);

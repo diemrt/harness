@@ -27,5 +27,31 @@
   "externalWorker": {
     "enabled": false,
     "command": "ollama launch claude --model gemma4:31b-cloud -- -p {promptFile} --dangerously-skip-permissions"
+  },
+  "docsGate": {
+    "enabled": true,
+    "include": [
+      "**/*.mjs",
+      "**/*.js",
+      "**/*.cjs",
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.jsx",
+      "**/*.py",
+      "**/*.go",
+      "**/*.cs",
+      "**/*.java",
+      "**/*.rb",
+      "**/*.rs",
+      "**/*.php"
+    ],
+    "exclude": [
+      "docs/**",
+      "test/**",
+      "tests/**",
+      "**/*.md",
+      "issues.json",
+      ".harness-manifest.json"
+    ]
   }
 }

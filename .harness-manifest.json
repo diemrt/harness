@@ -1,6 +1,6 @@
 {
   "harnessVersion": "0.4.0",
-  "generatedAt": "2026-07-17T09:12:07.579Z",
+  "generatedAt": "2026-07-17T09:20:51.480Z",
   "files": {
     ".gitignore": {
       "sha256": "97cfd8789112c2af22ba553b5942f351a785c9717fa1a0b32e7bda1e6a5a37e3",
@@ -31,11 +31,19 @@
       "policy": "managed"
     },
     "hooks/install.mjs": {
-      "sha256": "e8640ac65b2d98c732f9320338daa3d20a9c801ae75537c4e6ee48c275366a1c",
+      "sha256": "9199bca7c550b55b2162356a9bff8c714c5b22e0f3550cf9744df2e37fba71bb",
       "policy": "managed"
     },
     "hooks/match.mjs": {
       "sha256": "7f33d84beb5a3f0efcce5c66217a9de00de9fc1c2fcb88db1759b549594f5c18",
+      "policy": "managed"
+    },
+    "hooks/post-commit": {
+      "sha256": "a5e4655169f60db4ed8970774dd113af2e7569e34f8a5e1ae2db9e845d6c199e",
+      "policy": "managed"
+    },
+    "hooks/post-commit.mjs": {
+      "sha256": "f381a85f88bfec04d57c1f6cb736716d2ddb1ce2d9716a543ab3e66cdae468fe",
       "policy": "managed"
     },
     "hooks/pre-commit": {
@@ -47,7 +55,7 @@
       "policy": "managed"
     },
     "init.config.json": {
-      "sha256": "8214dd71fa2c28653359f5400ab0e3d11015768e6c409961f878f7f5d1d09f4f",
+      "sha256": "84f175dc5bbb0eaa0ab542a3fa2d766482fd717773baf1c542974225f24c416d",
       "policy": "seeded-once"
     },
     "init.mjs": {
