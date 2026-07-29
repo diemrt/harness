@@ -1,0 +1,19 @@
+{
+  "name": "harness",
+  "version": "0.6.0",
+  "description": "Controlled development harness for AI agents: issue tracker, live issue board, and agent operating rules — installed as a plugin, leaving nothing but issues.json in your project.",
+  "author": {
+    "name": "diemrt",
+    "url": "https://github.com/diemrt"
+  },
+  "homepage": "https://github.com/diemrt/harness#readme",
+  "repository": "https://github.com/diemrt/harness",
+  "license": "MIT",
+  "keywords": [
+    "harness",
+    "ai-agent",
+    "issue-tracker",
+    "workflow",
+    "verification"
+  ]
+}

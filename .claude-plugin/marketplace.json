@@ -1,0 +1,28 @@
+{
+  "name": "diemrt",
+  "description": "diemrt's Claude Code plugins.",
+  "owner": {
+    "name": "diemrt",
+    "url": "https://github.com/diemrt"
+  },
+  "plugins": [
+    {
+      "name": "harness",
+      "source": "./",
+      "description": "Controlled development harness for AI agents: issue tracker, live issue board, and agent operating rules — installed as a plugin, leaving nothing but issues.json in your project.",
+      "version": "0.6.0",
+      "category": "engineering",
+      "keywords": [
+        "harness",
+        "ai-agent",
+        "issue-tracker",
+        "workflow",
+        "verification"
+      ],
+      "author": {
+        "name": "diemrt",
+        "url": "https://github.com/diemrt"
+      }
+    }
+  ]
+}

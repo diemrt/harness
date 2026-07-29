@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-29T13:20:46Z",
+  "last_updated": "2026-07-29T13:27:52Z",
   "rules": {
     "single_active_issue": false
   },
@@ -430,13 +430,13 @@
       "id": "75b75e31-9310-4ad9-b856-c237ade393ea",
       "title": "Scaffold marketplace Claude Code e skeleton del plugin harness",
       "description": "Creare la struttura di distribuzione del nuovo harness come plugin Claude Code, accanto all'harness v1 ancora funzionante (nessuna rimozione in questa issue).\n\n- `.claude-plugin/marketplace.json` alla radice del repo, che dichiara il plugin `harness`.\n- Directory del plugin con il proprio `.claude-plugin/plugin.json` (nome, versione, descrizione, autore) e le sottocartelle `skills/`, `commands/`, `agents/`, `scripts/` (anche vuote con placeholder).\n- Nessun file del plugin deve finire nella root materializzata dell'harness v1: le due cose convivono finche' non parte la demolizione.\n\nContesto: decisione di progetto e' distribuire harness come plugin installato per-utente (marketplace), non piu' come file materializzati nel repo consumer.",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "`/plugin marketplace add <path locale del repo>` seguito da `/plugin install harness@<owner>` completa senza errori e il plugin compare tra quelli installati; `plugin.json` e `marketplace.json` sono JSON validi con i campi richiesti.",
-        "state": "unknown"
+        "criteria": "PASS - verifica indipendente eseguita il 2026-07-29 su branch feat/plugin-rewrite. (1) JSON validi: node JSON.parse OK su .claude-plugin/plugin.json (564 B) e .claude-plugin/marketplace.json (724 B); `claude plugin validate <repo>` -> 'Validation passed' (exit 0). Campi conformi allo schema reale (confronto con superpowers 6.2.0 e mattpocock-skills 1.2.0): plugin.json ha name/version/description/author{name,url}/homepage/repository/license/keywords; marketplace.json ha name/description/owner{name,url}/plugins[] con entry harness source './' + version/category/keywords/author. (2) Flusso CLI reale: `claude plugin marketplace add C:/Users/diego_martignoni/Documents/Workspace/Projects/personal/herness` -> 'Successfully added marketplace: diemrt (declared in user settings)' exit 0; `claude plugin install harness@diemrt` -> 'Successfully installed plugin: harness@diemrt (scope: user)' exit 0; `claude plugin list` -> 'harness@diemrt / Version: 0.6.0 / Scope: user / Status: enabled'; `claude plugin details harness` -> inventario Skills 0, Agents 0, Hooks 0, MCP 0, LSP 0 (atteso: skeleton con soli .gitkeep). Nessuna conferma interattiva richiesta. (3) Gate di build: `npm test` -> 99 pass / 0 fail (exit 0); `npm run dev:check` -> {\"ok\":true,\"added\":[],\"updated\":[],\"conflicts\":[],\"removed\":[],\"orphaned\":[]} exit 0. (4) Harness v1 intatto: `git diff` sui file tracciati (escluso issues.json) vuoto; git status mostra solo i nuovi path .claude-plugin/marketplace.json, .claude-plugin/plugin.json, agents/.gitkeep, commands/.gitkeep, scripts/.gitkeep, skills/.gitkeep; l'unica modifica a issues.json e' la transizione di stato di questa issue. src/, template/, hooks/, issue-manager.mjs alla radice presenti e funzionanti (`node issue-manager.mjs --get --issue-id ...` -> ok:true). Nota non bloccante: plugin.json/marketplace.json dichiarano version 0.6.0 mentre package.json e' a 0.5.1 (i due manifest plugin concordano fra loro, requisito di `claude plugin tag`); l'allineamento va fatto al momento del rilascio.",
+        "state": "pass"
       },
       "created_at": "2026-07-29T13:20:46Z",
-      "updated_at": "2026-07-29T13:20:46Z"
+      "updated_at": "2026-07-29T13:27:52Z"
     },
     {
       "id": "dde4e03b-00b2-4db9-bdbf-830a23f8af3e",
