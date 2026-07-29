@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-29T15:29:29Z",
+  "last_updated": "2026-07-29T15:29:50Z",
   "rules": {
     "single_active_issue": false
   },
@@ -641,6 +641,30 @@
       },
       "created_at": "2026-07-29T15:29:29Z",
       "updated_at": "2026-07-29T15:29:29Z"
+    },
+    {
+      "id": "3532ee92-7342-42de-8270-fbb3c462d64c",
+      "title": "docs: verifica documentazione per commit d74de8f",
+      "description": "Contesto commit d74de8f: fix: merge configuration defaults per field, not per object\n\nValuta se servono aggiornamenti a docs/, AGENTS.md o README.md e descrivi cosa cambiare per ciascun file.\nSe non serve aggiornare nulla, chiudi la issue motivando la decisione.\n\nFile di codice modificati:\n- scripts/harness-config.mjs",
+      "status": "backlog",
+      "validation": {
+        "criteria": "Verificare la documentazione per il commit d74de8f (fix: merge configuration defaults per field, not per object). Controllare che tutti i file siano stati aggiornati, che sia stato usato meno testo possibile, che non siano state introdotte delle ripetizioni in documenti diversi",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-29T15:29:32Z",
+      "updated_at": "2026-07-29T15:29:32Z"
+    },
+    {
+      "id": "654cbb05-94e5-4d0a-a0e2-a786a10c6c84",
+      "title": "docsGate con include vuoto esplicito: gate attivo ma inerte",
+      "description": "Trovata dalla verifica indipendente sulla issue del merge dei default, come gap residuo dichiarato fuori scope. Il merge campo per campo chiude il caso dei campi OMESSI, ma non quello di un valore esplicito vuoto: `{\"docsGate\":{\"enabled\":true,\"include\":[]}}` supera la validazione (un array vuoto e vacuamente un array di stringhe) e produce un gate `enabled: true` che non puo matchare nulla. Stesso sintomo del bug originale, innescato da un valore intenzionale invece che da unomissione.\n\nIl verificatore ha osservato che nemmeno la strada alternativa (rifiuto di un docsGate incompleto) avrebbe chiuso questo caso: servirebbe comunque una regola esplicita, indipendente da quella scelta.\n\nDa decidere: rifiutare `include` vuoto quando `enabled` e true, oppure accettarlo trattandolo come `enabled: false` esplicito (un gate che non guarda nessun file e un gate spento), oppure lasciarlo passare documentandolo. Le prime due chiudono il fallimento silenzioso, la terza no.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "Non esiste piu nessuna configurazione, con campi omessi o con valori espliciti, che produca un docsGate con enabled true e nessun file possibile da matchare senza che questo sia evidente a chi legge la configurazione o a chi la scrive. Il comportamento scelto e coperto da test e descritto in references/config.md.",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-29T15:29:50Z",
+      "updated_at": "2026-07-29T15:29:50Z"
     }
   ]
 }
