@@ -66,6 +66,23 @@ Tredici linguaggi nell'`include` di default, non i cinque dell'esempio: se restr
 copiando l'esempio, stai anche decidendo che gli altri otto non contano come codice per il
 gate documentale. `verify` non ha default: è obbligatorio.
 
+Il merge è **per campo**, non per oggetto: la tabella sopra vale non solo quando ometti
+`docsGate` o `externalWorker` del tutto, ma anche quando ne ometti solo alcuni campi. Passare
+`{"docsGate":{"enabled":true}}` scrive `enabled: true` **insieme** a `include`/`exclude`
+riempiti coi default sopra, mai un `docsGate` con `enabled: true` e `include` assente — quel
+caso produrrebbe un gate che sembra attivo e non segnala mai niente, perché niente
+combacerebbe con un `include` mancante. Allo stesso modo, `{"externalWorker":{"command":"cmd
+{promptFile}"}}` scrive `enabled: false` esplicito accanto al `command` fornito, non un
+oggetto a cui manca la chiave `enabled`. Ogni campo esplicito nell'input sovrascrive il
+default corrispondente; i campi omessi prendono il default; non c'è merge dentro gli array
+(`include`/`exclude` forniti sostituiscono l'intero array di default, non si sommano ad
+esso).
+
+I campi di `docsGate`, quando presenti, sono tipizzati: `enabled` deve essere booleano,
+`include`/`exclude` array di stringhe. Un tipo sbagliato (`"include": "**/*.js"` invece di
+un array) è rifiutato con `INVALID_INPUT` invece di essere scritto e ignorato in silenzio a
+valle.
+
 Non c'è un task runner: i comandi vengono eseguiti direttamente. La configurazione li
 **dichiara**, così il gate è lo stesso a ogni verifica e non dipende da cosa si ricorda
 l'agente in quel momento.
@@ -101,7 +118,7 @@ niente**.
 |---|---|
 | `CONFIG_NOT_FOUND` | `.harness/config.json` non esiste |
 | `CONFIG_EXISTS` | configurazione già presente e nessun `--force` |
-| `INVALID_INPUT` | campo sconosciuto, `verify` mancante o vuoto, worker abilitato senza `{promptFile}` |
+| `INVALID_INPUT` | campo sconosciuto, `verify` mancante o vuoto, worker abilitato senza `{promptFile}`, `docsGate`/`externalWorker` non un oggetto, `docsGate.enabled` non booleano, `docsGate.include`/`exclude` non un array di stringhe |
 | `INVALID_JSON` | payload non JSON valido |
 | `FILE_NOT_FOUND` | `--config-file` o `--project-dir` inesistente |
 | `MISSING_ARGS` | payload assente, o `--config-data` e `--config-file` insieme |

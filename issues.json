@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-29T15:15:00Z",
+  "last_updated": "2026-07-29T15:29:29Z",
   "rules": {
     "single_active_issue": false
   },
@@ -574,13 +574,13 @@
       "id": "c3eb9048-a7bd-404a-8961-5e7054649518",
       "title": "docsGate parziale disattiva il gate documentale in silenzio",
       "description": "Emersa da un'osservazione fuori scope della verifica indipendente sulla issue della config locale.\n\n`initConfig` in `scripts/harness-config.mjs` applica i default a granularita' di oggetto: `config.docsGate ?? DEFAULT_DOCS_GATE`. Passando un `docsGate` parziale, ad esempio `{\"docsGate\":{\"enabled\":true}}`, viene scritto esattamente quello, senza `include` ne' `exclude`.\n\nConseguenza: chi poi applica il gate documentale legge `include` undefined, nessun file matcha, e il gate risulta attivo (`enabled: true`) ma non segnala mai niente. E' un fallimento silenzioso: il caso peggiore, perche' sembra che la protezione ci sia.\n\nDa decidere e implementare: merge campo per campo dei default dentro `docsGate` (e coerentemente dentro `externalWorker`), oppure rifiuto esplicito di un `docsGate` incompleto con `INVALID_INPUT`. La seconda e' piu' severa ma piu' onesta; la prima e' piu' comoda. In entrambi i casi il comportamento va documentato in `skills/harness/references/config.md`, dove oggi la tabella dei default e' corretta solo per il caso 'ometti docsGate del tutto'.",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "Una configurazione con `docsGate` parziale non puo' piu' produrre un gate documentale che sembra attivo e non lo e': o i campi mancanti vengono riempiti con i default (verificabile leggendo il config.json scritto), o la configurazione viene rifiutata con INVALID_INPUT senza scrivere niente. Il comportamento scelto e' coperto da un test e descritto in references/config.md.",
-        "state": "unknown"
+        "criteria": "Verificato con configurazioni parziali reali scritte su disco (scripts/harness-config.mjs, init in project dir temporanei): {docsGate:{enabled:true}} -> include/exclude riempiti coi 13/5 default; {docsGate:{include:[...]}} -> enabled:true+exclude default; {docsGate:{exclude:[...]}} -> enabled:true+include default; {docsGate:{}} e docsGate:null -> tutti i default; nessuna combinazione di campi OMESSI produce enabled:true con include/exclude assenti (unico caso limite trovato: include:[] esplicito produce enabled:true+include vuoto, ma e' un valore presente non mancante, fuori dalla lettera del criterio - vedi osservazione). externalWorker parziale (solo command, solo enabled) sempre scritto con entrambe le chiavi presenti. Validazione tipi aggiunta (docsGate.enabled boolean, include/exclude array di stringhe) verificata senza regressioni: gate `npm run test` (letto da .harness/config.json) = 181/181 pass, 0 fail, inclusi i 4 nuovi test in test/plugin-config.test.mjs (righe 197-303) che coprono merge parziale docsGate/externalWorker e rifiuto dei tipi sbagliati. `npm run dev:check`: updated=[] conflicts=[] (scripts/ e skills/ non fanno parte del set gestito da template/, quindi non compaiono nell'output - atteso). skills/harness/references/config.md aggiornato (righe 69-84, 121) descrive correttamente il merge per-campo e la tabella INVALID_INPUT corrisponde 1:1 alle condizioni in validateConfigInput (righe 217-271). git diff limitato a scripts/harness-config.mjs, test/plugin-config.test.mjs, skills/harness/references/config.md piu' bookkeeping in issues.json; nessun file fuori scope toccato da questa issue (board-server.mjs/board.html/plugin-board.test.mjs appartengono alla issue parallela a6c3e45e, gia' verificata, come da contesto fornito). Nessun file modificato dal verificatore oltre alla chiusura della issue.",
+        "state": "pass"
       },
       "created_at": "2026-07-29T14:25:33Z",
-      "updated_at": "2026-07-29T14:25:33Z"
+      "updated_at": "2026-07-29T15:28:38Z"
     },
     {
       "id": "cd8cf9b4-abaa-43ab-8454-b632d2230bb4",
@@ -622,13 +622,25 @@
       "id": "a6c3e45e-bf0d-41cb-a7b0-444cfe4f0485",
       "title": "Il board mostra il nome della cartella invece del nome del progetto",
       "description": "Emersa da unosservazione fuori scope della verifica sul ripristino della UI. La UI storica mostrava nel titolo il campo project di issues.json (es. MyProject - Issue Board). Il board servito dal plugin mostra invece il basename della directory del progetto, perche readIssues() in scripts/board-server.mjs non propaga il campo project del file. Differenza di comportamento rispetto alla UI storica, non richiesta da nessun criterio. Fix previsto: includere project nel payload di api/issues e usarlo nel titolo con fallback sul basename della directory quando il campo manca (i tracker nuovi non lo hanno, il seed minimale e last_updated + issues).",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "Il titolo del board mostra il campo project di issues.json quando presente, e il basename della directory del progetto quando assente. Coperto da un test che verifica entrambi i casi sul payload di api/issues.",
-        "state": "unknown"
+        "criteria": "Verificato: (1) readIssues() in scripts/board-server.mjs include ora `project` in tutti e tre i rami (file assente L53, letto L64, illeggibile L69), null quando il campo non e' una stringa non vuota. (2) projectNameFrom(project, projectDir) in scripts/board.html (L188-193) usa project se presente, altrimenti basename di projectDir, altrimenti 'Issue Board'; il titolo (L373) usa il formato storico '<nome> — Issue Board'. (3) Due nuovi test in test/plugin-board.test.mjs coprono entrambi i casi sul payload di api/issues. Gate `npm run test`: 181/181 pass, 0 fail. `npm run dev:check`: updated=[] conflicts=[]. Prove dal vivo con 3 project dir temporanee sotto AppData/Local/Temp/claude/.../scratchpad (eliminate a fine verifica, processi board-server terminati con taskkill /F sui PID 21364/30536/34300): con {project:'MyRealProject'} -> api/issues restituisce project:'MyRealProject'; senza campo project -> api/issues restituisce project:null e projectDir invariato (fallback al basename lato client confermato leggendo projectNameFrom); con issues.json malformato -> api/issues restituisce {issues:[],lastUpdated:null,project:null,error:'issues.json is not readable right now'}, stessa forma coerente. git status --short mostra solo scripts/board-server.mjs, scripts/board.html, test/plugin-board.test.mjs tra i file di questa issue: gli altri file modificati (scripts/harness-config.mjs, skills/harness/references/config.md, test/plugin-config.test.mjs) appartengono alla issue parallela c3eb9048 come da contesto fornito; issues.json e' bookkeeping dell'issue-manager. Nessun file toccato dal verificatore oltre alla chiusura della issue.",
+        "state": "pass"
       },
       "created_at": "2026-07-29T15:15:00Z",
-      "updated_at": "2026-07-29T15:15:00Z"
+      "updated_at": "2026-07-29T15:25:45Z"
+    },
+    {
+      "id": "fa9e838f-890d-43bd-82b6-18b1da88ccca",
+      "title": "docs: verifica documentazione per commit 420ecf6",
+      "description": "Contesto commit 420ecf6: fix: show the project name on the board, not the folder name\n\nValuta se servono aggiornamenti a docs/, AGENTS.md o README.md e descrivi cosa cambiare per ciascun file.\nSe non serve aggiornare nulla, chiudi la issue motivando la decisione.\n\nFile di codice modificati:\n- scripts/board-server.mjs",
+      "status": "backlog",
+      "validation": {
+        "criteria": "Verificare la documentazione per il commit 420ecf6 (fix: show the project name on the board, not the folder name). Controllare che tutti i file siano stati aggiornati, che sia stato usato meno testo possibile, che non siano state introdotte delle ripetizioni in documenti diversi",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-29T15:29:29Z",
+      "updated_at": "2026-07-29T15:29:29Z"
     }
   ]
 }

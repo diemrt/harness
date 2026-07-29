@@ -194,6 +194,114 @@ test("a configuration without a verification command is rejected", () => {
   }
 });
 
+test("a partial docsGate is filled in field-by-field, never left half-defaulted", () => {
+  const dir = tempProject();
+  try {
+    const partial = JSON.stringify({ verify: "npm test", docsGate: { enabled: true } });
+    const written = assertOk(run(dir, ["--init", "--config-data", partial]));
+
+    assert.equal(written.config.docsGate.enabled, true, "the explicit override must survive");
+    assert.ok(
+      Array.isArray(written.config.docsGate.include) && written.config.docsGate.include.length > 0,
+      "include must be filled in with the default, not left undefined"
+    );
+    assert.ok(
+      Array.isArray(written.config.docsGate.exclude) && written.config.docsGate.exclude.length > 0,
+      "exclude must be filled in with the default, not left undefined"
+    );
+
+    const onDisk = JSON.parse(readFileSync(path.join(dir, ".harness", "config.json"), "utf8"));
+    assert.equal(onDisk.docsGate.enabled, true);
+    assert.ok(Array.isArray(onDisk.docsGate.include) && onDisk.docsGate.include.length > 0);
+    assert.ok(Array.isArray(onDisk.docsGate.exclude) && onDisk.docsGate.exclude.length > 0);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("a partial docsGate overriding one field keeps the defaults for the rest", () => {
+  const dir = tempProject();
+  try {
+    const partial = JSON.stringify({
+      verify: "npm test",
+      docsGate: { exclude: ["vendor/**"] },
+    });
+    const written = assertOk(run(dir, ["--init", "--config-data", partial]));
+
+    assert.deepEqual(written.config.docsGate.exclude, ["vendor/**"], "explicit override wins");
+    assert.equal(written.config.docsGate.enabled, true, "enabled keeps its default");
+    assert.ok(
+      written.config.docsGate.include.includes("**/*.mjs"),
+      "include keeps the default when omitted"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("a partial externalWorker is filled in field-by-field too", () => {
+  const dir = tempProject();
+  try {
+    const partial = JSON.stringify({
+      verify: "npm test",
+      externalWorker: { command: "copilot -p {promptFile}" },
+    });
+    const written = assertOk(run(dir, ["--init", "--config-data", partial]));
+
+    assert.equal(written.config.externalWorker.command, "copilot -p {promptFile}");
+    assert.equal(
+      written.config.externalWorker.enabled,
+      false,
+      "enabled must default to false, not be left missing (which would also read as falsy, but the field must exist)"
+    );
+
+    const onDisk = JSON.parse(readFileSync(path.join(dir, ".harness", "config.json"), "utf8"));
+    assert.ok(
+      Object.prototype.hasOwnProperty.call(onDisk.externalWorker, "enabled"),
+      "the 'enabled' key must be present on disk, not just absent-and-falsy"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("docsGate with the wrong field shapes is rejected, not silently merged", () => {
+  const dir = tempProject();
+  try {
+    assertFail(
+      run(dir, ["--init", "--config-data", JSON.stringify({ verify: "npm test", docsGate: "yes" })]),
+      "INVALID_INPUT"
+    );
+    assertFail(
+      run(dir, [
+        "--init",
+        "--config-data",
+        JSON.stringify({ verify: "npm test", docsGate: { enabled: "true" } }),
+      ]),
+      "INVALID_INPUT"
+    );
+    assertFail(
+      run(dir, [
+        "--init",
+        "--config-data",
+        JSON.stringify({ verify: "npm test", docsGate: { include: "**/*.js" } }),
+      ]),
+      "INVALID_INPUT"
+    );
+    assertFail(
+      run(dir, [
+        "--init",
+        "--config-data",
+        JSON.stringify({ verify: "npm test", docsGate: { exclude: [1, 2] } }),
+      ]),
+      "INVALID_INPUT"
+    );
+    assert.equal(existsSync(path.join(dir, ".harness")), false, "a rejected config must write nothing");
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("an enabled external worker must carry the {promptFile} placeholder", () => {
   const dir = tempProject();
   try {

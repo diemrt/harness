@@ -246,6 +246,29 @@ function validateConfigInput(config) {
       );
     }
   }
+  // A partial docsGate is filled in field-by-field with the defaults (see initConfig), so that
+  // `enabled: true` can never end up paired with a missing `include`/`exclude` — the gate must
+  // never look active while matching nothing. That merge only works if the fields, when present,
+  // are of the right shape: an `include` that isn't an array would be silently useless downstream
+  // too, just typed instead of missing.
+  if (config.docsGate !== undefined && config.docsGate !== null) {
+    const gate = config.docsGate;
+    if (typeof gate !== "object" || Array.isArray(gate)) {
+      fail("'docsGate' must be an object or null.", "INVALID_INPUT");
+    }
+    if (gate.enabled !== undefined && typeof gate.enabled !== "boolean") {
+      fail("'docsGate.enabled' must be a boolean.", "INVALID_INPUT");
+    }
+    for (const field of ["include", "exclude"]) {
+      const value = gate[field];
+      if (value === undefined) {
+        continue;
+      }
+      if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string")) {
+        fail(`'docsGate.${field}' must be an array of glob strings.`, "INVALID_INPUT");
+      }
+    }
+  }
 }
 
 // Writes .harness/, its self-ignoring .gitignore, and config.json — in that order, so the
@@ -271,11 +294,17 @@ function initConfig(dir, config, force) {
     "utf8"
   );
 
+  // Defaults are merged field-by-field, not swapped in wholesale, precisely so a partial
+  // `docsGate` (or `externalWorker`) can never lose the fields that make it work. Passing
+  // `{"docsGate":{"enabled":true}}` used to write exactly that — `enabled: true` with no
+  // `include`/`exclude` at all, a gate that looks active and matches nothing. Filling in only the
+  // fields the caller omitted keeps that impossible while still letting a caller override just
+  // one field (say, add a glob to `exclude`) without having to restate everything else.
   const stored = {
     setup: config.setup ?? null,
     verify: config.verify,
-    externalWorker: config.externalWorker ?? { enabled: false, command: null },
-    docsGate: config.docsGate ?? DEFAULT_DOCS_GATE,
+    externalWorker: { enabled: false, command: null, ...(config.externalWorker ?? {}) },
+    docsGate: { ...DEFAULT_DOCS_GATE, ...(config.docsGate ?? {}) },
   };
   writeFileSync(configPath, JSON.stringify(stored, null, 2) + "\n", "utf8");
 
