@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Harness board</title>
+<style>
+  /* Self-contained by design: the board is served from a loopback socket and must render with
+     no network at all. No CDN, no font fetch, no build step. */
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --ink: #16181d;
+    --muted: #6b7280;
+    --line: #e4e7ec;
+    --accent: #3b5bdb;
+    --backlog: #94a3b8;
+    --in_progress: #d97706;
+    --in_review: #7c3aed;
+    --blocked: #dc2626;
+    --done: #15803d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --panel: #171a21;
+      --ink: #e6e8ec;
+      --muted: #9aa1ad;
+      --line: #262b35;
+      --accent: #7d92f5;
+      --backlog: #7c8797;
+      --in_progress: #f0a52a;
+      --in_review: #a78bfa;
+      --blocked: #f87171;
+      --done: #4ade80;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    position: sticky; top: 0; z-index: 5;
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    padding: 14px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+  h1 { font-size: 16px; margin: 0; letter-spacing: -0.01em; }
+  .project { color: var(--muted); font-size: 13px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .spacer { flex: 1; }
+  #search {
+    padding: 7px 11px; min-width: 220px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--bg); color: inherit; font: inherit;
+  }
+  #search:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .live { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--done); }
+  .dot.stale { background: var(--blocked); }
+  main {
+    display: grid; gap: 16px; padding: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    align-items: start;
+  }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+  section > h2 {
+    display: flex; align-items: center; gap: 8px;
+    margin: 0; padding: 12px 14px;
+    font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em;
+    border-bottom: 1px solid var(--line);
+  }
+  section > h2 .bar { width: 3px; height: 14px; border-radius: 2px; background: var(--status); }
+  section > h2 .count { margin-left: auto; color: var(--muted); font-weight: 400; }
+  ul { list-style: none; margin: 0; padding: 8px; display: grid; gap: 8px; }
+  li { padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); }
+  li h3 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+  li p { margin: 0; font-size: 13px; color: var(--muted); }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+  .id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .state { padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); }
+  .state.pass { color: var(--done); border-color: currentColor; }
+  .state.fail { color: var(--blocked); border-color: currentColor; }
+  .empty { padding: 18px 14px; color: var(--muted); font-size: 13px; }
+  footer { padding: 0 20px 24px; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Harness board</h1>
+  <span class="project" id="project"></span>
+  <span class="spacer"></span>
+  <input id="search" type="search" placeholder="Filter issues…" autocomplete="off" />
+  <span class="live"><span class="dot" id="dot"></span><span id="liveLabel">live</span></span>
+</header>
+<main id="board"></main>
+<footer id="updated"></footer>
+
+<script>
+  const STATUSES = ["in_progress", "in_review", "blocked", "backlog", "done"];
+  const LABELS = {
+    in_progress: "In progress",
+    in_review: "In review",
+    blocked: "Blocked",
+    backlog: "Backlog",
+    done: "Done",
+  };
+
+  const board = document.getElementById("board");
+  const search = document.getElementById("search");
+  const dot = document.getElementById("dot");
+  const liveLabel = document.getElementById("liveLabel");
+
+  let issues = [];
+
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
+  }
+
+  function matches(issue, needle) {
+    if (!needle) return true;
+    const haystack = `${issue.title} ${issue.description} ${issue.id}`.toLowerCase();
+    return haystack.includes(needle);
+  }
+
+  function card(issue) {
+    const validation = issue.validation;
+    const state = validation && validation.state ? validation.state : null;
+    const stateChip = state && state !== "unknown"
+      ? `<span class="state ${escapeHtml(state)}">${escapeHtml(state)}</span>`
+      : "";
+    const description = String(issue.description ?? "").split("\n")[0];
+    return `<li>
+      <h3>${escapeHtml(issue.title)}</h3>
+      <p>${escapeHtml(description.length > 160 ? description.slice(0, 160) + "…" : description)}</p>
+      <div class="meta">
+        <span class="id">${escapeHtml(String(issue.id).slice(0, 8))}</span>
+        ${stateChip}
+        <span>${escapeHtml(String(issue.updated_at ?? "").replace("T", " ").replace("Z", ""))}</span>
+      </div>
+    </li>`;
+  }
+
+  function render() {
+    const needle = search.value.trim().toLowerCase();
+    const visible = issues.filter((issue) => matches(issue, needle));
+    board.innerHTML = STATUSES.map((status) => {
+      const group = visible.filter((issue) => issue.status === status);
+      const body = group.length
+        ? `<ul>${group.map(card).join("")}</ul>`
+        : `<p class="empty">nothing here</p>`;
+      return `<section style="--status: var(--${status})">
+        <h2><span class="bar"></span>${LABELS[status]}<span class="count">${group.length}</span></h2>
+        ${body}
+      </section>`;
+    }).join("");
+  }
+
+  async function load() {
+    const response = await fetch("./api/issues");
+    const payload = await response.json();
+    issues = Array.isArray(payload.issues) ? payload.issues : [];
+    document.getElementById("project").textContent = payload.projectDir ?? "";
+    document.getElementById("updated").textContent = payload.lastUpdated
+      ? `issues.json last updated ${payload.lastUpdated}`
+      : "";
+    render();
+  }
+
+  search.addEventListener("input", render);
+
+  // The server pushes on every change to issues.json; the browser never polls.
+  const events = new EventSource("./events");
+  events.addEventListener("issues", load);
+  events.onopen = () => {
+    dot.classList.remove("stale");
+    liveLabel.textContent = "live";
+  };
+  events.onerror = () => {
+    dot.classList.add("stale");
+    liveLabel.textContent = "reconnecting…";
+  };
+
+  load();
+</script>
+</body>
+</html>

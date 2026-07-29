@@ -107,7 +107,13 @@ test("the board serves the page and the project's issues", async () => {
     const page = await fetch(url);
     assert.equal(page.status, 200);
     assert.match(page.headers.get("content-type"), /text\/html/);
-    assert.match(await page.text(), /Harness board/);
+    const html = await page.text();
+    assert.match(html, /Issue Board/);
+    // The page must read from the server, not from a sibling issues.json the way the copied
+    // viewer used to.
+    assert.match(html, /fetch\("api\/issues"/);
+    assert.match(html, /new EventSource\("events"\)/);
+    assert.doesNotMatch(html, /fetch\("issues\.json"/);
 
     const api = await fetch(`${url}api/issues`);
     const data = await api.json();
@@ -217,11 +223,35 @@ test("an unreadable issues.json degrades instead of killing the board", async ()
   }
 });
 
+test("the page keeps the features the copied viewer had", async () => {
+  const dir = tempProject(seed());
+  const { child, url } = await startServer(dir);
+  try {
+    const html = await (await fetch(url)).text();
+    // Each of these was lost once already by rewriting the page instead of serving it.
+    for (const marker of [
+      "counters", // per-status counters
+      "statusFilters", // WIP / per-status / all tabs
+      "WIP_PRIORITY", // blocked before in_progress before in_review before backlog
+      "preserve-newlines", // full description, newlines kept
+      "Validazione", // validation criteria block
+      "loadingState",
+      "emptyState",
+      "errorState",
+    ]) {
+      assert.match(html, new RegExp(marker), `the board page lost: ${marker}`);
+    }
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("unknown paths 404 rather than leaking files", async () => {
   const dir = tempProject(seed());
   const { child, url } = await startServer(dir);
   try {
-    for (const suffix of ["nope", "../board-server.mjs", "issues.json"]) {
+    for (const suffix of ["nope", "../board-server.mjs", "issues.json", "../../proposals/board-minimal.html"]) {
       const response = await fetch(`${url}${suffix}`);
       assert.equal(response.status, 404, `${suffix} must not be served`);
     }

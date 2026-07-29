@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-29T15:00:29Z",
+  "last_updated": "2026-07-29T15:13:22Z",
   "rules": {
     "single_active_issue": false
   },
@@ -605,6 +605,18 @@
       },
       "created_at": "2026-07-29T14:55:46Z",
       "updated_at": "2026-07-29T15:00:29Z"
+    },
+    {
+      "id": "3e7a852c-e9be-49e1-9f83-1adbd26bd159",
+      "title": "Ripristinare la UI di issues.html nel board servito dal plugin",
+      "description": "La issue del board server ha sostituito la UI esistente con una pagina riscritta da zero. Era fuori scope: il compito era servire il board dal plugin, non ridisegnarlo. La riscrittura ha perso funzionalita' presenti in `issues.html`: contatori per stato, tab di filtro con vista WIP prioritizzata (blocked > in_progress > in_review > backlog), descrizione completa con newline preservate, blocco validazione con criteri e stato, date formattate it-IT, id completo, stati di loading / empty / error.\n\nDa fare:\n- ripristinare la UI di `issues.html` (stile Tailwind + daisyUI + Lucide) come pagina servita dal board server, adattandola al server invece che al file: dati da `./api/issues`, aggiornamento live via SSE su `./events` mantenendo filtro e ricerca correnti;\n- congelare la UI minimale scritta per errore come proposta di miglioramento, senza che venga servita;\n- aggiornare `skills/harness/references/board.md`: la pagina ripristinata carica Tailwind, daisyUI e Lucide da CDN, quindi la dichiarazione di autosufficienza offline non vale piu' ed e' un trade-off da dichiarare, non da nascondere.\n\nDecisione presa dall'utente: la coerenza di stile con la UI esistente vale piu' dell'indipendenza dalla rete. Le due UI verranno riviste in un secondo momento.",
+      "status": "done",
+      "validation": {
+        "criteria": "PASS. (1) UI storica ripristinata: `diff -u issues.html scripts/board.html` produce solo differenze intenzionali (indicatore live+link api/issues nell'header, testo dello stato di errore adattato al server, projectNameFrom(), load()/subscribe() al posto del fetch di issues.json). Contatori, tabs WIP/stati/Tutti, WIP_PRIORITY {blocked:0,in_progress:1,in_review:2,backlog:3}, .preserve-newlines su descrizione e criteri, blocco Validazione con badge pass/fail/unknown, formatDate toLocaleString('it-IT'), id completo, loadingState/emptyState/errorState sono byte-identici all'originale. Nessuna funzionalita' della UI storica risulta persa. (2) Sorgente dati: fetch(\"api/issues\") (board.html:363), nessun fetch(\"issues.json\"); SSE: new EventSource(\"events\") + listener 'issues' (board.html:396-403); nome progetto da payload server (data.projectDir, board.html:370 + board-server.mjs:157). (3) Prova dal vivo su istanza propria (port 55871, project dir temporanea): GET / -> 200 e il body e' byte-identico a scripts/board.html (diff -q silenzioso); GET api/issues -> 200 {\"projectDir\":...,\"issues\":[],\"lastUpdated\":null}; con client SSE aperto, --insert via issue-manager ha prodotto CHUNK \"event: issues\ndata: {}\n\n\" e api/issues ha poi restituito la nuova issue. Istanza terminata (taskkill PID 27564; GET successiva -> 000). Istanza dell'orchestratore (pid 17316, porta 55450) lasciata attiva e verificata: serve la stessa pagina. (4) proposals/board-minimal.html non raggiungibile: /proposals/board-minimal.html, /board-minimal.html, /../proposals/board-minimal.html, /api/board-minimal.html -> tutti 404. (5) board.md: rimossa la riga 'Non richiede rete: la pagina e' autosufficiente... Funziona con la macchina offline'; nuova sezione 'Dipendenze della pagina' dichiara Tailwind+daisyUI+Lucide da CDN, che sono esattamente i tre CDN caricati (cdn.tailwindcss.com, cdn.jsdelivr.net/daisyui@4.12.10, unpkg.com/lucide). grep -rni 'offline' su skills/ e scripts/ non trova piu' claim di autosufficienza. (6) Gate `npm run test` (verify da .harness/config.json): 175 pass, 0 fail. `npm run dev:check`: {\"ok\":true,...,\"updated\":[],\"conflicts\":[]}. (7) Nessuna regressione: git status --short mostra solo issues.json (record di questa issue), rename scripts/board.html->proposals/board-minimal.html, skills/harness/references/board.md, test/plugin-board.test.mjs, proposals/README.md e scripts/board.html nuovi; `git diff -- issues.html init.mjs issue-manager.mjs docs/ template/` vuoto: issues.html alla radice non toccato.",
+        "state": "pass"
+      },
+      "created_at": "2026-07-29T15:06:34Z",
+      "updated_at": "2026-07-29T15:13:22Z"
     }
   ]
 }

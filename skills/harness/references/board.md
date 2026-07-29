@@ -56,8 +56,16 @@ occupata, l'avvio fallisce con `PORT_IN_USE` invece di restare a metà.
   compreso `issues.json` chiesto per path.
 - Non è un'interfaccia di modifica: le issue si cambiano con la CLI
   ([issues.md](issues.md)), così ogni scrittura passa dalle stesse validazioni.
-- Non richiede rete: la pagina è autosufficiente, nessun CDN e nessun font remoto. Funziona
-  con la macchina offline.
+
+## Dipendenze della pagina
+
+La pagina carica Tailwind, daisyUI e Lucide **da CDN**: senza rete si apre ma non si
+presenta. È un trade-off scelto consapevolmente — la coerenza con la UI storica del progetto
+vale più dell'indipendenza dalla rete — non una svista. In `proposals/board-minimal.html`
+c'è una UI alternativa senza dipendenze esterne, congelata in attesa di decidere se
+vendorizzare le librerie o cambiare interfaccia.
+
+I dati invece non passano mai da fuori: `api/issues` legge il file locale e basta.
 
 ## Se un progetto non ha `issues.json`
 
