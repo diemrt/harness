@@ -15,6 +15,11 @@ plugin e i dati dal progetto corrente: nel repository non finisce nessun HTML.
 node "$SCRIPTS/board-server.mjs" [--project-dir <path>] [--port <n>]
 ```
 
+Il progetto è risolto come per gli altri script del plugin: **default la directory corrente
+del processo**, `--project-dir` come override esplicito quando non controlli la cwd. Se lo
+ometti partendo dalla cartella sbagliata ottieni un board vuoto del progetto sbagliato, senza
+nessun errore: il campo `projectDir` nella riga di avvio è lì per accorgertene subito.
+
 Il processo resta in esecuzione: avvialo **in background**. All'avvio stampa una riga JSON e
 poi tace:
 

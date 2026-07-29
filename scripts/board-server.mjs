@@ -7,11 +7,11 @@
 // issues.json and pushes to the browser, which never polls.
 //
 // Usage:
-//   node board-server.mjs [--project-dir <path>] [--port <n>] [--once]
+//   node board-server.mjs [--project-dir <path>] [--port <n>]
 //
+// --project-dir defaults to the process cwd: the board shows the project you are working in.
 // --port 0 (the default) lets the OS pick a free port. The socket is bound to 127.0.0.1: the
 // board is never reachable from outside the machine.
-// --once serves a single request and exits; only useful for tests.
 //
 // On startup the server prints exactly one line of JSON — the same contract as the other plugin
 // scripts — and then keeps running:
@@ -73,7 +73,6 @@ function main() {
     options: {
       "project-dir": { type: "string" },
       port: { type: "string", default: "0" },
-      once: { type: "boolean" },
     },
   });
 
@@ -90,9 +89,6 @@ function main() {
     if (url.pathname === "/" || url.pathname === "/index.html") {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
       res.end(page);
-      if (values.once) {
-        shutdown();
-      }
       return;
     }
 
