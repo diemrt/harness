@@ -15,6 +15,16 @@ viene mai toccato.
 Conseguenza voluta: la configurazione è **per clone**, non condivisa. Un collega che non usa
 harness non vede niente; tu la ricrei se ricloni.
 
+## Dove sta la configurazione
+
+`.harness/` viene risolta contro la **directory del progetto**, mai accanto allo script:
+
+- default: la directory corrente del processo;
+- `--project-dir <path>`: override esplicito, quando non controlli la cwd.
+
+Vale per tutti i comandi, `--detect` e `--get` compresi: una sola copia installata configura
+progetti diversi senza confonderli.
+
 ## `config.json`
 
 ```json
@@ -42,6 +52,20 @@ harness non vede niente; tu la ricrei se ricloni.
 - **`docsGate`** — glob che stabiliscono quali file contano come "codice" per il gate
   documentale dopo il commit.
 
+L'esempio sopra è **abbreviato**. Quello che `--init` scrive davvero per i campi che ometti:
+
+| Campo omesso | Valore scritto |
+|---|---|
+| `setup` | `null` — nessun comando di preparazione |
+| `externalWorker` | `{ "enabled": false, "command": null }` |
+| `docsGate.include` | `**/*.mjs`, `**/*.js`, `**/*.cjs`, `**/*.ts`, `**/*.tsx`, `**/*.jsx`, `**/*.py`, `**/*.go`, `**/*.cs`, `**/*.java`, `**/*.rb`, `**/*.rs`, `**/*.php` |
+| `docsGate.exclude` | `docs/**`, `test/**`, `tests/**`, `**/*.md`, `issues.json` |
+| `docsGate.enabled` | `true` |
+
+Tredici linguaggi nell'`include` di default, non i cinque dell'esempio: se restringi i glob
+copiando l'esempio, stai anche decidendo che gli altri otto non contano come codice per il
+gate documentale. `verify` non ha default: è obbligatorio.
+
 Non c'è un task runner: i comandi vengono eseguiti direttamente. La configurazione li
 **dichiara**, così il gate è lo stesso a ogni verifica e non dipende da cosa si ricorda
 l'agente in quel momento.
@@ -61,6 +85,12 @@ node "$SCRIPTS/harness-config.mjs" --detect
 # scriverla, dopo la conferma dell'utente
 node "$SCRIPTS/harness-config.mjs" --init --config-file ./proposed.json
 node "$SCRIPTS/harness-config.mjs" --init --config-data '{"setup":"npm ci","verify":"npm test"}'
+
+# operare su un altro progetto
+node "$SCRIPTS/harness-config.mjs" --get --project-dir /path/to/project
+
+# elenco completo di comandi e flag
+node "$SCRIPTS/harness-config.mjs" --help
 ```
 
 `--init` rifiuta di sovrascrivere una configurazione esistente (`CONFIG_EXISTS`) se non passi
@@ -75,6 +105,8 @@ niente**.
 | `INVALID_JSON` | payload non JSON valido |
 | `FILE_NOT_FOUND` | `--config-file` o `--project-dir` inesistente |
 | `MISSING_ARGS` | payload assente, o `--config-data` e `--config-file` insieme |
+| `UNKNOWN_COMMAND` | nessun comando riconosciuto (vedi `--help`) |
+| `ERROR` | catch-all per errori imprevisti |
 
 ## Primo uso su un progetto
 

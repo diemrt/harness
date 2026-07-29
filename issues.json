@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-29T14:14:50Z",
+  "last_updated": "2026-07-29T14:24:22Z",
   "rules": {
     "single_active_issue": false
   },
@@ -557,6 +557,18 @@
       },
       "created_at": "2026-07-29T13:42:16Z",
       "updated_at": "2026-07-29T13:42:16Z"
+    },
+    {
+      "id": "6e090e8d-98c4-42c0-84a9-b501a8bb2c93",
+      "title": "docs: verifica documentazione per commit b311c38",
+      "description": "Contesto commit b311c38: feat: keep the project configuration out of the repository\n\nValuta se servono aggiornamenti a docs/, AGENTS.md o README.md e descrivi cosa cambiare per ciascun file.\nSe non serve aggiornare nulla, chiudi la issue motivando la decisione.\n\nFile di codice modificati:\n- scripts/harness-config.mjs",
+      "status": "done",
+      "validation": {
+        "criteria": "PASS (riverifica indipendente). Gate: verify da .harness/config.json = 'npm run test' -> node --test: 166 pass / 0 fail / 0 cancelled. Le 4 lacune del fail precedente sono colmate in skills/harness/references/config.md, unico file di doc toccato (git diff --stat: config.md +32, issues.json +14/-1): (a) --help documentato a config.md:92-93 nel blocco 'Comandi'; (b) --project-dir: nuova sezione 'Dove sta la configurazione' config.md:18-26, dice che il default e' la cwd e che il flag e' un override esplicito, coerente con resolveProjectDir() harness-config.mjs:90-96 e parseArgs:333; (c) UNKNOWN_COMMAND aggiunto alla tabella codici config.md:108 (lanciato a harness-config.mjs:373); (d) tabella dei default di --init a config.md:55-67. I default documentati corrispondono ESATTAMENTE al sorgente, verificato sia per lettura (DEFAULT_DOCS_GATE harness-config.mjs:49-67, initConfig righe 274-279) sia empiricamente: 'node scripts/harness-config.mjs --init --project-dir <tmp> --config-data {\"verify\":\"npm test\"}' scrive setup:null, externalWorker:{enabled:false,command:null}, docsGate.enabled:true, include con i 13 glob nello stesso ordine documentato (mjs,js,cjs,ts,tsx,jsx,py,go,cs,java,rb,rs,php) ed exclude [docs/**,test/**,tests/**,**/*.md,issues.json]. Nessuna nuova divergenza doc/sorgente: riconfrontata l'intera config.md con 'node scripts/harness-config.mjs --help' e con lo script; la riga aggiunta 'ERROR | catch-all' corrisponde a harness-config.mjs:70,76,383 (e' --help che non lo elenca, non la doc a sbagliare). Criteri originali della issue docs (dal template hooks/post-commit.mjs:89): 'tutti i file aggiornati' ora soddisfatto; 'meno testo possibile' soddisfatto (+32 righe, nessun riempitivo); 'nessuna ripetizione in documenti diversi' soddisfatto: le aggiunte non duplicano contenuto di altri reference (external-worker.md descrive il template {promptFile}, non i default; config.md continua a rimandarci a riga 51). Nessun file modificato dal verificatore: 'git status --short' finale mostra solo ' M issues.json' e ' M skills/harness/references/config.md'; le due config di prova sono state create e rimosse sotto AppData/Local/Temp/claude, fuori dal repo. Osservazioni fuori scope, non bloccanti: (1) la tabella elenca docsGate.include/exclude/enabled come righe separate, ma il codice applica il default a granularita' di oggetto (config.docsGate ?? DEFAULT_DOCS_GATE): passando {\"docsGate\":{\"enabled\":true}} viene scritto solo {enabled:true}, senza include/exclude di default (verificato in tmp); (2) config.md:75-76 dichiara 'una riga JSON su stdout' e poi elenca --help, che stampa testo semplice: l'eccezione e' esplicitata solo in issues.md:71-72, a cui config.md rimanda con 'stesso contratto del tracker'; (3) restano stale, come gia' rilevato, README.md:133/179, AGENTS.md:30 e docs/ARCHITECTURE.md:57-58,77 sul vecchio modello init.config.json (retaggio del rewrite, non introdotto da b311c38).",
+        "state": "pass"
+      },
+      "created_at": "2026-07-29T14:15:36Z",
+      "updated_at": "2026-07-29T14:24:22Z"
     }
   ]
 }
