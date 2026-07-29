@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-29T13:27:52Z",
+  "last_updated": "2026-07-29T13:39:11Z",
   "rules": {
     "single_active_issue": false
   },
@@ -442,13 +442,13 @@
       "id": "dde4e03b-00b2-4db9-bdbf-830a23f8af3e",
       "title": "Portare issue-manager.mjs nel plugin con risoluzione della project dir",
       "description": "Spostare `issue-manager.mjs` dentro `scripts/` del plugin e renderlo utilizzabile da qualsiasi progetto senza essere copiato nel progetto stesso.\n\n- Il file `issues.json` va risolto nella directory del progetto (cwd), non accanto allo script; prevedere un override esplicito (es. `--project-dir`).\n- Se `issues.json` non esiste nella project dir, crearlo vuoto al primo uso (unica cosa che harness scrive nel repo condiviso).\n- Formato di `issues.json` invariato: i dati esistenti devono restare leggibili senza migrazione.\n- Contratto di output invariato (una riga JSON su stdout, `ok`/`error`/`code`, exit code 0/1).\n- Aggiornare la suite di test in `test/` di conseguenza.",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "La suite di test passa; lanciando lo script dal plugin con cwd su un progetto diverso, le operazioni agiscono sull'`issues.json` di quel progetto; su una dir senza `issues.json` il file viene creato vuoto; l'`issues.json` reale del repo resta leggibile e integro.",
-        "state": "unknown"
+        "criteria": "Verifica indipendente PASS. (1) npm test: 137 test, 0 fail (di cui 38 nuovi in test/plugin-issue-manager.test.mjs che lanciano scripts/issue-manager.mjs con cwd sulla project dir). (2) npm run dev:check: updated=[] e conflicts=[] (18 skipped). (3) Prove funzionali indipendenti dalla suite, eseguite fuori dal repo in C:\\Users\\diego_martignoni\\AppData\\Local\\Temp\\claude\\verify-dde4e03b (80+ assert, tutte verdi): due project dir distinte restano isolate (insert/update/delete con cwd su A lasciano l'issues.json di B byte-identico; --get da B su un id di A -> NOT_FOUND); su una dir senza issues.json --get-all restituisce {totalCount:0,issues:[]} con exit 0 SENZA creare il file (dir rimasta vuota), mentre il primo --insert lo crea con l'issue dentro; --project-dir vince sul cwd sia in lettura sia in scrittura (insert con cwd=A e --project-dir=B scrive solo in B); nessun file .tmp residuo in nessuna project dir dopo le scritture e nessun issues.json creato accanto allo script (scripts/ contiene solo .gitkeep e issue-manager.mjs); contratto di output integro su successo e su errore (stdout sempre una sola riga JSON parsabile, stderr vuoto, exit 0/1 coerente) con i codici INVALID_ID, UNKNOWN_COMMAND, MISSING_ARGS, INVALID_JSON, FILE_NOT_FOUND (--project-dir inesistente, che non viene creato); role guard confermato: con HARNESS_ROLE=worker status=done e validation.state=pass falliscono con FORBIDDEN_ROLE senza scrivere nulla su disco, mentre in_review resta permesso e un ruolo non-worker puo' impostare done. (4) Integrita' dei dati reali: issues.json del repo leggibile via plugin (totalCount 43); confronto con git show HEAD:issues.json -> stesse 43 issue, stessi id nello stesso ordine, chiavi top-level (project, last_updated, rules, status_legend, tags, issues) e campo rules invariati, nessun campo di altre issue alterato; l'unica differenza e' questa issue (status e updated_at). (5) Nessuna regressione su harness v1: git status --short mostra solo ' M issues.json' piu' i due file nuovi untracked; git diff su issue-manager.mjs, template/, src/, hooks/, test/issue-manager.test.mjs, docs/, init.mjs, issues.html e' vuoto.",
+        "state": "pass"
       },
       "created_at": "2026-07-29T13:20:46Z",
-      "updated_at": "2026-07-29T13:20:46Z"
+      "updated_at": "2026-07-29T13:39:11Z"
     },
     {
       "id": "6be9ff8f-d016-4192-8b0e-1d23e8e03ede",
