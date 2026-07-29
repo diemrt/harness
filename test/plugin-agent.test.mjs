@@ -1,0 +1,86 @@
+// Structural checks on the plugin's agents. The verifier's independence rests on two things a
+// test can actually hold: it must not be able to edit files, and the skill must name the agent
+// that exists.
+
+import test from "node:test";
+import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const rootDir = path.resolve(__dirname, "..");
+const agentPath = path.join(rootDir, "agents", "harness-verifier.md");
+const skillDir = path.join(rootDir, "skills", "harness");
+
+function readAgent() {
+  assert.ok(existsSync(agentPath), "agents/harness-verifier.md must exist");
+  return readFileSync(agentPath, "utf8");
+}
+
+function frontmatter(content) {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
+  assert.ok(match, "the agent must open with a --- delimited frontmatter block");
+  return match[1];
+}
+
+test("harness-verifier declares a name and a description", () => {
+  const fm = frontmatter(readAgent());
+  assert.match(fm, /^name:\s*harness-verifier$/m);
+  const description = fm.match(/description:\s*>?([\s\S]*?)(?=\n[a-z_-]+:|$)/);
+  assert.ok(description, "the agent must carry a description");
+  assert.ok(
+    description[1].replace(/\s+/g, " ").trim().length > 60,
+    "the description must say when to use the agent, not just name it"
+  );
+});
+
+test("harness-verifier cannot edit files", () => {
+  const fm = frontmatter(readAgent());
+  const tools = fm.match(/^tools:\s*\[(.*)\]$/m);
+  assert.ok(tools, "the agent must declare an explicit tool list");
+  const granted = tools[1].split(",").map((t) => t.trim());
+  for (const forbidden of ["Edit", "Write", "NotebookEdit", "MultiEdit"]) {
+    assert.ok(
+      !granted.includes(forbidden),
+      `${forbidden} would let the verifier fix the work it is meant to judge`
+    );
+  }
+  assert.ok(granted.includes("Read"), "the verifier must be able to read the artifacts");
+  assert.ok(granted.includes("Bash"), "the verifier must be able to run the verification gate");
+});
+
+test("harness-verifier is told not to correct the work", () => {
+  const body = readAgent().split(/\r?\n---\r?\n/).slice(1).join("\n");
+  assert.match(body, /non corregg/i, "the prompt must forbid fixing the work in so many words");
+});
+
+test("harness-verifier closes issues through the plugin's tracker", () => {
+  const body = readAgent();
+  const invocations = [...body.matchAll(/node "?([^"\s]*issue-manager\.mjs)/g)].map((m) => m[1]);
+  assert.ok(invocations.length >= 2, "the agent must show how to read and how to close an issue");
+  for (const invocation of invocations) {
+    assert.ok(
+      invocation.includes("CLAUDE_PLUGIN_ROOT"),
+      `'${invocation}' assumes a copy of the tracker in the project`
+    );
+  }
+});
+
+test("the skill names an agent that exists", () => {
+  const referenced = [
+    path.join(skillDir, "SKILL.md"),
+    path.join(skillDir, "references", "verification.md"),
+  ];
+  const name = frontmatter(readAgent()).match(/^name:\s*(.+)$/m)[1].trim();
+  for (const file of referenced) {
+    const content = readFileSync(file, "utf8");
+    for (const match of content.matchAll(/`(harness-[a-z-]+)`/g)) {
+      assert.equal(
+        match[1],
+        name,
+        `${path.basename(file)} points at the agent '${match[1]}', which the plugin does not ship`
+      );
+    }
+  }
+});
