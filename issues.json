@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-29T14:25:33Z",
+  "last_updated": "2026-07-29T14:41:52Z",
   "rules": {
     "single_active_issue": false
   },
@@ -478,13 +478,13 @@
       "id": "1a6ddded-9269-4191-a2ae-c53fd81cb512",
       "title": "Board server: issues.html servito dal plugin con live reload",
       "description": "Sostituire `issues.html` copiato nel progetto con un server locale avviato dal plugin, che replica l'esperienza Go Live.\n\n- Server node in `scripts/` del plugin, bind su 127.0.0.1 e porta libera scelta a runtime.\n- Serve la pagina del board (template dentro il plugin) e i dati letti dall'`issues.json` del progetto corrente.\n- Watch sul file `issues.json`: alla modifica il browser si aggiorna da solo (push lato server, es. SSE), senza refresh manuale.\n- Nessun file scritto nel repo del progetto.\n- Avvio automatico al clock-in con URL stampato a console; stop a fine sessione. Nessuna apertura automatica del browser.",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "Con il server attivo e la pagina aperta, una modifica a `issues.json` (via issue-manager) si riflette nella pagina senza refresh manuale; il server ascolta solo su 127.0.0.1; dopo l'avvio e lo stop, `git status --short` del progetto non mostra file nuovi.",
-        "state": "unknown"
+        "criteria": "Verifica indipendente (istanza mia su project dir temporanea, non i test del worker).\n\n1) Live reload senza refresh: server avviato con `node scripts/board-server.mjs --project-dir <tmp> --port 0` -> startup line {\"ok\":true,\"data\":{\"url\":\"http://127.0.0.1:55835/\",\"port\":55835,\"pid\":18768,...}}. Client SSE aperto su /events (200, content-type text/event-stream, primo chunk \"retry: 1000\"). Poi `issue-manager.mjs --insert --project-dir <tmp>` da un processo esterno: sullo stream e' arrivato spontaneamente, senza alcuna richiesta del client, {\"t\":633,\"chunk\":\"event: issues\ndata: {}\"}. Secondo insert -> secondo push (t=2225), quindi il watcher sopravvive al rename di issues.json. /api/issues successivo restituisce [\"verifier live reload probe\",\"verifier second probe\"]. Il wiring client combacia: scripts/board.html:179-180 `new EventSource(\"./events\")` + `addEventListener(\"issues\", load)` e load() rifa fetch(\"./api/issues\") e render().\n\n2) Solo loopback: `netstat -ano | findstr :55040` -> `TCP 127.0.0.1:55040 0.0.0.0:0 LISTENING 12480` (nessun 0.0.0.0 ne' ::). Stessa cosa sull'istanza dell'orchestratore: `TCP 127.0.0.1:58247 ... LISTENING 32100`. Connessione TCP dall'IP di LAN 172.27.14.64:55040 -> ECONNREFUSED.\n\n3) Nessun file scritto nel progetto: sessione board-only (GET /, /index.html, /api/issues, /nope, apertura+chiusura SSE) su project dir con issues.json preesistente; sha256 e mtime identici prima e dopo (da586919af0f...59f7d, 2026-07-29 16:39:03.670944400, 667 byte) e nessun file nuovo nella dir. Sul repo reale `git status --short --untracked-files=all` mostra solo M issues.json, M skills/harness/references/board.md, ?? scripts/board-server.mjs, ?? scripts/board.html, ?? test/plugin-board.test.mjs: nessun artefatto generato dal board.\n\nGate: `npm run test` -> tests 174, pass 174, fail 0 (8 di test/plugin-board.test.mjs). `npm run dev:check` -> {\"ok\":true,\"action\":\"update\",\"added\":[],\"updated\":[],\"conflicts\":[],\"removed\":[],\"orphaned\":[]}.\n\nControlli aggiuntivi: pagina autosufficiente (nessun http://, https://, <link>, <script src>, url(), @font-face in scripts/board.html); issues.json corrotto -> /api/issues 200 con {\"error\":\"issues.json is not readable right now\"}, server vivo, / continua a servire la pagina, recupero automatico al ripristino; path sconosciuti 404 anche via socket raw (/../scripts/board-server.mjs, /./../../issues.json, /issues.json, /board.html -> 404; /..\\board-server.mjs -> 400) e nessuna lettura da filesystem nel codice oltre a board.html allo startup; codici documentati riprodotti (FILE_NOT_FOUND su --project-dir inesistente, PORT_IN_USE su --port 58247 occupata, exit 1 in entrambi); skills/harness/references/board.md senza nota \"implementazione in corso\" (grep vuoto su tutto il repo) e coerente con comando, riga di avvio e tabella codici realmente implementati; SKILL.md passo 4 clock-in e clock-out allineati.\n\nOsservazione fuori scope (non blocca): l'URL protocol-relative `//board.html` restituisce 200 servendo la pagina, perche' `new URL(\"//board.html\", base)` sposta la stringa nell'host e il pathname diventa \"/\": nessuna lettura dal filesystem, solo la stessa index.",
+        "state": "pass"
       },
       "created_at": "2026-07-29T13:20:46Z",
-      "updated_at": "2026-07-29T13:20:46Z"
+      "updated_at": "2026-07-29T14:41:52Z"
     },
     {
       "id": "aa99ab24-30f1-4f44-9fdf-8dffc6bf813e",
