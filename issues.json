@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-29T14:07:35Z",
+  "last_updated": "2026-07-29T14:14:50Z",
   "rules": {
     "single_active_issue": false
   },
@@ -466,13 +466,13 @@
       "id": "5ed04da6-c38e-4bdf-ba20-7dd1da495431",
       "title": "Config locale .harness/ auto-ignorante con rilevamento dei comandi",
       "description": "Introdurre la configurazione locale che sostituisce `init.config.json`, senza toccare nessun file condiviso del progetto.\n\n- `.harness/config.json` nella root del progetto, contenente: comando di setup, comando di verifica (il gate su cui il verificatore basa il pass) e la sezione `externalWorker` (comando del worker esterno, per-macchina).\n- `.harness/.gitignore` con `*` in modo che la cartella ignori se stessa: il `.gitignore` del progetto non va MAI modificato.\n- Al primo uso in un progetto la skill propone i comandi deducendoli da `package.json` / README / file di build presenti, e chiede conferma prima di scrivere.\n- Nessun task runner: i comandi vengono eseguiti direttamente, la config li dichiara soltanto.",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "Dopo la creazione di `.harness/` in un repo pulito, `git status --short` non mostra nulla e il `.gitignore` del progetto risulta immutato (`git diff` vuoto); la config viene riletta correttamente in una sessione successiva.",
-        "state": "unknown"
+        "criteria": "Verifica indipendente. GATE (verify da .harness/config.json = 'npm run test'): 166/166 pass, 0 fail. dev:check: updated=[], conflicts=[]. (1) Repo git temporaneo creato da zero (git init + app.mjs + .gitignore di progetto 'node_modules/,dist/,*.log' + commit): dopo --init, 'git status --porcelain --untracked-files=all' e 'git status --short' output VUOTO, 'git diff' vuoto, sha256 di .gitignore identico prima/dopo (e8bc935ce727f1809c792f4c5d26c5fc75ba2b7df7fc9390c56c8892f6a6007f); 'git check-ignore -v .harness/config.json' -> '.harness/.gitignore:2:*'. (2) Rilettura da processo separato con cwd diverso (/c/Windows): --get restituisce esattamente setup/verify/externalWorker scritti da --init. (3) --detect: nessun file creato (ls invariato, git status vuoto), output con confirmed:false e proposals+evidence. (4) Repo reale: git status -uall non mostra .harness/; 'git diff -- .gitignore' vuoto. (5) Errori: --get non configurato -> CONFIG_NOT_FOUND exit 1 senza creare nulla; --init su config esistente senza --force -> CONFIG_EXISTS, sha256 config invariato (52849c12...); config senza verify -> INVALID_INPUT anche con --force, sha invariato e su dir vergine nessuna .harness/ creata. Verificati anche INVALID_JSON, MISSING_ARGS (payload assente e data+file insieme), FILE_NOT_FOUND (config-file e project-dir), UNKNOWN_COMMAND. (6) skills/harness/references/config.md: nota 'implementazione in corso' rimossa (diff), comandi e tabella codici coincidono con --help e con il sorgente scripts/harness-config.mjs. (7) Nessuna regressione: 'git diff --stat' tocca solo issues.json e skills/harness/references/config.md; src/, template/, hooks/, init.mjs, init.config.json, issue-manager.mjs alla radice intatti. test/plugin-config.test.mjs: 18/18 pass.",
+        "state": "pass"
       },
       "created_at": "2026-07-29T13:20:46Z",
-      "updated_at": "2026-07-29T13:20:46Z"
+      "updated_at": "2026-07-29T14:14:50Z"
     },
     {
       "id": "1a6ddded-9269-4191-a2ae-c53fd81cb512",
