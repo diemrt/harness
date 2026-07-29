@@ -1,0 +1,131 @@
+---
+name: harness
+description: Usa quando lavori allo sviluppo di un progetto con il workflow harness — issue tracciate su issues.json, una sola issue in corso per catena di dipendenza, verifica indipendente obbligatoria prima di ogni commit. Si attiva su "clock in", "clock out", "lavora la issue", "apri una issue", "board delle issue", o quando il progetto contiene un issues.json.
+---
+
+# Harness
+
+Harness impone un modo di lavorare, non una libreria: ogni pezzo di lavoro è una issue
+tracciata, ogni issue viene verificata da un agente **diverso** da chi l'ha svolta, e si
+committa solo dopo quella verifica.
+
+**Cosa harness scrive nel progetto:** `issues.json` alla radice (i dati del tracker, l'unico
+file condiviso) e `.harness/` (configurazione e log locali, che si auto-ignora e non finisce
+mai in git). Nient'altro: script, regole e board vivono in questo plugin.
+
+Nel resto del documento `$SCRIPTS` sta per `${CLAUDE_PLUGIN_ROOT}/scripts`.
+
+## Clock in (inizio sessione)
+
+1. **Contesto di progetto** — leggi quello che il progetto ha già (`CLAUDE.md`, `AGENTS.md`,
+   `README`, `docs/`). Non creare documenti: harness non semina file nel progetto.
+2. **Configurazione** — leggi `.harness/config.json` (comando di setup, comando di verifica,
+   worker esterno). Se manca, vedi [references/config.md](references/config.md): va proposta
+   all'utente e confermata, mai indovinata in silenzio.
+3. **Ambiente** — esegui il comando di setup dichiarato in configurazione. Se fallisce,
+   **fermati e segnala**: non consumare token su un ambiente rotto.
+4. **Board** — avvia il board delle issue e stampa l'URL una volta sola (vedi
+   [references/board.md](references/board.md)). Non aprire il browser da solo.
+5. **Stato del tracker**:
+   ```bash
+   node "$SCRIPTS/issue-manager.mjs" --get-all --status in_progress
+   node "$SCRIPTS/issue-manager.mjs" --get-all --status backlog
+   ```
+6. **Scelta del lavoro** — identifica le issue su cui lavorare rispettando la regola 1-WIP
+   qui sotto.
+
+Leggi solo la documentazione necessaria alla richiesta: contesto in più costa token e non
+migliora la risposta.
+
+## Regola 1-WIP per catena di dipendenza
+
+**Una sola issue `in_progress` per catena di dipendenza.** Issue scorrelate (catene distinte)
+possono procedere in parallelo. Dentro una stessa catena si va in ordine, una alla volta.
+
+**Avvia un subagent per issue.** Può essere un subagent interno o un worker esterno (vedi
+[references/external-worker.md](references/external-worker.md)); harness non prescrive come
+si istanzia.
+
+**Overlap verifica → next:** puoi iniziare la issue successiva mentre la verifica della
+precedente è ancora in corso, purché le catene lo consentano. Evita attese inutili su lavori
+brevi.
+
+### Invarianti, non negoziabili
+
+- **verifica indipendente su OGNI issue** — mai auto-verifica;
+- **commit SOLO dopo `validation.state = pass`** assegnato dal verificatore;
+- **nessun `pass` auto-assegnato** da chi ha svolto il lavoro.
+
+Questi tre punti valgono qualunque sia il grado di parallelismo e qualunque sia il tipo di
+subagent usato. Nel modello plugin non esiste più un hook git che li imponga a livello di
+processo: reggono perché li applichi tu.
+
+## Scelta del tier per i subagent
+
+Harness non pinna modelli per nome: definisce tier che l'orchestratore mappa sui modelli
+disponibili. A parità di esito atteso, scegli il tier che consuma meno token.
+
+- **Economico** — lavoro meccanico, deterministico, a basso rischio.
+- **Standard** — default; implementazione ordinaria con decisioni locali limitate.
+- **Reasoning** — ragionamento esteso, giudizio architetturale, trade-off critici.
+
+Segnali: numero di file toccati e superficie di impatto; ambiguità di `description` e
+`validation.criteria`; esecuzione meccanica vs decisioni di design; posizione nella catena
+(bloccante o terminale); trade-off in conflitto.
+
+In dubbio fra due tier, **sali**: un fail in verifica costa più della differenza di token.
+Il verificatore usa un tier **>=** a quello del worker, mai inferiore. Policy di efficienza,
+non invariante.
+
+## Verifica indipendente
+
+A fine lavoro il worker porta la issue a `status = in_review` con
+`validation.state = unknown`, e si ferma. **Non chiude la propria issue.**
+
+La chiusura spetta a un agente dedicato: usa l'agent **`harness-verifier`** (vedi
+[references/verification.md](references/verification.md)). Il verificatore:
+
+- controlla i `validation.criteria` della issue contro gli artefatti reali;
+- esegue il **comando di verifica** dichiarato in `.harness/config.json` — il suo esito *è*
+  il gate;
+- **verifica soltanto, non corregge**;
+- chiude la issue: superata → `status = done`, `validation.state = pass`, `criteria` con
+  l'evidenza; fallita → `status = blocked`, `validation.state = fail`, `criteria` con il
+  motivo.
+
+## Gate sul commit
+
+Committa **una issue alla volta**, come snapshot, **solo** dopo il `pass` del verificatore.
+Nessun commit di una issue `done`/`pass` non verificata da un altro agente, né di una issue
+`blocked`. Se la verifica fallisce: nessun commit finché la issue non viene ripresa,
+corretta e riverificata.
+
+Convenzioni di branch e messaggi: [references/git.md](references/git.md).
+
+## Dopo il commit: gate documentale
+
+Subito dopo ogni commit, controlla i file che conteneva. Se il commit tocca **file di
+codice** (secondo `docsGate.include`/`exclude` in `.harness/config.json`), apri una issue
+docs con `--insert`, che verrà lavorata poi col workflow normale — clock-in, verifica
+indipendente, gate sul commit come qualsiasi altra.
+
+Non blocca mai il commit: è un promemoria tracciato, non un veto. Nel modello plugin questo
+controllo lo fai tu, non un hook `post-commit`.
+
+## Clock out (fine sessione)
+
+Per ogni issue lavorata: lavoro concluso → `in_review` → verifica indipendente → `pass` →
+commit dedicato. Poi ferma il board server avviato al clock-in.
+
+## Reference
+
+- [references/issues.md](references/issues.md) — CLI del tracker: comandi, schema, contratto
+  di output, codici di errore.
+- [references/verification.md](references/verification.md) — come si delega e cosa deve fare
+  il verificatore indipendente.
+- [references/git.md](references/git.md) — branch, commit, checklist prima del merge.
+- [references/config.md](references/config.md) — `.harness/config.json`: comandi, docs gate,
+  worker esterno.
+- [references/board.md](references/board.md) — board delle issue con aggiornamento live.
+- [references/external-worker.md](references/external-worker.md) — delega opt-in a una CLI
+  esterna.
