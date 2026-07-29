@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-29T15:13:22Z",
+  "last_updated": "2026-07-29T15:15:00Z",
   "rules": {
     "single_active_issue": false
   },
@@ -617,6 +617,18 @@
       },
       "created_at": "2026-07-29T15:06:34Z",
       "updated_at": "2026-07-29T15:13:22Z"
+    },
+    {
+      "id": "a6c3e45e-bf0d-41cb-a7b0-444cfe4f0485",
+      "title": "Il board mostra il nome della cartella invece del nome del progetto",
+      "description": "Emersa da unosservazione fuori scope della verifica sul ripristino della UI. La UI storica mostrava nel titolo il campo project di issues.json (es. MyProject - Issue Board). Il board servito dal plugin mostra invece il basename della directory del progetto, perche readIssues() in scripts/board-server.mjs non propaga il campo project del file. Differenza di comportamento rispetto alla UI storica, non richiesta da nessun criterio. Fix previsto: includere project nel payload di api/issues e usarlo nel titolo con fallback sul basename della directory quando il campo manca (i tracker nuovi non lo hanno, il seed minimale e last_updated + issues).",
+      "status": "backlog",
+      "validation": {
+        "criteria": "Il titolo del board mostra il campo project di issues.json quando presente, e il basename della directory del progetto quando assente. Coperto da un test che verifica entrambi i casi sul payload di api/issues.",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-29T15:15:00Z",
+      "updated_at": "2026-07-29T15:15:00Z"
     }
   ]
 }
