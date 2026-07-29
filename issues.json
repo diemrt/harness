@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-29T14:54:56Z",
+  "last_updated": "2026-07-29T14:55:56Z",
   "rules": {
     "single_active_issue": false
   },
@@ -593,6 +593,18 @@
       },
       "created_at": "2026-07-29T14:42:44Z",
       "updated_at": "2026-07-29T14:54:56Z"
+    },
+    {
+      "id": "242720c8-28b5-4823-8a63-735e43ce3dde",
+      "title": "docs: verifica documentazione per commit 0e06511",
+      "description": "Contesto commit 0e06511: refactor: drop the board's unused --once flag and document the project default\n\nValuta se servono aggiornamenti a docs/, AGENTS.md o README.md e descrivi cosa cambiare per ciascun file.\nSe non serve aggiornare nulla, chiudi la issue motivando la decisione.\n\nFile di codice modificati:\n- scripts/board-server.mjs",
+      "status": "in_review",
+      "validation": {
+        "criteria": "Verificare la documentazione per il commit 0e06511 (refactor: drop the board's unused --once flag and document the project default). Controllare che tutti i file siano stati aggiornati, che sia stato usato meno testo possibile, che non siano state introdotte delle ripetizioni in documenti diversi",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-29T14:55:46Z",
+      "updated_at": "2026-07-29T14:55:56Z"
     }
   ]
 }
