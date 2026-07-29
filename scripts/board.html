@@ -182,8 +182,11 @@
       return STATUS_META[status] || { label: status || "—", badge: "badge-ghost", text: "", icon: "circle", dot: "bg-base-300" };
     }
 
-    // The project name is not in the payload: the server reports the directory it is serving.
-    function projectNameFrom(projectDir) {
+    // The historical UI showed issues.json's `project` field. The minimal seed the plugin writes
+    // today (`{last_updated, issues}`) has no such field, so this falls back to the basename of
+    // the directory the server is reading — never the empty string.
+    function projectNameFrom(project, projectDir) {
+      if (typeof project === "string" && project) return project;
       if (!projectDir) return "Issue Board";
       const parts = String(projectDir).split(/[\\/]/).filter(Boolean);
       return parts.length ? parts[parts.length - 1] : "Issue Board";
@@ -367,7 +370,7 @@
       state.data = data;
       state.issues = Array.isArray(data.issues) ? data.issues : [];
 
-      el.projectTitle.textContent = `${projectNameFrom(data.projectDir)} — Issue Board`;
+      el.projectTitle.textContent = `${projectNameFrom(data.project, data.projectDir)} — Issue Board`;
       el.lastUpdated.textContent = data.lastUpdated
         ? `Ultimo aggiornamento: ${formatDate(data.lastUpdated)} · ${state.issues.length} issue`
         : `${state.issues.length} issue`;

@@ -50,7 +50,7 @@ function resolveProjectDir(projectDir) {
 // the issue manager reads one. The file may appear later, and the watcher will notice.
 function readIssues(issuesFilePath, projectDir) {
   if (!existsSync(issuesFilePath)) {
-    return { projectDir, issues: [], lastUpdated: null };
+    return { projectDir, issues: [], lastUpdated: null, project: null };
   }
   try {
     const data = JSON.parse(readFileSync(issuesFilePath, "utf8"));
@@ -58,11 +58,15 @@ function readIssues(issuesFilePath, projectDir) {
       projectDir,
       issues: Array.isArray(data.issues) ? data.issues : [],
       lastUpdated: data.last_updated ?? null,
+      // Older trackers named the project explicitly; the minimal seed the plugin writes today
+      // (`{last_updated, issues}`) has no such field, and the board falls back to the directory
+      // basename in that case (see projectNameFrom in board.html).
+      project: typeof data.project === "string" && data.project ? data.project : null,
     };
   } catch {
     // A read landing between the temp write and the rename can see a partial file. Report it
     // instead of crashing the server the user is watching.
-    return { projectDir, issues: [], lastUpdated: null, error: "issues.json is not readable right now" };
+    return { projectDir, issues: [], lastUpdated: null, project: null, error: "issues.json is not readable right now" };
   }
 }
 

@@ -127,6 +127,41 @@ test("the board serves the page and the project's issues", async () => {
   }
 });
 
+test("the board reports the project field from issues.json when present", async () => {
+  const dir = tempProject(
+    JSON.stringify(
+      { project: "MyProject", last_updated: "2026-01-01T00:00:00Z", issues: [] },
+      null,
+      2
+    )
+  );
+  const { child, url } = await startServer(dir);
+  try {
+    const data = await (await fetch(`${url}api/issues`)).json();
+    assert.equal(data.project, "MyProject");
+
+    const html = await (await fetch(url)).text();
+    assert.match(html, /projectNameFrom\(data\.project, data\.projectDir\)/);
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the board falls back to the directory basename when issues.json has no project field", async () => {
+  // The minimal seed the plugin writes for new trackers has no `project` field.
+  const dir = tempProject(seed([issue("11111111-1111-1111-1111-111111111111")]));
+  const { child, url } = await startServer(dir);
+  try {
+    const data = await (await fetch(`${url}api/issues`)).json();
+    assert.equal(data.project, null, "the field must stay absent/null, not fabricated");
+    assert.equal(data.projectDir, dir, "the client falls back to this for the title");
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("the board is bound to loopback only", async () => {
   const dir = tempProject(seed());
   const { child, port } = await startServer(dir);
