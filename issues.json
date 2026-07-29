@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-29T13:39:11Z",
+  "last_updated": "2026-07-29T13:40:03Z",
   "rules": {
     "single_active_issue": false
   },
@@ -533,6 +533,18 @@
       },
       "created_at": "2026-07-29T13:20:46Z",
       "updated_at": "2026-07-29T13:20:46Z"
+    },
+    {
+      "id": "da8a6b63-490e-4673-a9fc-9d2d7b22da7c",
+      "title": "docs: verifica documentazione per commit a44cf54",
+      "description": "Contesto commit a44cf54: feat: move the issue tracker into the plugin\n\nValuta se servono aggiornamenti a docs/, AGENTS.md o README.md e descrivi cosa cambiare per ciascun file.\nSe non serve aggiornare nulla, chiudi la issue motivando la decisione.\n\nFile di codice modificati:\n- scripts/issue-manager.mjs",
+      "status": "backlog",
+      "validation": {
+        "criteria": "Verificare la documentazione per il commit a44cf54 (feat: move the issue tracker into the plugin). Controllare che tutti i file siano stati aggiornati, che sia stato usato meno testo possibile, che non siano state introdotte delle ripetizioni in documenti diversi",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-29T13:40:03Z",
+      "updated_at": "2026-07-29T13:40:03Z"
     }
   ]
 }
