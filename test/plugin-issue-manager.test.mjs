@@ -396,6 +396,116 @@ test("INVALID_INPUT: empty object {} rejected on --update", () => {
 });
 
 // ---------------------------------------------------------------------------
+// tier — the expected cost of the work
+// ---------------------------------------------------------------------------
+
+function insertWithTier(dir, tier) {
+  const payload = JSON.stringify({ title: "t", description: "d", status: "backlog", tier });
+  return run(dir, ["--insert", "--issue-data", payload]);
+}
+
+test("every tier is accepted and survives a round trip", () => {
+  const { dir } = setupTempProject();
+  try {
+    for (const tier of ["economy", "standard", "reasoning"]) {
+      const data = assertOk(insertWithTier(dir, tier));
+      assert.equal(data.tier, tier);
+      assert.equal(assertOk(run(dir, ["--get", "--issue-id", data.id])).tier, tier);
+    }
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("an issue inserted without a tier stores null", () => {
+  const { dir } = setupTempProject();
+  try {
+    const payload = JSON.stringify({ title: "t", description: "d", status: "backlog" });
+    const data = assertOk(run(dir, ["--insert", "--issue-data", payload]));
+    assert.equal(data.tier, null);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("INVALID_TIER: a value outside the enum, on insert and on update", () => {
+  const { dir } = setupTempProject();
+  try {
+    assertFail(insertWithTier(dir, "cheap"), "INVALID_TIER");
+    assertFail(
+      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", '{"tier":"expensive"}']),
+      "INVALID_TIER"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("an explicit null clears the tier, and a tier-only update leaves everything else alone", () => {
+  // A tier that went stale after a change of scope is not a defect, so it has to stay removable.
+  const { dir } = setupTempProject();
+  try {
+    const set = assertOk(
+      run(dir, ["--update", "--issue-id", ID_TWO, "--issue-data", '{"tier":"reasoning"}'])
+    );
+    assert.equal(set.tier, "reasoning");
+    assert.equal(set.title, "Issue Two", "a tier-only update must not touch the other fields");
+    assert.equal(set.status, "backlog");
+    assert.equal(set.validation.criteria, "criteria two");
+
+    const cleared = assertOk(
+      run(dir, ["--update", "--issue-id", ID_TWO, "--issue-data", '{"tier":null}'])
+    );
+    assert.equal(cleared.tier, null);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("an issue stored before the field gets an explicit null, not a missing key", () => {
+  // The records in a real tracker have no tier at all. Carrying an undefined through the rebuild
+  // would drop the key from the stored object instead of stating that no tier is set.
+  const { dir } = setupTempProject();
+  try {
+    const data = assertOk(
+      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", '{"status":"in_progress"}'])
+    );
+    assert.equal(data.tier, null);
+    assert.ok("tier" in data, "the stored issue must carry the key");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("tier does not open the payload to other unknown fields", () => {
+  const { dir } = setupTempProject();
+  try {
+    const payload = JSON.stringify({
+      title: "t",
+      description: "d",
+      status: "backlog",
+      tier: "economy",
+      cost: 3,
+    });
+    assertFail(run(dir, ["--insert", "--issue-data", payload]), "INVALID_INPUT");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--help documents tier and INVALID_TIER", () => {
+  const { dir } = setupTempProject();
+  try {
+    const result = run(dir, ["--help"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /INVALID_TIER/);
+    assert.match(result.stdout, /economy \| standard \| reasoning/);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // LIMIT_EXCEEDED — length caps on the free text of an issue
 // ---------------------------------------------------------------------------
 

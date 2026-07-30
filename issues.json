@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T11:08:20Z",
+  "last_updated": "2026-07-30T12:18:14Z",
   "rules": {
     "single_active_issue": false
   },
@@ -778,13 +778,14 @@
       "id": "497230cc-342f-4841-9fa8-9f9e083b5710",
       "title": "CLI: campo tier sulla issue, con codice INVALID_TIER",
       "description": "Serve un dato che dichiari il costo di sviluppo della issue, cosi' che chi dispatcha sappia quale agente invocare senza ridedurlo ogni volta. SKILL.md ha gia' i tre tier, ma decisi ad hoc al momento del dispatch.\n\nIn scripts/issue-manager.mjs: nuovo campo input opzionale tier, valori economy, standard, reasoning. Assente all'insert viene salvato null, che si legge come standard. In --update un tier presente deve essere valido, un null esplicito lo azzera. Valore fuori enum rifiutato con il nuovo codice INVALID_TIER, coerente con INVALID_STATUS e INVALID_STATE: un codice per campo, cosi' l'agente sa dove guardare.\n\nIl campo e' un hint, non un vincolo: un tier stantio dopo un cambio di scope non e' un difetto.\n\nSpec: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione C.",
-      "status": "backlog",
+      "status": "done",
+      "tier": "standard",
       "validation": {
-        "criteria": "- --insert con \"tier\":\"economy\", \"standard\" o \"reasoning\" esce 0 e la issue riletta con --get riporta il valore\n- --insert senza tier esce 0 e la issue salvata ha tier null\n- --insert o --update con un tier fuori enum escono 1 con code INVALID_TIER\n- --update con \"tier\":null azzera il campo; --update con solo tier non altera gli altri campi\n- un campo sconosciuto diverso da tier resta rifiutato con INVALID_INPUT\n- --help elenca tier fra i campi accettati e INVALID_TIER fra i codici\n- npm test verde",
-        "state": "unknown"
+        "criteria": "Verifica indipendente, criterio per criterio (comandi eseguiti su copie temporanee con --project-dir, tracker reale mai scritto se non da questa chiusura).\n\n1) --insert con tier economy/standard/reasoning esce 0 e il valore si rilegge: per i tre valori insert_exit=0 e `--get` restituisce rispettivamente \"economy\", \"standard\", \"reasoning\". PASS.\n\n2) --insert senza tier salva null: envelope tier = null, key present = true; controllo sul file su disco: on-disk tier = null, key present = true. PASS.\n\n3) tier fuori enum -> INVALID_TIER: insert con \"cheap\" -> {\"ok\":false,\"error\":\"Invalid tier value 'cheap'. Valid values are: economy, standard, reasoning.\",\"code\":\"INVALID_TIER\"} exit=1; update con \"expensive\", \"Economy\" (case-sensitive) e 3 (non stringa) -> tutti code INVALID_TIER exit=1. PASS.\n\n4) tier:null azzera, update solo-tier non altera il resto: {\"tier\":\"reasoning\"} -> tier=\"reasoning\", title/status/validation invariati; {\"tier\":null} -> tier=null con la chiave presente, exit=0. PASS.\n   Controllo aggiuntivo richiesto, su copia di issues.json reale (72 issue, 71 senza la chiave tier): update solo-tier su 28fc023e-bca9-4947-ba53-0bef8a09cf62 -> diff campo per campo SAME id/title/description/status/validation/created_at, DIFF solo updated_at e tier (undefined -> \"reasoning\"); nessun campo perso. Update solo-status su a14f5543-f53a-4398-9cae-7d7773a8930e -> tier presente e valorizzato null (non chiave mancante). Confronto record per record: le altre 70 issue byte-identiche, ordine e conteggio invariati.\n\n5) campo sconosciuto diverso da tier ancora rifiutato: insert con \"cost\":3 -> INVALID_INPUT exit=1; update con \"priority\" -> INVALID_INPUT exit=1 (messaggio: \"Allowed input fields: title, description, status, validation, tier.\"). PASS.\n\n6) --help: riga 19 \"Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_TIER, INVALID_INPUT,\"; riga 38 \"Allowed input fields for --insert/--update: title, description, status, tier, validation\"; riga 42 \"tier         : economy | standard | reasoning | null - expected cost of the work; absent reads as standard\". PASS.\n\n7) Gate `npm run test` (da .harness/config.json): tests 155, pass 155, fail 0, duration_ms 6075. Il file test/plugin-issue-manager.test.mjs da solo: tests 60, pass 60, fail 0, incluse le 7 prove nuove sul tier (round trip, null all'insert, INVALID_TIER, null esplicito + update solo-tier, issue legacy senza chiave, campo sconosciuto, --help). PASS.\n\nDanni collaterali: `git status --short` mostra solo issues.json, scripts/issue-manager.mjs, test/plugin-issue-manager.test.mjs; nessun file fuori scope, nessun segreto nel diff. issues.json cambia solo per la transizione di stato di questa issue (4 aggiunte / 3 rimozioni).\n\nOsservazione fuori scope (non blocca, non e' fra i criteri): skills/harness/references/issues.md documenta la tabella dei codici di errore e i campi ammessi ma non cita tier ne INVALID_TIER (tabella a riga 183-196) - candidato a una issue di documentazione separata.",
+        "state": "pass"
       },
       "created_at": "2026-07-30T10:37:08Z",
-      "updated_at": "2026-07-30T10:37:08Z"
+      "updated_at": "2026-07-30T12:18:14Z"
     },
     {
       "id": "a14f5543-f53a-4398-9cae-7d7773a8930e",

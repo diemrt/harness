@@ -23,9 +23,9 @@
 // outcomes.
 // Exception: --help prints plain text.
 //
-// Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_INPUT, INVALID_JSON,
-//              LIMIT_EXCEEDED, NOT_FOUND, FILE_NOT_FOUND, MISSING_ARGS, UNKNOWN_COMMAND,
-//              FORBIDDEN_ROLE.
+// Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_TIER, INVALID_INPUT,
+//              INVALID_JSON, LIMIT_EXCEEDED, NOT_FOUND, FILE_NOT_FOUND, MISSING_ARGS,
+//              UNKNOWN_COMMAND, FORBIDDEN_ROLE.
 //
 // Length limits: title and description are capped (see LIMITS) so an issue stays readable by a
 // human instead of turning into an untitled document. Over the cap the payload is rejected with
@@ -44,6 +44,7 @@
 //     "title": "<string>",
 //     "description": "<string>",
 //     "status": "<backlog|in_progress|in_review|blocked|done>",
+//     "tier": "<economy|standard|reasoning>"|null,
 //     "validation": { "criteria": "<string>", "state": "<unknown|pass|fail>" }|null,
 //     "created_at": "<datetime>",
 //     "updated_at": "<datetime>"
@@ -81,6 +82,12 @@ const LIMITS = {
   criterion: 200,
   criteriaCount: 7,
 };
+
+// What the work of an issue is expected to cost, so whoever dispatches it does not have to work it
+// out again from the description every time. Deliberately a tier and not a model name: harness pins
+// no model, it declares a class that the orchestrator maps onto whatever is available. An absent
+// tier reads as "standard".
+const TIERS = ["economy", "standard", "reasoning"];
 
 // Helper: exception carrying the failure envelope fields, thrown by any validator/reader and
 // caught once at the top level so exactly one JSON line is ever emitted.
@@ -225,6 +232,17 @@ function validateStatus(status) {
   }
 }
 
+// Helper: validate the provided tier value. Its own code, like status and state: one code per field
+// tells the caller where to look without parsing the message.
+function validateTier(tier) {
+  if (!TIERS.includes(tier)) {
+    fail(
+      `Invalid tier value '${tier}'. Valid values are: ${TIERS.join(", ")}.`,
+      "INVALID_TIER"
+    );
+  }
+}
+
 // Helper: validate the provided validation.state value
 function validateState(state) {
   const validStates = ["unknown", "pass", "fail"];
@@ -247,7 +265,7 @@ function validateIssueInput(issue, partial = false) {
     fail("Issue data must be a JSON object.", "INVALID_INPUT");
   }
 
-  const allowedFields = ["title", "description", "status", "validation"];
+  const allowedFields = ["title", "description", "status", "validation", "tier"];
   const providedFields = Object.keys(issue);
   const unknownFields = providedFields.filter((f) => !allowedFields.includes(f));
   if (unknownFields.length > 0) {
@@ -289,6 +307,12 @@ function validateIssueInput(issue, partial = false) {
     validateStatus(issue.status);
   } else if (!partial) {
     fail("'status' is required.", "INVALID_INPUT");
+  }
+
+  // tier: optional everywhere. Absent at insert means null, and an explicit null clears it — a stale
+  // tier after a change of scope is not a defect, so it must stay removable.
+  if (hasProp(issue, "tier") && issue.tier !== null) {
+    validateTier(issue.tier);
   }
 
   // validation: must be null or a well-formed object { criteria, state (valid) }
@@ -420,9 +444,9 @@ function showHelp() {
     '  failure : {"ok":false,"error":"<msg>","code":"<CODE>"}  exit code 1',
     "Nothing is written to stderr: pipe stdout to JSON.parse in both cases.",
     "",
-    "Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_INPUT, INVALID_JSON,",
-    "             LIMIT_EXCEEDED, NOT_FOUND, FILE_NOT_FOUND, MISSING_ARGS, UNKNOWN_COMMAND,",
-    "             FORBIDDEN_ROLE",
+    "Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_TIER, INVALID_INPUT,",
+    "             INVALID_JSON, LIMIT_EXCEEDED, NOT_FOUND, FILE_NOT_FOUND, MISSING_ARGS,",
+    "             UNKNOWN_COMMAND, FORBIDDEN_ROLE",
     "",
     "Role guard: when env var HARNESS_ROLE=worker, --insert/--update requests that set",
     "status=done or validation.state=pass are rejected with FORBIDDEN_ROLE (no self-validation).",
@@ -439,10 +463,11 @@ function showHelp() {
     "  --issue-data-file <path>  reads the JSON from a file — no shell quoting/escaping",
     "  --issue-data '<json>'     inline JSON; mutually exclusive with --issue-data-file",
     "",
-    "Allowed input fields for --insert/--update: title, description, status, validation",
+    "Allowed input fields for --insert/--update: title, description, status, tier, validation",
     `  title        : non-empty string, at most ${LIMITS.title} characters`,
     `  description  : non-empty string, at most ${LIMITS.description} characters`,
     "  status       : backlog | in_progress | in_review | blocked | done",
+    `  tier         : ${TIERS.join(" | ")} | null — expected cost of the work; absent reads as standard`,
     "  validation   : null OR { criteria, state: unknown|pass|fail }",
     `                 state=unknown : criteria is an array of at most ${LIMITS.criteriaCount} strings of ${LIMITS.criterion} characters`,
     "                 state=pass|fail : criteria carries the verification evidence — string or array, uncapped",
@@ -525,6 +550,7 @@ function insertIssue(issueData) {
     title: newIssue.title,
     description: newIssue.description,
     status: newIssue.status,
+    tier: hasProp(newIssue, "tier") ? newIssue.tier : null,
     validation: hasProp(newIssue, "validation") ? newIssue.validation : null,
     created_at: now,
     updated_at: now,
@@ -560,6 +586,9 @@ function updateIssue(issueId, issueData) {
     title: hasProp(updatedIssue, "title") ? updatedIssue.title : existing.title,
     description: hasProp(updatedIssue, "description") ? updatedIssue.description : existing.description,
     status: hasProp(updatedIssue, "status") ? updatedIssue.status : existing.status,
+    // ?? null, not the bare value: the issues written before this field have no `tier` key at all,
+    // and carrying an undefined through would silently drop the key from the stored object.
+    tier: hasProp(updatedIssue, "tier") ? updatedIssue.tier : existing.tier ?? null,
     validation: hasProp(updatedIssue, "validation") ? updatedIssue.validation : existing.validation,
     created_at: existing.created_at,
     updated_at: nowTimestamp(),
