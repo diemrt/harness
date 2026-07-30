@@ -264,6 +264,22 @@ code {
   color: var(--muted);
 }
 
+/* View toggle and status filters share the tab strip: they are the same control in two flavours,
+   and giving the toggle a look of its own would say they are different kinds of thing. */
+.toolbar__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Search and status filters drive the list only. In graph view they would be controls that
+   answer nothing, so they are not shown rather than shown inert. */
+.toolbar--graph .search-field,
+.toolbar--graph #statusFilters {
+  display: none;
+}
+
 .status-filters {
   display: flex;
   flex-wrap: nowrap;
@@ -296,6 +312,12 @@ code {
   background: var(--bg);
   color: var(--ink);
   font-weight: 600;
+}
+
+/* The graph tab while a cycle is open: the view it leads to has nothing trustworthy to draw. */
+.status-filters__tab[disabled] {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 /* --- States: loading / error / empty --- */
@@ -370,6 +392,162 @@ code {
 .hint-box__body {
   margin: 0;
   color: var(--muted);
+}
+
+/* --- Cycle banner --- */
+
+.cycle-banner {
+  padding: 0 var(--space-5) var(--space-4);
+}
+
+/* --- Graph view ---------------------------------------------------------------
+   Two halves side by side: the issues with no chain at all (a wrapping grid, no column) and
+   the canvas, where every level is a column. Geometry comes from layoutGraph() in board.js —
+   the CSS only says what a node looks like, never where it goes. */
+
+.graph {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-5);
+  padding: 0 var(--space-5) var(--space-6);
+}
+
+.graph-unchained {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 320px;
+}
+
+.graph-unchained:empty {
+  display: none;
+}
+
+.graph-group__label,
+.graph-column-label {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.graph-group__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.graph-canvas {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: auto;
+}
+
+.graph-plane {
+  position: relative;
+}
+
+.graph-column-label {
+  position: absolute;
+  top: 0;
+  margin: 0;
+}
+
+/* The edges sit under the cards: a polyline that has to cross a column disappears behind it
+   instead of being drawn over the text. */
+.graph-edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.graph-edge {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1;
+  opacity: 0.5;
+}
+
+.graph-edge__tip {
+  fill: var(--muted);
+  opacity: 0.5;
+}
+
+.graph-node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow: hidden;
+  padding: var(--space-3);
+  background: var(--surface);
+  border: var(--border);
+  border-radius: var(--radius);
+}
+
+/* The unchained grid is laid out by the browser, not by layoutGraph: same card, no coordinates. */
+.graph-node--flow {
+  position: static;
+  width: 148px;
+}
+
+/* A ghost is a dependency you cannot work on — already closed, or an id nothing answers for.
+   Dashed and unfilled so it reads as the edge of the graph rather than as work. */
+.graph-node--ghost {
+  background: transparent;
+  border-style: dashed;
+}
+
+/* The card has a fixed height, so its rows must not be shrinkable: a flex item that shrinks is
+   cut mid-line, which is unreadable, while the title's own clamp cuts at a whole line. */
+.graph-node > * {
+  flex-shrink: 0;
+}
+
+.graph-node__title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.graph-node--ghost .graph-node__title {
+  -webkit-line-clamp: 1;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.graph-node__badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: auto;
+}
+
+.graph-node__id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.badge--ghost {
+  border-style: dashed;
+}
+
+.graph-empty {
+  margin: 0;
+  padding: var(--space-4) 0;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 /* --- Issue cards --- */

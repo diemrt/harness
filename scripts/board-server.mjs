@@ -31,11 +31,17 @@ const PAGE_PATH = path.join(__dirname, "board.html");
 
 // Static route table for the page's own assets: declared one by one, never built from the
 // request URL, so "no arbitrary file is served" stays true after the split of board.html into
-// three files. Anything not listed here — /board-graph.mjs included, not yet wired to the page —
-// falls through to the catch-all 404, traversal attempts among them.
+// four files. Anything not listed here falls through to the catch-all 404, traversal attempts
+// among them.
+//
+// /board-graph.mjs is served with the same content-type as /board.js because that is what it is:
+// board.js imports it as a module (`import ... from "./board-graph.mjs"`), and the browser
+// refuses a module whose response is not a JavaScript MIME type. The extension is what tells a
+// reader the file is a module and nothing else — the route is what makes it loadable.
 const ASSET_ROUTES = [
   { pathname: "/board.css", filePath: path.join(__dirname, "board.css"), contentType: "text/css" },
   { pathname: "/board.js", filePath: path.join(__dirname, "board.js"), contentType: "text/javascript" },
+  { pathname: "/board-graph.mjs", filePath: path.join(__dirname, "board-graph.mjs"), contentType: "text/javascript" },
 ];
 
 // Changes arrive in bursts: issue-manager writes a temp file and renames it over issues.json, so

@@ -7,6 +7,12 @@
 // The functions here are plain exports so tests can import them directly; init() — the only part
 // that touches the DOM at module load — runs only when `document` exists, which it does not under
 // `node --test`.
+//
+// The graph's arithmetic is not here: levels, ordering, ghosts and the cycle guard live in
+// board-graph.mjs, imported below and served from /board-graph.mjs. This file turns what that
+// module computed into coordinates and markup, and nothing in it recomputes a level.
+
+import { buildGraph, GHOST_DONE, GHOST_UNKNOWN } from "./board-graph.mjs";
 
 // --- Icons ------------------------------------------------------------------------
 // Inline SVG, hand-drawn to match the icon names the board already used. No icon font, no CDN,
@@ -65,6 +71,10 @@ export const state = {
   issues: [],
   activeStatus: "wip", // "wip" | "all" | one of STATUS_ORDER
   query: "",
+  // "graph" | "list". The graph is what the board opens on; the list is the reference view and
+  // keeps the whole tracker, `done` included, which the graph deliberately drops.
+  view: "graph",
+  graph: null,
 };
 
 // --- DOM refs -------------------------------------------------------------------
@@ -76,8 +86,14 @@ function cacheEl() {
   el.projectTitle = document.getElementById("projectTitle");
   el.lastUpdated = document.getElementById("lastUpdated");
   el.counters = document.getElementById("counters");
+  el.toolbar = document.getElementById("toolbar");
+  el.viewToggle = document.getElementById("viewToggle");
   el.statusFilters = document.getElementById("statusFilters");
   el.searchInput = document.getElementById("searchInput");
+  el.cycleBanner = document.getElementById("cycleBanner");
+  el.graphView = document.getElementById("graphView");
+  el.graphUnchained = document.getElementById("graphUnchained");
+  el.graphCanvas = document.getElementById("graphCanvas");
   el.loadingState = document.getElementById("loadingState");
   el.errorState = document.getElementById("errorState");
   el.errorDetail = document.getElementById("errorDetail");
@@ -170,6 +186,32 @@ export function renderFilters() {
 export function filterTab(status, label) {
   const active = state.activeStatus === status ? " is-active" : "";
   return `<button type="button" role="tab" data-status="${status}" class="status-filters__tab${active}">${escapeHtml(label)}</button>`;
+}
+
+// --- Rendering: view toggle -----------------------------------------------------
+// Same tab strip as the status filters: graph and list are two ways of looking at one tracker,
+// not two features. `disabled` is how the cycle fallback holds — a disabled button fires no
+// click, so the page cannot be walked back into a graph whose levels are not to be trusted.
+export function viewTab(view, label, disabled) {
+  const active = state.view === view;
+  return (
+    `<button type="button" role="tab" data-view="${view}" aria-selected="${active}"` +
+    `${disabled ? ' disabled title="Ciclo nelle dipendenze: il grafo non è disegnabile"' : ""}` +
+    ` class="status-filters__tab${active ? " is-active" : ""}">${escapeHtml(label)}</button>`
+  );
+}
+
+export function renderViewToggle() {
+  const looped = hasCycle(state.graph);
+  el.viewToggle.innerHTML = viewTab("graph", "Grafo", looped) + viewTab("list", "Lista", false);
+
+  el.viewToggle.querySelectorAll("[data-view]").forEach((node) => {
+    node.addEventListener("click", () => {
+      state.view = node.getAttribute("data-view");
+      renderViewToggle();
+      renderView();
+    });
+  });
 }
 
 // --- Filtering ------------------------------------------------------------------
@@ -295,6 +337,258 @@ export function issueCard(it) {
     </article>`;
 }
 
+// --- Graph view -----------------------------------------------------------------
+// buildGraph() said which nodes exist, at which level, in which order. Everything below turns
+// that into pixels and markup: no level is recomputed here, and no node is invented.
+
+export function hasCycle(graph) {
+  return Boolean(graph && graph.cycle && graph.cycle.detected);
+}
+
+// A loop can only get into issues.json by hand — the CLI refuses to write one. When it does, the
+// levels are a guess and the page says so with the ids instead of drawing a plausible lie.
+export function renderCycleBanner(cycle) {
+  if (!cycle || !cycle.detected) return "";
+  const ids = cycle.ids.map((id) => `<code>${escapeHtml(id)}</code>`).join(" ");
+  return `
+    <div role="alert" class="alert">
+      ${svgIcon("alert-triangle")}
+      <div>
+        <h3 class="alert__title">Ciclo nelle dipendenze</h3>
+        <div class="alert__detail">
+          Il grafo non è disegnabile e la pagina ripiega sulla lista.
+          Issue coinvolte: ${ids}
+        </div>
+      </div>
+    </div>`;
+}
+
+// Fixed card sizes are what lets the layout be a pure function: a level's height is known before
+// anything is in the document, so the edges can be computed here instead of measured after a
+// paint. The cards clip what does not fit, which is the point — a graph node is a handle on an
+// issue, not the issue.
+export const GRAPH_METRICS = {
+  nodeWidth: 248,
+  // Tall enough for what the card holds — two clamped title lines, the badge row, the id — with
+  // the ghost dropping the id and the second line. Cut short, the flex column shrinks the title
+  // instead of clipping it, and a card shows half a row of letters.
+  nodeHeight: 124,
+  ghostHeight: 76,
+  gapX: 88, // the corridor between two columns: where every edge turns
+  gapY: 16,
+  laneStep: 12, // multi-level edges are spread across the corridor so they stay countable
+  padTop: 32, // room for the level label
+  padLeft: 8,
+  padBottom: 24,
+};
+
+/**
+ * Places the chained nodes in columns and routes the edges between them.
+ *
+ * @param {object} graph the value returned by buildGraph
+ * @returns {{
+ *   columns: {level: number, x: number, nodes: object[]}[],
+ *   positions: Map<string, object>,
+ *   edges: {from: string, to: string, span: number, points: number[][]}[],
+ *   width: number, height: number
+ * }}
+ */
+export function layoutGraph(graph) {
+  const m = GRAPH_METRICS;
+  const positions = new Map();
+  const levels = graph && Array.isArray(graph.levels) ? graph.levels : [];
+
+  const columns = levels.map((level, depth) => {
+    const x = m.padLeft + depth * (m.nodeWidth + m.gapX);
+    let y = m.padTop;
+    const nodes = level.map((node) => {
+      const height = node.ghost ? m.ghostHeight : m.nodeHeight;
+      const placed = { node, x, y, width: m.nodeWidth, height };
+      positions.set(node.id, placed);
+      y += height + m.gapY;
+      return placed;
+    });
+    return { level: depth, x, nodes };
+  });
+
+  const edges = layoutEdges(graph, positions);
+
+  const width = columns.length === 0
+    ? 0
+    : m.padLeft * 2 + columns.length * (m.nodeWidth + m.gapX) - m.gapX;
+  const height = columns.reduce((max, column) => {
+    const last = column.nodes[column.nodes.length - 1];
+    return last ? Math.max(max, last.y + last.height) : max;
+  }, m.padTop) + m.padBottom;
+
+  return { columns, positions, edges, width, height };
+}
+
+// One elbow per edge: out of the dependency's right side, a turn inside the corridor, then
+// straight into the left side of the issue that declares it — so the arrow always arrives
+// pointing at the target. An edge that skips levels turns in the corridor right after its
+// source and gets its own lane there, instead of every long edge sharing one line.
+function layoutEdges(graph, positions) {
+  const m = GRAPH_METRICS;
+  const edges = graph && Array.isArray(graph.edges) ? graph.edges : [];
+  const lanes = new Map();
+  const routed = [];
+
+  for (const edge of edges) {
+    const from = positions.get(edge.from);
+    const to = positions.get(edge.to);
+    if (!from || !to) {
+      continue;
+    }
+    const source = graph.byId.get(edge.from);
+    const target = graph.byId.get(edge.to);
+    const span = (target.level ?? 0) - (source.level ?? 0);
+
+    const x1 = from.x + from.width;
+    const y1 = Math.round(from.y + from.height / 2);
+    const x2 = to.x;
+    const y2 = Math.round(to.y + to.height / 2);
+
+    let turn = x1 + m.gapX / 2;
+    if (span > 1) {
+      const lane = lanes.get(source.level) ?? 0;
+      lanes.set(source.level, lane + 1);
+      turn = x1 + Math.min(m.gapX - 12, 14 + lane * m.laneStep);
+    }
+
+    routed.push({
+      from: edge.from,
+      to: edge.to,
+      span,
+      points: [[x1, y1], [turn, y1], [turn, y2], [x2, y2]],
+    });
+  }
+
+  return routed;
+}
+
+// One <svg> for every edge, sized to the plane and sitting under the cards. The arrowhead is a
+// marker on the polyline's end, so it is on the target by construction and turns with the last
+// segment rather than being positioned by hand.
+export function renderEdges(layout) {
+  const lines = layout.edges
+    .map((edge) => {
+      const points = edge.points.map(([x, y]) => `${x},${y}`).join(" ");
+      return `<polyline class="graph-edge" points="${points}" marker-end="url(#graph-arrow)"></polyline>`;
+    })
+    .join("");
+  return (
+    `<svg class="graph-edges" width="${layout.width}" height="${layout.height}" ` +
+    `viewBox="0 0 ${layout.width} ${layout.height}" aria-hidden="true">` +
+    `<defs><marker id="graph-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">` +
+    `<path class="graph-edge__tip" d="M0 0 L8 4 L0 8 Z"></path></marker></defs>${lines}</svg>`
+  );
+}
+
+export function shortId(id) {
+  return String(id || "").slice(0, 8);
+}
+
+export function graphNodeBody(node) {
+  // Nothing in the tracker answers for this id: the card carries the id itself, because that is
+  // the only thing that lets someone go and find what went wrong.
+  if (node.ghost === GHOST_UNKNOWN) {
+    return (
+      `<p class="graph-node__title" title="${escapeHtml(node.id)}">id sconosciuto · ${escapeHtml(shortId(node.id))}</p>` +
+      `<div class="graph-node__badges"><span class="badge badge--ghost">` +
+      `${svgIcon("help-circle", "icon--sm")}sconosciuto</span></div>`
+    );
+  }
+
+  const issue = node.issue || {};
+  const status = node.ghost === GHOST_DONE ? "done" : issue.status;
+  const meta = statusMeta(status);
+  const badge =
+    `<span class="badge badge--status badge--${escapeHtml(status)}">` +
+    `${svgIcon(meta.icon, "icon--sm")}${escapeHtml(meta.label)}</span>`;
+  const title = `<p class="graph-node__title" title="${escapeHtml(issue.title)}">${escapeHtml(issue.title)}</p>`;
+
+  // A ghost is a closed dependency: title and status, nothing to act on.
+  if (node.ghost) {
+    return `${title}<div class="graph-node__badges">${badge}</div>`;
+  }
+  return (
+    `${title}<div class="graph-node__badges">${renderTierBadge(issue.tier)}${badge}</div>` +
+    `<div class="graph-node__id">${escapeHtml(shortId(node.id))}</div>`
+  );
+}
+
+// With coordinates the card is absolutely placed on the plane; without them it flows inside the
+// unchained grid. Same card either way, so the two groups read as the same kind of thing.
+export function graphNode(node, style) {
+  const classes = ["graph-node"];
+  if (node.ghost) classes.push("graph-node--ghost");
+  if (!style) classes.push("graph-node--flow");
+  return (
+    `<article class="${classes.join(" ")}" data-id="${escapeHtml(node.id)}"` +
+    `${style ? ` style="${style}"` : ""}>${graphNodeBody(node)}</article>`
+  );
+}
+
+export function graphNodeCard(placed) {
+  return graphNode(
+    placed.node,
+    `left:${placed.x}px;top:${placed.y}px;width:${placed.width}px;height:${placed.height}px`
+  );
+}
+
+// Issues with neither dependencies nor dependents are not a level: they are a labelled grid that
+// wraps, kept out of the columns. On this tracker most issues declare nothing, and putting them
+// at level 0 turns the whole graph into one vertical column.
+export function renderUnchained(nodes) {
+  if (!Array.isArray(nodes) || nodes.length === 0) return "";
+  return (
+    `<h2 class="graph-group__label">senza catena · ${nodes.length}</h2>` +
+    `<div class="graph-group__grid">${nodes.map((node) => graphNode(node, "")).join("")}</div>`
+  );
+}
+
+export function renderGraph() {
+  const graph = state.graph;
+  el.graphUnchained.innerHTML = renderUnchained(graph.unchained);
+
+  const layout = layoutGraph(graph);
+  if (layout.columns.length === 0) {
+    el.graphCanvas.innerHTML = graph.unchained.length
+      ? `<p class="graph-empty">Nessuna dipendenza dichiarata: non c'è nessuna catena da disegnare.</p>`
+      : `<p class="graph-empty">Nessuna issue aperta: il grafo non ha niente da mostrare.</p>`;
+    return;
+  }
+
+  const labels = layout.columns
+    .map(
+      (column) =>
+        `<p class="graph-column-label" style="left:${column.x}px;width:${GRAPH_METRICS.nodeWidth}px">livello ${column.level}</p>`
+    )
+    .join("");
+  const cards = layout.columns.map((column) => column.nodes.map(graphNodeCard).join("")).join("");
+
+  el.graphCanvas.innerHTML =
+    `<div class="graph-plane" style="width:${layout.width}px;height:${layout.height}px">` +
+    `${renderEdges(layout)}${labels}${cards}</div>`;
+}
+
+// The toggle: one of the two views is in the document at a time. Search and status filters drive
+// the list only, so they follow it instead of sitting there answering nothing.
+export function renderView() {
+  const graphActive = state.view === "graph";
+  el.toolbar.classList.toggle("toolbar--graph", graphActive);
+  el.graphView.classList.toggle("is-hidden", !graphActive);
+  el.issuesList.classList.toggle("is-hidden", graphActive);
+
+  if (graphActive) {
+    el.emptyState.classList.add("is-hidden");
+    renderGraph();
+    return;
+  }
+  renderIssues();
+}
+
 // --- Boot -----------------------------------------------------------------------
 export function showError(message) {
   el.loadingState.classList.add("is-hidden");
@@ -318,6 +612,9 @@ export async function load() {
 
   state.data = data;
   state.issues = Array.isArray(data.issues) ? data.issues : [];
+  // Built on every load, whichever view is open: the cycle guard has to speak even when the
+  // graph is not the thing being looked at.
+  state.graph = buildGraph(state.issues);
 
   el.projectTitle.textContent = `${projectNameFrom(data.project, data.projectDir)} — Issue Board`;
   el.lastUpdated.textContent = data.lastUpdated
@@ -333,9 +630,19 @@ export async function load() {
     el.errorState.classList.add("is-hidden");
   }
 
+  // The cycle banner is not an error state: the tracker is readable, the graph is not drawable.
+  // The list is a complete view of the same data, so the page falls back to it and keeps going.
+  const banner = renderCycleBanner(state.graph.cycle);
+  el.cycleBanner.innerHTML = banner;
+  el.cycleBanner.classList.toggle("is-hidden", banner === "");
+  if (hasCycle(state.graph)) {
+    state.view = "list";
+  }
+
   renderCounters();
   renderFilters();
-  renderIssues();
+  renderViewToggle();
+  renderView();
 }
 
 export function setLive(connected) {

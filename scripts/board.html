@@ -46,8 +46,8 @@
     <!-- populated by JS -->
   </section>
 
-  <!-- Toolbar: search + status filters -->
-  <section class="toolbar">
+  <!-- Toolbar: search + view toggle + status filters -->
+  <section id="toolbar" class="toolbar">
     <label class="search-field">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="11" cy="11" r="7"></circle>
@@ -55,10 +55,18 @@
       </svg>
       <input id="searchInput" type="text" class="search-field__input" placeholder="Cerca per titolo o descrizione…" autocomplete="off" />
     </label>
-    <div id="statusFilters" role="tablist" class="status-filters">
-      <!-- populated by JS -->
+    <div class="toolbar__tabs">
+      <div id="viewToggle" role="tablist" aria-label="Vista" class="status-filters">
+        <!-- populated by JS -->
+      </div>
+      <div id="statusFilters" role="tablist" class="status-filters">
+        <!-- populated by JS -->
+      </div>
     </div>
   </section>
+
+  <!-- Cycle guard: a hand-edited issues.json can hold a loop the CLI refuses to write. -->
+  <div id="cycleBanner" class="cycle-banner is-hidden"></div>
 
   <!-- States -->
   <div id="loadingState" class="state state--loading">
@@ -96,6 +104,12 @@
     </svg>
     <p>Nessuna issue corrisponde ai filtri attuali.</p>
   </div>
+
+  <!-- Graph view: the issues still open, laid out by dependency level -->
+  <section id="graphView" class="graph is-hidden">
+    <aside id="graphUnchained" class="graph-unchained"></aside>
+    <div id="graphCanvas" class="graph-canvas"></div>
+  </section>
 
   <!-- Issue list -->
   <section id="issuesList" class="issues-grid"></section>

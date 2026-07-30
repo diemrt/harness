@@ -14,11 +14,28 @@ const rootDir = path.resolve(__dirname, "..");
 const SERVER_PATH = path.join(rootDir, "scripts", "board-server.mjs");
 const ISSUE_MANAGER = path.join(rootDir, "scripts", "issue-manager.mjs");
 const BOARD_JS_PATH = path.join(rootDir, "scripts", "board.js");
+const BOARD_GRAPH_PATH = path.join(rootDir, "scripts", "board-graph.mjs");
 
 // A real import, not an extraction: board.js guards its only DOM access (init(), called from a
 // DOMContentLoaded listener) behind `typeof document !== "undefined"`, so it loads cleanly here
 // and every exported function is the function the browser actually runs.
-const { renderCriteria, renderTierBadge, escapeHtml } = await import(pathToFileURL(BOARD_JS_PATH).href);
+const {
+  renderCriteria,
+  renderTierBadge,
+  escapeHtml,
+  state,
+  getFilteredIssues,
+  GRAPH_METRICS,
+  layoutGraph,
+  renderEdges,
+  graphNode,
+  renderUnchained,
+  renderCycleBanner,
+} = await import(pathToFileURL(BOARD_JS_PATH).href);
+
+// The graph's arithmetic is verified in plugin-board-graph.test.mjs; here it is only the input
+// the renderer is fed, so the layout is tested against real levels instead of a hand-made shape.
+const { buildGraph } = await import(pathToFileURL(BOARD_GRAPH_PATH).href);
 
 function seed(issues = []) {
   return JSON.stringify({ last_updated: "2026-01-01T00:00:00Z", issues }, null, 2);
@@ -417,10 +434,11 @@ test("unknown paths 404 rather than leaking files", async () => {
       "../board-server.mjs",
       "issues.json",
       "../../proposals/board-minimal.html",
-      // board-graph.mjs exists on disk (see scripts/board-graph.mjs) but is deliberately not one
-      // of the declared routes yet: wiring it to the page is separate work, and until then it
-      // must 404 like anything else undeclared.
-      "board-graph.mjs",
+      // Near-misses of the declared routes: the lookup is exact on the table, not a prefix or a
+      // guess at an extension, so a name that merely looks like an asset is still a 404.
+      "board-graph.js",
+      "board.js.map",
+      "board-graph.mjs/",
       "../package.json",
       "../issues.json",
     ]) {
@@ -523,6 +541,211 @@ test("the flags the board does declare keep working", async () => {
   } finally {
     stop(withPort.child);
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the board serves board-graph.mjs so the page can import it as a module", async () => {
+  // The browser refuses a module whose response is not a JavaScript MIME type: served as
+  // anything else, the import in board.js fails and the graph view never renders.
+  const dir = tempProject(seed());
+  const { child, url } = await startServer(dir);
+  try {
+    const module = await fetch(`${url}board-graph.mjs`);
+    assert.equal(module.status, 200);
+    assert.match(module.headers.get("content-type"), /text\/javascript/);
+    assert.match(await module.text(), /export function buildGraph/);
+
+    const js = await (await fetch(`${url}board.js`)).text();
+    assert.match(
+      js,
+      /import \{[^}]*buildGraph[^}]*\} from "\.\/board-graph\.mjs"/,
+      "board.js must import the module, not carry a second copy of the layering"
+    );
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- Graph rendering ------------------------------------------------------------
+// buildGraph is verified on its own; what follows is the renderer's half of the contract, which
+// is what a browser would otherwise be needed for: coordinates, markup, fallbacks.
+
+const A = "aaaaaaaa-1111-1111-1111-111111111111";
+const B = "bbbbbbbb-2222-2222-2222-222222222222";
+const C = "cccccccc-3333-3333-3333-333333333333";
+const D = "dddddddd-4444-4444-4444-444444444444";
+
+// A → B → C, plus A → C skipping a level, and D chained to nothing.
+function chainFixture() {
+  return buildGraph([
+    issue(A),
+    issue(B, { depends_on: [A] }),
+    issue(C, { depends_on: [A, B] }),
+    issue(D),
+  ]);
+}
+
+test("layoutGraph gives every level its own column and leaves the unchained issues out of them", () => {
+  const layout = layoutGraph(chainFixture());
+
+  assert.equal(layout.columns.length, 3, "three levels, three columns");
+  assert.deepEqual(layout.columns.map((column) => column.level), [0, 1, 2]);
+  for (let i = 1; i < layout.columns.length; i += 1) {
+    assert.equal(
+      layout.columns[i].x - layout.columns[i - 1].x,
+      GRAPH_METRICS.nodeWidth + GRAPH_METRICS.gapX,
+      "columns are one card plus one corridor apart"
+    );
+  }
+  // D has neither dependencies nor dependents: it must not have been given a coordinate at all,
+  // or it would be sitting in the level 0 column instead of in the wrapping grid.
+  assert.equal(layout.positions.has(D), false);
+  assert.equal(layout.positions.has(A), true);
+  assert.ok(layout.width > 0 && layout.height > 0, "the plane must have a size to scroll");
+});
+
+test("the unchained issues render as a labelled wrapping grid, not as a column", () => {
+  const graph = chainFixture();
+  assert.deepEqual(graph.unchained.map((node) => node.id), [D]);
+
+  const markup = renderUnchained(graph.unchained);
+  assert.match(markup, /senza catena/);
+  assert.match(markup, /graph-group__grid/);
+  // No coordinates: the browser wraps these, layoutGraph never touches them.
+  assert.match(markup, /graph-node--flow/);
+  assert.equal(markup.includes("left:"), false, "an unchained card must not be positioned");
+
+  assert.equal(renderUnchained([]), "", "nothing to show means no label either");
+});
+
+test("edges leave the dependency and land on the issue that declares it", () => {
+  const graph = chainFixture();
+  const layout = layoutGraph(graph);
+
+  const from = layout.positions.get(A);
+  const to = layout.positions.get(B);
+  const edge = layout.edges.find((entry) => entry.from === A && entry.to === B);
+  assert.ok(edge, "the arc goes from the dependency to the dependent, not the other way round");
+
+  const first = edge.points[0];
+  const last = edge.points[edge.points.length - 1];
+  assert.equal(first[0], from.x + from.width, "it starts on the right edge of the dependency");
+  assert.equal(first[1], Math.round(from.y + from.height / 2));
+  assert.equal(last[0], to.x, "and ends on the left edge of the target");
+  assert.equal(last[1], Math.round(to.y + to.height / 2));
+  assert.ok(last[0] > first[0], "the arrow always points forward, never back into a column");
+
+  const svg = renderEdges(layout);
+  assert.equal((svg.match(/<polyline/g) || []).length, layout.edges.length);
+  assert.match(svg, /marker-end="url\(#graph-arrow\)"/, "the tip is on the target end");
+  assert.match(svg, /<marker id="graph-arrow"/);
+  assert.match(svg, new RegExp(`points="${first.join(",")} `), "the polyline carries the points");
+});
+
+test("an edge that skips a level turns inside the corridor between the columns", () => {
+  const layout = layoutGraph(chainFixture());
+  const jump = layout.edges.find((edge) => edge.from === A && edge.to === C);
+  assert.equal(jump.span, 2, "A is at level 0 and C at level 2");
+
+  const sourceRight = layout.positions.get(A).x + GRAPH_METRICS.nodeWidth;
+  const [, turn] = jump.points;
+  assert.ok(
+    turn[0] > sourceRight && turn[0] < sourceRight + GRAPH_METRICS.gapX,
+    `the vertical leg must sit in the corridor (${sourceRight} < ${turn[0]} < ${sourceRight + GRAPH_METRICS.gapX})`
+  );
+  // Four points, three segments: out, across, in. A straight line would have no elbow to route.
+  assert.equal(jump.points.length, 4);
+  assert.equal(jump.points[1][0], jump.points[2][0], "the middle segment is the vertical one");
+
+  // Parallel long edges must not share one line, or a fan-in reads as a single arc.
+  const second = layoutGraph(
+    buildGraph([
+      issue(A),
+      issue(B, { depends_on: [A] }),
+      issue(C, { depends_on: [A, B] }),
+      issue(D, { depends_on: [A, B] }),
+    ])
+  ).edges.filter((edge) => edge.span > 1);
+  assert.equal(second.length, 2);
+  assert.notEqual(second[0].points[1][0], second[1].points[1][0], "each long edge gets its lane");
+});
+
+test("a done dependency is drawn as a compact ghost instead of an arrow out of nowhere", () => {
+  const graph = buildGraph([
+    issue(A, { status: "done", title: "Chiusa" }),
+    issue(B, { depends_on: [A] }),
+  ]);
+  const layout = layoutGraph(graph);
+
+  const ghost = graph.byId.get(A);
+  assert.equal(ghost.ghost, "done");
+  assert.equal(
+    layout.positions.get(A).height,
+    GRAPH_METRICS.ghostHeight,
+    "a ghost is shorter than a real card"
+  );
+  assert.notEqual(GRAPH_METRICS.ghostHeight, GRAPH_METRICS.nodeHeight);
+
+  const markup = graphNode(ghost, "");
+  assert.match(markup, /graph-node--ghost/, "the dashed border rides on this class");
+  assert.match(markup, /Chiusa/, "title");
+  assert.match(markup, /badge--done/, "and status");
+  assert.equal(markup.includes("graph-node__id"), false, "nothing else: a ghost is not work");
+
+  // The same shape for an id nothing in the tracker answers for, id included so it can be found.
+  const unknown = buildGraph([issue(B, { depends_on: [C] })]).byId.get(C);
+  assert.equal(unknown.ghost, "unknown");
+  const unknownMarkup = graphNode(unknown, "");
+  assert.match(unknownMarkup, /graph-node--ghost/);
+  assert.match(unknownMarkup, /id sconosciuto/);
+  assert.match(unknownMarkup, new RegExp(C.slice(0, 8)));
+});
+
+test("a cycle in the data is named, not drawn: the banner carries the ids", () => {
+  // issue-manager refuses to write this; a hand-edited issues.json can still hold it.
+  const graph = buildGraph([issue(A, { depends_on: [B] }), issue(B, { depends_on: [A] })]);
+  assert.equal(graph.cycle.detected, true, "the guard must find it rather than loop");
+
+  const banner = renderCycleBanner(graph.cycle);
+  assert.match(banner, /Ciclo nelle dipendenze/);
+  assert.match(banner, /ripiega sulla lista/);
+  for (const id of graph.cycle.ids) {
+    assert.match(banner, new RegExp(id), `the banner must name ${id}`);
+  }
+
+  // No cycle, no banner: the page must not carry an alert it has nothing to say in.
+  assert.equal(renderCycleBanner(chainFixture().cycle), "");
+  assert.equal(renderCycleBanner(null), "");
+});
+
+test("the list keeps every issue the graph drops, done included", () => {
+  const issues = [issue(A, { status: "done" }), issue(B, { status: "in_progress" })];
+  const graph = buildGraph(issues);
+  assert.deepEqual(
+    graph.nodes.map((node) => node.id),
+    [B],
+    "the graph answers 'what do I work on now', so a closed issue is not a node"
+  );
+
+  const previousIssues = state.issues;
+  const previousStatus = state.activeStatus;
+  const previousQuery = state.query;
+  try {
+    state.issues = issues;
+    state.query = "";
+    state.activeStatus = "all";
+    assert.deepEqual(
+      getFilteredIssues().map((it) => it.id),
+      [A, B],
+      "the list is the reference view: the whole tracker is reachable from it"
+    );
+    state.activeStatus = "done";
+    assert.deepEqual(getFilteredIssues().map((it) => it.id), [A]);
+  } finally {
+    state.issues = previousIssues;
+    state.activeStatus = previousStatus;
+    state.query = previousQuery;
   }
 });
 
