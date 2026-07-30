@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T11:05:58Z",
+  "last_updated": "2026-07-30T11:08:20Z",
   "rules": {
     "single_active_issue": false
   },
@@ -766,13 +766,13 @@
       "id": "fdc1e6d9-d93a-497c-9efd-009da2ce9cda",
       "title": "Docs: limiti di formato delle issue in issues.md e issue.md",
       "description": "I limiti imposti dalla CLI vanno documentati dove gli agenti li leggono, insieme alle regole che il codice non puo' misurare: paragrafi nella description, e rimando a un documento del progetto quando il testo sfora invece di comprimerlo.\n\nIn skills/harness/references/issues.md: limiti, forma di criteria condizionata a validation.state, LIMIT_EXCEEDED nella tabella dei codici, schema aggiornato. In commands/issue.md: come si compone un criteria array e cosa fare quando la CLI risponde LIMIT_EXCEEDED.\n\nLe skill di spec eventualmente installate (superpowers:brainstorming, core-dev-toolkit:spec) vanno menzionate come opzione per produrre quel documento, con nota esplicita che harness non le invoca e non crea file: continua a valere che harness non semina file nel progetto.\n\nDipende dalla issue che introduce criteria array nella CLI. Spec: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione A.",
-      "status": "in_review",
+      "status": "done",
       "validation": {
-        "criteria": "- issues.md riporta i quattro limiti con i valori 80, 1200, 200 e 7, e la misura sulla stringa trimmata\n- issues.md documenta che criteria e' array con state unknown, stringa o array con pass o fail\n- LIMIT_EXCEEDED compare nella tabella dei codici d'errore di issues.md\n- commands/issue.md spiega come comporre criteria come array e come reagire a LIMIT_EXCEEDED\n- documentata la regola dei paragrafi e il rimando a un documento del progetto sopra il limite\n- le skill di spec sono citate come opzionali, con la nota che harness non crea file\n- npm test verde, plugin-skill e plugin-commands compresi",
-        "state": "unknown"
+        "criteria": "PASS. 1) issues.md:118-127 tabella con title 80 / description 1200 / singolo criterio 200 / numero di criteri 7, piu' 'La lunghezza si misura sulla stringa trimmata'. 2) issues.md:129-139 forma di criteria condizionata a state (array 1..7 a unknown, stringa o array senza limiti a pass/fail). 3) issues.md:190 riga LIMIT_EXCEEDED nella tabella dei codici; INVALID_INPUT esteso alle forme sbagliate di criteria. 4) commands/issue.md:51-53 e 57 composizione array + sezione 'Se il testo non ci sta' con LIMIT_EXCEEDED vs INVALID_INPUT. 5) issues.md:141-151 rimando a un documento del progetto + regola dei paragrafi (anche commands/issue.md:52-53). 6) issues.md:154-157 e commands/issue.md:62-64 skill di spec opzionali con 'Harness non le invoca e non crea documenti da se''. 7) npm run test: tests 148, pass 148, fail 0 (plugin-skill e plugin-commands eseguiti anche isolatamente: 15/15). Accuratezza docs-vs-codice verificata contro la CLI in una project-dir temporanea: title 81->LIMIT_EXCEEDED / 80 e 80+padding ok; description 1201->LIMIT_EXCEEDED / 1200 ok; criterio 201->LIMIT_EXCEEDED / 200 ok; 8 criteri->LIMIT_EXCEEDED / 7 ok; stringa a state unknown->INVALID_INPUT; array vuoto ed elemento non stringa->INVALID_INPUT; a state pass/fail stringa da 5000 char e array da 10 elementi accettati senza cap; update di sola status su una issue legacy (title 300 char, criteria stringa) accettato -> i campi omessi non sono rivalidati. git status --short: solo ' M commands/issue.md' e ' M skills/harness/references/issues.md' (le modifiche delle altre issue sono state committate nel frattempo in 44e27d5/c1affd9); git diff --stat: 2 file, 76 insertions, 10 deletions, nessun file fuori scope, nessun segreto.",
+        "state": "pass"
       },
       "created_at": "2026-07-30T10:37:08Z",
-      "updated_at": "2026-07-30T11:04:19Z"
+      "updated_at": "2026-07-30T11:08:20Z"
     },
     {
       "id": "497230cc-342f-4841-9fa8-9f9e083b5710",
@@ -866,6 +866,23 @@
       "validation": null,
       "created_at": "2026-07-30T11:05:58Z",
       "updated_at": "2026-07-30T11:05:58Z"
+    },
+    {
+      "id": "0fd97d81-aeb1-4e6b-928a-0587d45405f1",
+      "title": "Test: assert vacuo sul fail fuori classe in plugin-agent",
+      "description": "Il verificatore della issue 55b06dcb ha segnalato un difetto reale nel test che quella issue ha aggiunto: l'assert /\\bfail\\b/ in test/plugin-agent.test.mjs matcha il \"state\":\"fail\" gia' presente nel payload di chiusura dentro il prompt dell'agent. Passerebbe anche se il paragrafo sul diff fuori classe venisse cancellato.\n\nRisultato: l'istruzione piu' importante di quel paragrafo (uscire dalla classe di lavoro dichiarata e' un fail, non un'osservazione) non e' vincolata da nessun test.\n\nVa reso specifico, ancorandolo al contesto della frase e non alla parola isolata, e va provato che il test diventi rosso rimettendo il prompt di prima. Nessun cambio ad agents/harness-verifier.md: il testo e' verificato, qui si irrobustisce solo il test.",
+      "status": "backlog",
+      "validation": {
+        "criteria": [
+          "l'assert non passa piu' se dal prompt si rimuove il paragrafo sul diff fuori classe, provato rimettendo la versione precedente in una copia temporanea",
+          "l'assert non e' soddisfatto dal solo \"state\":\"fail\" del payload di chiusura mostrato nel prompt",
+          "agents/harness-verifier.md non viene modificato da questa issue",
+          "npm test verde"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-07-30T11:07:37Z",
+      "updated_at": "2026-07-30T11:07:37Z"
     }
   ]
 }

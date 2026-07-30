@@ -48,10 +48,28 @@ Trasforma la descrizione dell'utente in `title`, `description` e `validation.cri
 I criteri sono la parte che conta: devono essere verificabili da un altro agente che non ha
 visto questa conversazione — "funziona bene" non lo è, "il comando X esce 0 e stampa Y" sì.
 
+`criteria` è un **array**: un elemento per criterio, al massimo 7, ognuno entro 200 caratteri.
+Il `title` sta in 80 caratteri, la `description` in 1200 e va scritta in **paragrafi separati
+da riga vuota**, non come un blocco unico: la legge una persona.
+
 Scrivi il payload **su file** e passalo con `--issue-data-file` (nessun escaping di quote da
-gestire nella shell), con `"status":"backlog"` e `"validation":{"criteria":"...","state":"unknown"}`.
-Mostra il payload all'utente e chiedi conferma **prima** di scrivere. L'id della issue creata
-si legge da `.data.id` della risposta, non dal testo del messaggio.
+gestire nella shell), con `"status":"backlog"` e
+`"validation":{"criteria":["...","..."],"state":"unknown"}`. Mostra il payload all'utente e
+chiedi conferma **prima** di scrivere. L'id della issue creata si legge da `.data.id` della
+risposta, non dal testo del messaggio.
+
+### Se il testo non ci sta
+
+`LIMIT_EXCEEDED` non si risolve comprimendo il testo: tieni un riassunto nel campo e **rimanda a
+un documento** del progetto, scrivendone il path nella description. Un contenuto che sfora non è
+una issue, è un documento a cui la issue punta.
+
+Il documento lo scrive l'utente, eventualmente con le skill di spec presenti nell'ambiente
+(`superpowers:brainstorming`, `core-dev-toolkit:spec` e simili) — proponile se ci sono. Harness
+non le invoca da sé e non crea file nel progetto.
+
+Se invece la CLI risponde `INVALID_INPUT` non è una questione di lunghezza ma di forma del
+payload: rileggi il contratto in `references/issues.md` invece di accorciare a caso.
 
 ## `update <id> <modifica>` → aggiornare
 
