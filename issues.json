@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T12:55:01Z",
+  "last_updated": "2026-07-30T12:58:37Z",
   "rules": {
     "single_active_issue": false
   },
@@ -865,10 +865,14 @@
       "id": "25ab3cae-4bf6-400e-92c5-a65bae9d9495",
       "title": "Docs: due frasi rimaste indietro sulle regole riscritte",
       "description": "Verifica leggera: riformulazione di due frasi di documentazione ormai false, nessun codice eseguibile toccato.\n\nDue punti sono rimasti indietro rispetto alle regole cambiate, segnalati dai verificatori come osservazioni fuori scope:\n\n1. skills/harness/references/external-worker.md parla del \"subagent per issue richiesto dalla regola 1-WIP\": quella formula non esiste piu', il subagent e' una scelta e non un obbligo.\n2. scripts/issue-manager.mjs, commento di testata che abbozza la struttura della issue memorizzata, documenta ancora validation.criteria come stringa. Il blocco successivo dello stesso commento e' invece corretto.\n\nSolo riformulazione: nessuna riga di codice eseguibile, nessun test da cambiare.",
-      "status": "backlog",
-      "validation": null,
+      "status": "done",
+      "tier": null,
+      "validation": {
+        "criteria": "Verifica leggera, classe dichiarata: \"riformulazione di due frasi di documentazione ormai false, nessun codice eseguibile toccato\". git diff: solo 3 file. (1) scripts/issue-manager.mjs riga 48, unica riga cambiata, dentro il blocco commento di testata: \"criteria\": \"<string>\" -> \"criteria\": [\"<string>\"]; nessuna riga eseguibile toccata (il codice parte da import a riga 62) e lo sketch ora concorda con validateCriteria() righe 170-220, che a state=unknown pretende un array. (2) skills/harness/references/external-worker.md righe 144-148, sezione \"Rapporto con la regola 1-WIP\": la frase \"Il subagent per issue richiesto dalla regola 1-WIP\" e' sostituita da \"la regola 1-WIP limita quante issue procedono in parallelo per catena, non impone un subagent per issue\", coerente con skills/harness/SKILL.md righe 42-43 e 53 (\"Un subagent per issue non e' un obbligo\"); resto del paragrafo solo rewrappato. (3) issues.json: sola transizione di stato backlog->in_review + tier:null, scritti da issue-manager.mjs riga 591 (tier: ... ?? null per i record precedenti al campo). Gate .harness/config.json verify=\"npm run test\": tests 157, pass 157, fail 0, duration_ms 5871.98. git status --short: solo i 3 file attesi, nessun file fuori scope, nessun segreto nel diff, indice vuoto (git diff --cached vuoto).",
+        "state": "pass"
+      },
       "created_at": "2026-07-30T11:05:58Z",
-      "updated_at": "2026-07-30T11:05:58Z"
+      "updated_at": "2026-07-30T12:58:37Z"
     },
     {
       "id": "0fd97d81-aeb1-4e6b-928a-0587d45405f1",

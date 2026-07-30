@@ -45,7 +45,7 @@
 //     "description": "<string>",
 //     "status": "<backlog|in_progress|in_review|blocked|done>",
 //     "tier": "<economy|standard|reasoning>"|null,
-//     "validation": { "criteria": "<string>", "state": "<unknown|pass|fail>" }|null,
+//     "validation": { "criteria": ["<string>"], "state": "<unknown|pass|fail>" }|null,
 //     "created_at": "<datetime>",
 //     "updated_at": "<datetime>"
 // }

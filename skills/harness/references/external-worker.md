@@ -141,7 +141,8 @@ interattivo e può cambiare quale credenziale è attiva. Verificalo prima di lan
 
 ## Rapporto con la regola 1-WIP
 
-Il "subagent per issue" richiesto dalla regola 1-WIP può essere un worker esterno. La
-**verifica indipendente resta un agente distinto**: worker ≠ verificatore ≠ orchestratore, e
-commit solo dopo il `pass`. Harness non prescrive *come* si istanzia un subagent, quindi
-nessun invariante viene contraddetto.
+Quando scegli di dispatchare una issue su un subagent, quel subagent può essere un worker
+esterno — la regola 1-WIP limita quante issue procedono in parallelo per catena, non impone
+un subagent per issue. La **verifica indipendente resta un agente distinto**: worker ≠
+verificatore ≠ orchestratore, e commit solo dopo il `pass`. Harness non prescrive *come* si
+istanzia un subagent, quindi nessun invariante viene contraddetto.
