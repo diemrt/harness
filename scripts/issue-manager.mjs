@@ -49,8 +49,10 @@
 //     "updated_at": "<datetime>"
 // }
 //
-// validation.criteria: set at creation time to define acceptance criteria (state="unknown");
-// updated at closure with the verification evidence (state="pass"|"fail").
+// validation.criteria: set at creation time to define acceptance criteria (state="unknown"), as an
+// array of short strings — a bullet list, one item per criterion; updated at closure with the
+// verification evidence (state="pass"|"fail"), where a plain string is accepted too and no length
+// cap applies, because evidence is the output of the commands that were run.
 // validation can be null if no criteria are defined.
 //
 // --insert requires the full payload. --update merges: omitted fields keep their current value,
@@ -76,6 +78,8 @@ let issuesFilePath = null;
 const LIMITS = {
   title: 80,
   description: 1200,
+  criterion: 200,
+  criteriaCount: 7,
 };
 
 // Helper: exception carrying the failure envelope fields, thrown by any validator/reader and
@@ -142,6 +146,72 @@ function validateLength(fieldName, value, max) {
   if (length > max) {
     fail(`'${fieldName}' is ${length} characters long, the maximum is ${max}.`, "LIMIT_EXCEEDED");
   }
+}
+
+// Helper: validate validation.criteria against the phase the issue is in.
+//
+// The field carries two different things at two different moments, and that is why the rules are
+// not the same for both. At creation (state "unknown") it holds the acceptance criteria: a bullet
+// list, one item per criterion, each short enough to be checked at a glance — so it must be an
+// array, capped in length and in count. At closure (state "pass"/"fail") the same field holds the
+// EVIDENCE of the verification: the commands that were run and what they printed. Capping that
+// would push a verifier towards "verified, all good", which is exactly what evidence is not, so no
+// cap applies and a plain string stays acceptable.
+//
+// A string is also how every issue written before this rule stored its criteria: those records
+// keep reading and updating fine, and nothing rewrites them.
+function validateCriteria(criteria, state) {
+  const isBulletList = state === "unknown";
+
+  if (typeof criteria === "string") {
+    if (isBulletList) {
+      fail(
+        `'validation.criteria' must be an array of strings when 'validation.state' is 'unknown': ` +
+          `one item per criterion, at most ${LIMITS.criteriaCount} items of ${LIMITS.criterion} characters. ` +
+          "A single string is only accepted at closure, where the field carries the verification evidence.",
+        "INVALID_INPUT"
+      );
+    }
+    if (isNullOrWhitespace(criteria)) {
+      fail("'validation.criteria' must be a non-empty string.", "INVALID_INPUT");
+    }
+    return;
+  }
+
+  if (!Array.isArray(criteria)) {
+    fail(
+      "'validation.criteria' must be an array of non-empty strings, or a non-empty string at closure.",
+      "INVALID_INPUT"
+    );
+  }
+
+  if (criteria.length === 0) {
+    fail("'validation.criteria' cannot be an empty array.", "INVALID_INPUT");
+  }
+
+  criteria.forEach((entry, index) => {
+    if (isNullOrWhitespace(entry)) {
+      fail(
+        `'validation.criteria[${index}]' must be a non-empty string.`,
+        "INVALID_INPUT"
+      );
+    }
+  });
+
+  // Length and count are the criteria's business only: at closure the array holds evidence too.
+  if (!isBulletList) {
+    return;
+  }
+
+  if (criteria.length > LIMITS.criteriaCount) {
+    fail(
+      `'validation.criteria' has ${criteria.length} items, the maximum is ${LIMITS.criteriaCount}.`,
+      "LIMIT_EXCEEDED"
+    );
+  }
+  criteria.forEach((entry, index) => {
+    validateLength(`validation.criteria[${index}]`, entry, LIMITS.criterion);
+  });
 }
 
 // Helper: validate the provided status value
@@ -221,7 +291,7 @@ function validateIssueInput(issue, partial = false) {
     fail("'status' is required.", "INVALID_INPUT");
   }
 
-  // validation: must be null or a well-formed object { criteria (non-empty), state (valid) }
+  // validation: must be null or a well-formed object { criteria, state (valid) }
   if (hasProp(issue, "validation") && issue.validation !== null) {
     const v = issue.validation;
     if (v === null || typeof v !== "object" || Array.isArray(v)) {
@@ -238,16 +308,18 @@ function validateIssueInput(issue, partial = false) {
         "INVALID_INPUT"
       );
     }
-    if (!hasProp(v, "criteria") || isNullOrWhitespace(v.criteria)) {
+    if (!hasProp(v, "criteria")) {
       fail(
-        "'validation.criteria' is required and must be a non-empty string when 'validation' is provided.",
+        "'validation.criteria' is required when 'validation' is provided.",
         "INVALID_INPUT"
       );
     }
     if (!hasProp(v, "state") || isNullOrWhitespace(v.state)) {
       fail("'validation.state' is required when 'validation' is provided.", "INVALID_INPUT");
     }
+    // The state decides which rules apply to criteria, so it is validated first.
     validateState(v.state);
+    validateCriteria(v.criteria, v.state);
   }
 }
 
@@ -371,8 +443,9 @@ function showHelp() {
     `  title        : non-empty string, at most ${LIMITS.title} characters`,
     `  description  : non-empty string, at most ${LIMITS.description} characters`,
     "  status       : backlog | in_progress | in_review | blocked | done",
-    "  validation   : null OR { criteria: <non-empty string>, state: unknown|pass|fail }",
-    "                 Set criteria at creation (state=unknown); update with evidence at closure (state=pass|fail).",
+    "  validation   : null OR { criteria, state: unknown|pass|fail }",
+    `                 state=unknown : criteria is an array of at most ${LIMITS.criteriaCount} strings of ${LIMITS.criterion} characters`,
+    "                 state=pass|fail : criteria carries the verification evidence — string or array, uncapped",
     "--insert requires title, description and status.",
     '--update merges: omitted fields keep their current value; an explicit "validation": null clears it.',
     "Length limits are checked on --insert and on the fields actually present in --update, and are",

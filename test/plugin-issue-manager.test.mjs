@@ -497,6 +497,140 @@ test("an --update that omits an over-limit field still succeeds: the merge does 
   }
 });
 
+// ---------------------------------------------------------------------------
+// validation.criteria — a bullet list at creation, free-form evidence at closure
+// ---------------------------------------------------------------------------
+
+const CRITERION_MAX = 200;
+const CRITERIA_COUNT_MAX = 7;
+
+function insertWithCriteria(dir, criteria, state = "unknown") {
+  const payload = JSON.stringify({
+    title: "t",
+    description: "d",
+    status: "backlog",
+    validation: { criteria, state },
+  });
+  return run(dir, ["--insert", "--issue-data", payload]);
+}
+
+test("criteria as a bare string is rejected while the state is unknown", () => {
+  const { dir } = setupTempProject();
+  try {
+    assertFail(insertWithCriteria(dir, "- one\n- two"), "INVALID_INPUT");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("criteria as an array of short strings is accepted and stored as an array", () => {
+  const { dir } = setupTempProject();
+  try {
+    const criteria = ["the command exits 0", "the file is not created"];
+    const data = assertOk(insertWithCriteria(dir, criteria));
+    assert.deepEqual(data.validation.criteria, criteria);
+    const reread = assertOk(run(dir, ["--get", "--issue-id", data.id]));
+    assert.deepEqual(reread.validation.criteria, criteria, "the shape must survive a round trip");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("LIMIT_EXCEEDED: more criteria than the cap allows", () => {
+  const { dir } = setupTempProject();
+  try {
+    const criteria = Array.from({ length: CRITERIA_COUNT_MAX + 1 }, (_, i) => `criterion ${i}`);
+    const parsed = assertFail(insertWithCriteria(dir, criteria), "LIMIT_EXCEEDED");
+    assert.match(parsed.error, new RegExp(String(CRITERIA_COUNT_MAX + 1)));
+    assert.match(parsed.error, new RegExp(String(CRITERIA_COUNT_MAX)));
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("exactly the maximum number of criteria is accepted", () => {
+  const { dir } = setupTempProject();
+  try {
+    const criteria = Array.from({ length: CRITERIA_COUNT_MAX }, (_, i) => `criterion ${i}`);
+    const data = assertOk(insertWithCriteria(dir, criteria));
+    assert.equal(data.validation.criteria.length, CRITERIA_COUNT_MAX);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("LIMIT_EXCEEDED: a single criterion over the cap, named by its index", () => {
+  const { dir } = setupTempProject();
+  try {
+    const criteria = ["short one", "c".repeat(CRITERION_MAX + 1)];
+    const parsed = assertFail(insertWithCriteria(dir, criteria), "LIMIT_EXCEEDED");
+    assert.match(parsed.error, /criteria\[1\]/, "the message must name which criterion is too long");
+    assert.match(parsed.error, new RegExp(String(CRITERION_MAX)));
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("INVALID_INPUT: an empty array, or an entry that is not a non-empty string", () => {
+  const { dir } = setupTempProject();
+  try {
+    assertFail(insertWithCriteria(dir, []), "INVALID_INPUT");
+    assertFail(insertWithCriteria(dir, ["fine", "   "]), "INVALID_INPUT");
+    assertFail(insertWithCriteria(dir, ["fine", 42]), "INVALID_INPUT");
+    assertFail(insertWithCriteria(dir, { one: "fine" }), "INVALID_INPUT");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("at closure the criteria field carries evidence: string or array, uncapped", () => {
+  // Evidence is the output of the commands that were run. Capping it would push a verifier towards
+  // "verified, all good", which is exactly what evidence is not.
+  const { dir } = setupTempProject();
+  try {
+    const longEvidence = "npm test output\n".repeat(500);
+    assert.ok(longEvidence.length > 1200, "the fixture must exceed every other cap");
+
+    // Evidence this size is exactly why the CLI takes a payload file: inline it would blow past the
+    // command-line length limit long before the script ever saw it.
+    const payloadPath = path.join(dir, "payload.json");
+    const updateWith = (validation) => {
+      writeFileSync(payloadPath, JSON.stringify({ validation }), "utf8");
+      return assertOk(run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data-file", payloadPath]));
+    };
+
+    for (const state of ["pass", "fail"]) {
+      const asString = updateWith({ criteria: longEvidence, state });
+      assert.equal(asString.validation.criteria, longEvidence);
+
+      const asArray = updateWith({
+        criteria: Array.from({ length: 20 }, () => longEvidence),
+        state,
+      });
+      assert.equal(asArray.validation.criteria.length, 20);
+    }
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("an issue stored with string criteria stays readable and updatable", () => {
+  // ID_TWO in the seed carries the pre-array shape: the records written before this rule are never
+  // rewritten, so reads and unrelated updates must keep working on them.
+  const { dir } = setupTempProject();
+  try {
+    const read = assertOk(run(dir, ["--get", "--issue-id", ID_TWO]));
+    assert.equal(read.validation.criteria, "criteria two");
+
+    const updated = assertOk(
+      run(dir, ["--update", "--issue-id", ID_TWO, "--issue-data", '{"status":"in_progress"}'])
+    );
+    assert.equal(updated.validation.criteria, "criteria two", "the legacy shape must survive");
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("--help documents LIMIT_EXCEEDED and the caps", () => {
   const { dir } = setupTempProject();
   try {
@@ -707,14 +841,14 @@ test("worker MAY set status up to in_review", () => {
 test("worker MAY set validation.state up to unknown", () => {
   const { dir } = setupTempProject();
   try {
-    const payload = JSON.stringify({ validation: { criteria: "x", state: "unknown" } });
+    const payload = JSON.stringify({ validation: { criteria: ["x"], state: "unknown" } });
     const result = runWithRole(
       dir,
       ["--update", "--issue-id", ID_ONE, "--issue-data", payload],
       "worker"
     );
     const data = assertOk(result);
-    assert.deepEqual(data.validation, { criteria: "x", state: "unknown" });
+    assert.deepEqual(data.validation, { criteria: ["x"], state: "unknown" });
   } finally {
     cleanup(dir);
   }

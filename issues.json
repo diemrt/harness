@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T10:56:23Z",
+  "last_updated": "2026-07-30T11:01:44Z",
   "rules": {
     "single_active_issue": false
   },
@@ -742,25 +742,25 @@
       "id": "903cd6e8-9ede-4957-aa0b-aec337386fdb",
       "title": "CLI: criteria come lista, limiti condizionati a validation.state",
       "description": "validation.criteria e' un campo sovraccarico: alla creazione porta i criteri, alla chiusura l'evidenza dei comandi eseguiti, che e' legittimamente lunga (max attuale 6482 caratteri). I limiti valgono quindi solo sulla fase in cui porta criteri.\n\nIn scripts/issue-manager.mjs: con state unknown, criteria deve essere un array di stringhe non vuote, da 1 a 7 elementi, ognuno entro 200 caratteri; una stringa e' rifiutata. Con state pass o fail, criteria accetta stringa o array senza limiti. La forma fornita viene salvata come e': nessuna normalizzazione, cosi' le 59 issue con criteria stringa restano leggibili.\n\nDipende dalla issue dei limiti su title e description, che introduce LIMIT_EXCEEDED e le costanti di modulo.\n\nSpec: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione A.",
-      "status": "in_review",
+      "status": "done",
       "validation": {
-        "criteria": "- con state unknown, criteria stringa e' rifiutato con code INVALID_INPUT\n- con state unknown, un array da 1 a 7 stringhe entro 200 caratteri e' accettato, exit 0\n- 8 elementi escono 1 con LIMIT_EXCEEDED e un messaggio che nomina 8 e 7\n- un elemento da 201 caratteri esce 1 con LIMIT_EXCEEDED e un messaggio che nomina il suo indice\n- array vuoto, elemento non stringa o elemento vuoto escono 1 con INVALID_INPUT\n- con state pass o fail, stringa e array di qualsiasi lunghezza sono accettati, exit 0\n- la forma e' salvata come fornita, verificato rileggendo la issue con --get; npm test verde",
-        "state": "unknown"
+        "state": "pass",
+        "criteria": "Verifica indipendente, CLI invocata su un progetto temporaneo con --project-dir (issues.json reale mai scritto se non per questa chiusura).\n\n1) state unknown + criteria stringa -> rifiutato: --insert ... '{\"validation\":{\"criteria\":\"- one\n- two\",\"state\":\"unknown\"}}' => {\"ok\":false,\"error\":\"'validation.criteria' must be an array of strings when 'validation.state' is 'unknown': one item per criterion, at most 7 items of 200 characters. ...\",\"code\":\"INVALID_INPUT\"} exit=1.\n\n2) array 1..7 entro 200 char accettato: array di 1 elemento => ok:true exit=0; array di 7 elementi con l'elemento [3] di esattamente 200 caratteri => ok:true exit=0.\n\n3) 8 elementi => {\"ok\":false,\"error\":\"'validation.criteria' has 8 items, the maximum is 7.\",\"code\":\"LIMIT_EXCEEDED\"} exit=1 (nomina 8 e 7).\n\n4) elemento di 201 caratteri all'indice 1 => {\"ok\":false,\"error\":\"'validation.criteria[1]' is 201 characters long, the maximum is 200.\",\"code\":\"LIMIT_EXCEEDED\"} exit=1 (nomina l'indice).\n\n5) INVALID_INPUT exit=1 per: array vuoto (\"cannot be an empty array\"), elemento 42 e elemento null e elemento \"   \" (\"'validation.criteria[1]' must be a non-empty string\"), criteria oggetto (\"must be an array of non-empty strings, or a non-empty string at closure\").\n\n6) state pass/fail senza cap: --update --issue-data-file con criteria stringa da 8400 caratteri => ok:true, type=string, len=8400; con array di 20 stringhe da 4500 caratteri e state fail => ok:true, isArray=true, n=20; array di 10 elementi con state pass => ok:true exit=0 (nessun cap di conteggio).\n\n7) forma salvata come fornita: --get sull'issue con 7 criteri => isArray=true, n=7, item[3] lunga 200; su disco le issue mantengono la forma con cui sono state scritte (string resta string, array resta array); issues.json reale: 70 issue, 70 con criteria stringa, 0 convertite, nessuna riscrittura (git diff issues.json vuoto). Issue con criteria stringa leggibile con --get e aggiornabile con --update {\"status\":\"in_progress\"} => ok:true, criteria stringa invariata.\n\nGate: npm run test => tests 147, pass 147, fail 0 (durata ~5.5s). Run mirata su test/plugin-issue-manager.test.mjs => pass 53, fail 0, con gli 8 nuovi test della sezione criteri verdi.\n\nDanni collaterali: git status --short mostra solo scripts/issue-manager.mjs e test/plugin-issue-manager.test.mjs (in scope) piu scripts/board.html e test/plugin-board.test.mjs, che appartengono alla issue 74cb0bdd in lavorazione. Nessun untracked, nessun segreto nel diff. Osservazione fuori scope: il commento di testata dello schema (scripts/issue-manager.mjs riga 47) documenta ancora \"criteria\": \"<string>\" nella struttura dell'issue memorizzata."
       },
       "created_at": "2026-07-30T10:37:08Z",
-      "updated_at": "2026-07-30T10:56:22Z"
+      "updated_at": "2026-07-30T11:00:59Z"
     },
     {
       "id": "74cb0bdd-4de8-49cd-8564-55c6c8f743a0",
       "title": "Board: render di criteria come lista, con fallback sulla forma stringa",
       "description": "Il board rende oggi validation.criteria come un solo paragrafo preserve-newlines (scripts/board.html, intorno alla riga 316). Con criteria diventato array serve una lista, e la forma stringa deve continuare a funzionare per le 59 issue esistenti, che non vengono migrate.\n\nIn scripts/board.html: array reso come ul con un li per criterio, stringa resa come oggi. Ogni criterio passa da escapeHtml come il resto dei campi: il board e' servito su loopback ma il contenuto arriva da issues.json, non e' fidato.\n\nDipende dalla issue che introduce criteria array nella CLI.\n\nSpec: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione A.",
-      "status": "in_progress",
+      "status": "in_review",
       "validation": {
         "criteria": "- una issue con criteria array viene resa come ul, un li per criterio, nell'ordine dell'array\n- una issue con criteria stringa continua a rendersi come paragrafo preserve-newlines\n- una issue con validation null non rende alcun blocco di validazione, come oggi\n- ogni criterio e' escapato: un criterio contenente <script> compare come testo, non come markup\n- test/plugin-board.test.mjs copre entrambe le forme di criteria\n- npm test verde",
         "state": "unknown"
       },
       "created_at": "2026-07-30T10:37:08Z",
-      "updated_at": "2026-07-30T10:56:23Z"
+      "updated_at": "2026-07-30T10:58:44Z"
     },
     {
       "id": "fdc1e6d9-d93a-497c-9efd-009da2ce9cda",
@@ -826,13 +826,13 @@
       "id": "55b06dcb-8530-4059-bc19-5210d136be2c",
       "title": "Agent harness-verifier: gate su una issue senza criteri",
       "description": "Il verificatore oggi confronta validation.criteria con gli artefatti reali. Su una issue a verifica leggera quei criteri non esistono, e senza istruzioni l'agente o si blocca o passa tutto per default: entrambi gli esiti sono peggiori di nessuna verifica, perche' danno l'illusione del gate.\n\nIn agents/harness-verifier.md: con criteria null il gate e' il comando verify di configurazione piu' il confronto del diff con la classe di lavoro dichiarata nella description. Un typo in un commento che tocca codice eseguibile e' un fail. La chiusura scrive validation come oggetto, con state e l'evidenza dei comandi eseguiti.\n\nDipende dalla issue che definisce la whitelist in SKILL.md e verification.md.\n\nSpec: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione B.",
-      "status": "backlog",
+      "status": "in_review",
       "validation": {
         "criteria": "- harness-verifier.md istruisce cosa fare quando validation e' null: verify piu' controllo del diff\n- e' scritto che un diff fuori dalla classe dichiarata e' un fail, non una nota\n- e' scritto che la chiusura passa validation da null a oggetto con state ed evidenza\n- resta scritto che il verificatore non corregge il lavoro\n- test/plugin-agent.test.mjs copre le nuove istruzioni\n- npm test verde",
         "state": "unknown"
       },
       "created_at": "2026-07-30T10:37:08Z",
-      "updated_at": "2026-07-30T10:37:08Z"
+      "updated_at": "2026-07-30T11:01:44Z"
     },
     {
       "id": "8c89bdd3-f8d8-4489-830a-4e7422bae125",
@@ -850,13 +850,13 @@
       "id": "107fda1e-868e-41e9-bc59-9638db91ea8c",
       "title": "SKILL: regola 1-WIP riscritta, euristica di dispatch e guard inline",
       "description": "Avviare un subagent per ogni issue non e' sempre sensato: su lavoro piccolo l'unico beneficio e' preservare il contesto dell'orchestratore, e il costo non lo giustifica. La regola diventa una scelta motivata invece di un obbligo.\n\nIn skills/harness/SKILL.md: sotto execution.mode auto, subagent quando la superficie e' ampia o l'output rumoroso, tier reasoning, o ci sono catene indipendenti da far avanzare in parallelo; inline quando la catena e' una, la superficie e' piccola, il contesto e' sano, tier economy o standard.\n\nIl punto critico e' il guard: HARNESS_ROLE=worker vive nell'environment del processo del subagent, quindi lavorando inline la self-validation torna tecnicamente possibile. Ogni mutazione del tracker fatta inline va lanciata col ruolo esplicito, nelle due forme, PowerShell e bash, perche' su PowerShell la forma VAR=x comando non esiste.\n\nVa scritto che execution.mode non tocca la verifica: sempre agent harness-verifier distinto, sempre parallela fra issue, anche con mode inline. Dipende dalla issue del blocco execution in configurazione. Spec: sezione D dello spec.",
-      "status": "backlog",
+      "status": "in_review",
       "validation": {
         "criteria": "- SKILL.md non impone piu' un subagent per issue e riporta i segnali per scegliere subagent o inline\n- SKILL.md documenta execution.mode e come i tre valori cambiano la scelta\n- il guard inline e' scritto in entrambe le forme, PowerShell con $env: e bash con il prefisso\n- e' scritto perche' serve: senza subagent il processo non ha HARNESS_ROLE e potrebbe auto-chiudere\n- e' esplicito che execution.mode non riguarda la verifica, distinta e parallela anche con mode inline\n- verification.md riporta il guard inline; le skill esterne sono citate come opzione, non integrate\n- npm test verde, plugin-skill compreso",
         "state": "unknown"
       },
       "created_at": "2026-07-30T10:37:09Z",
-      "updated_at": "2026-07-30T10:37:09Z"
+      "updated_at": "2026-07-30T11:00:12Z"
     }
   ]
 }
