@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T21:04:34Z",
+  "last_updated": "2026-07-30T21:09:41Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1173,6 +1173,29 @@
       },
       "created_at": "2026-07-30T19:17:42Z",
       "updated_at": "2026-07-30T19:42:59Z"
+    },
+    {
+      "id": "3fe5af9c-aaea-499b-8858-1afb61dd39ca",
+      "title": "board: gli archi che saltano piu' livelli spariscono dietro le colonne",
+      "description": "Segnalato dal verificatore della issue 1f4c689e come osservazione fuori contratto.\n\nUn arco fra nodi non adiacenti gira nel corridoio fra le colonne, come lo spec chiede, ma poi corre in orizzontale attraverso le colonne intermedie. Gli archi stanno sotto le card per scelta dichiarata, quindi quel tratto passa dietro le card ed e' invisibile: si vede la partenza, si vede la punta sul target, in mezzo il percorso sparisce.\n\nNon e' un dettaglio estetico. Gli archi lunghi sono quelli che raccontano le dipendenze non ovvie, quelle che saltano un livello e che guardando le colonne adiacenti non si indovinano: sono le uniche che il grafo serva a mostrare. Con piu' archi lunghi insieme diventa impossibile dire quale punta appartenga a quale partenza.\n\nIl layering non c'entra: board-graph.mjs calcola i livelli correttamente e non va toccato. Il problema e' il routing e l'ordine di disegno in board.js e board.css.\n\nStrade possibili, da scegliere motivando: corridoio piu' largo con tratto verticale dentro; archi sopra le card; corsie fra una riga e l'altra.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [
+        "1f4c689e-6087-4536-a995-2c31b856e171"
+      ],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "Un arco che salta almeno due livelli e' visibile per tutto il suo percorso, non solo agli estremi.",
+          "Con piu' archi lunghi nello stesso grafo resta possibile dire quale punta appartiene a quale partenza.",
+          "Gli archi restano polilinee SVG da 1px con la punta sul target e il verso dalla dipendenza alla issue che la dichiara.",
+          "scripts/board-graph.mjs non e' modificato: il difetto e' di render, non di layering.",
+          "Prova manuale su una copia del tracker con almeno un arco che salta due livelli, documentata nell'evidenza con screenshot o descrizione puntuale.",
+          "npm run test passa."
+        ]
+      },
+      "created_at": "2026-07-30T21:09:41Z",
+      "updated_at": "2026-07-30T21:09:41Z"
     }
   ]
 }
