@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T12:29:31Z",
+  "last_updated": "2026-07-30T12:35:37Z",
   "rules": {
     "single_active_issue": false
   },
@@ -888,34 +888,23 @@
       "updated_at": "2026-07-30T11:07:37Z"
     },
     {
-      "id": "cf7ee8f4-f8ef-4cee-ace0-03b693d0c9c3",
-      "title": "no tier",
-      "description": "desc",
+      "id": "4f7c19f1-ad0c-474e-9832-8992df5430c1",
+      "title": "Agent verifier: vietare gli insert di prova sul tracker reale",
+      "description": "Durante questa sessione un verificatore ha inserito due fixture nel issues.json reale del progetto (title \"no tier\" e \"reasoning\", description \"desc\", criteria [\"c1\"]): probe di prova lanciati con la cwd sul repository invece che su una copia temporanea. CLAUDE.md lo vieta esplicitamente, e i due record sono finiti nei commit della sessione.\n\nOggi la regola vive solo nel prompt che l'orchestratore scrive a mano, quindi vale se e quando se lo ricorda. Va nella definizione dell'agent, che e' il posto dove regge sempre.\n\nagents/harness-verifier.md deve dire che l'unica scrittura ammessa sul tracker del progetto e' la chiusura della issue in verifica, e che qualunque prova della CLI va fatta su una copia in directory temporanea con --project-dir.",
       "status": "backlog",
-      "tier": null,
+      "tier": "economy",
       "validation": {
         "criteria": [
-          "c1"
+          "harness-verifier.md dichiara che l'unica scrittura sul tracker del progetto e' la chiusura della issue in verifica",
+          "harness-verifier.md impone --project-dir su una copia temporanea per qualunque prova di insert o update",
+          "e' scritto che un probe sul tracker reale e' un errore del verificatore, non un dettaglio",
+          "test/plugin-agent.test.mjs copre le due istruzioni e diventa rosso se vengono rimosse",
+          "npm test verde"
         ],
         "state": "unknown"
       },
-      "created_at": "2026-07-30T12:27:31Z",
-      "updated_at": "2026-07-30T12:27:31Z"
-    },
-    {
-      "id": "002ebbb0-a811-4820-b252-1ed1faf58224",
-      "title": "reasoning",
-      "description": "desc",
-      "status": "backlog",
-      "tier": null,
-      "validation": {
-        "criteria": [
-          "c1"
-        ],
-        "state": "unknown"
-      },
-      "created_at": "2026-07-30T12:27:31Z",
-      "updated_at": "2026-07-30T12:27:41Z"
+      "created_at": "2026-07-30T12:32:24Z",
+      "updated_at": "2026-07-30T12:32:24Z"
     }
   ]
 }
