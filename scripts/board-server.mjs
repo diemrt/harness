@@ -18,7 +18,7 @@
 //   {"ok":true,"data":{"url":"...","port":1234,"pid":999,"projectDir":"..."}}
 //   {"ok":false,"error":"<message>","code":"<CODE>"}
 //
-// Error codes: FILE_NOT_FOUND, PORT_IN_USE, ERROR.
+// Error codes: UNKNOWN_ARGUMENT, FILE_NOT_FOUND, PORT_IN_USE, ERROR.
 
 import { createServer } from "node:http";
 import { existsSync, readFileSync, statSync, watch } from "node:fs";
@@ -71,14 +71,25 @@ function readIssues(issuesFilePath, projectDir) {
 }
 
 function main() {
-  const { values } = parseArgs({
-    args: process.argv.slice(2),
-    strict: false,
-    options: {
-      "project-dir": { type: "string" },
-      port: { type: "string", default: "0" },
-    },
-  });
+  // strict: an unknown flag must fail here, not start a server. This script has no subcommands —
+  // a mistyped or invented flag (--start, --stop) used to be swallowed and produced one more
+  // listening process on one more port, orphaned and invisible until something else broke.
+  let values;
+  try {
+    ({ values } = parseArgs({
+      args: process.argv.slice(2),
+      strict: true,
+      options: {
+        "project-dir": { type: "string" },
+        port: { type: "string", default: "0" },
+      },
+    }));
+  } catch (error) {
+    writeFail(
+      `${error.message.replace(/\.?$/, ".")} The board server takes --project-dir and --port only; it is stopped by killing its pid.`,
+      "UNKNOWN_ARGUMENT"
+    );
+  }
 
   const projectDir = resolveProjectDir(values["project-dir"]);
   const issuesFilePath = path.join(projectDir, "issues.json");

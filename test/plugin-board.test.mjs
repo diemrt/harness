@@ -421,6 +421,57 @@ test("unknown paths 404 rather than leaking files", async () => {
   }
 });
 
+test("an unknown flag is refused instead of starting one more server", async () => {
+  // This script has no subcommands, so --start/--stop look plausible and are not. Swallowed by a
+  // lenient parser they each left a listening process behind, on a port nobody had noted down.
+  const dir = tempProject(seed());
+  try {
+    for (const argv of [["--stop"], ["--start"], ["--porta", "8080"], ["stop"]]) {
+      // The timeout is part of the assertion: a lenient parser does not fail here, it *starts* a
+      // server, and spawnSync would then wait on a process that never exits. Without it the
+      // regression reads as a hung suite instead of a red test.
+      const run = spawnSync(process.execPath, [SERVER_PATH, "--project-dir", dir, ...argv], {
+        encoding: "utf8",
+        timeout: 10_000,
+      });
+      assert.equal(
+        run.status,
+        1,
+        `${argv.join(" ")} must exit 1, not run a server (status ${run.status}, signal ${run.signal})`
+      );
+      assert.equal(run.stderr, "", "the contract keeps stderr empty even on failure");
+      const lines = run.stdout.trim().split("\n");
+      assert.equal(lines.length, 1, "exactly one line of JSON, as for every other plugin script");
+      const parsed = JSON.parse(lines[0]);
+      assert.equal(parsed.ok, false);
+      assert.equal(parsed.code, "UNKNOWN_ARGUMENT");
+      assert.equal("data" in parsed, false, "a refused start must not report a url or a pid");
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the flags the board does declare keep working", async () => {
+  // The other half of the strict parser: refusing the unknown must not refuse the known.
+  const dir = tempProject(seed([issue("11111111-1111-1111-1111-111111111111")]));
+  const started = await startServer(dir); // --project-dir, plus no --port at all
+  try {
+    assert.equal(started.projectDir, dir);
+    assert.ok(started.port > 0, "an omitted --port still means: let the OS choose");
+  } finally {
+    stop(started.child);
+  }
+
+  const withPort = await startServer(dir, ["--port", "0"]);
+  try {
+    assert.ok(withPort.port > 0, "an explicit --port must still be accepted");
+  } finally {
+    stop(withPort.child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("a busy port is reported, not silently swallowed", async () => {
   const dir = tempProject(seed());
   const first = await startServer(dir);

@@ -15,6 +15,10 @@ plugin e i dati dal progetto corrente: nel repository non finisce nessun HTML.
 node "$SCRIPTS/board-server.mjs" [--project-dir <path>] [--port <n>]
 ```
 
+Non ci sono sottocomandi: lo script avvia e basta, e si ferma uccidendo il suo `pid`. Un flag
+che non sia `--project-dir` o `--port` viene **rifiutato** con `UNKNOWN_ARGUMENT` — inventarsi
+uno `--stop` non ferma niente, e prima che lo script fosse severo avviava un secondo server.
+
 Il progetto è risolto come per gli altri script del plugin: **default la directory corrente
 del processo**, `--project-dir` come override esplicito quando non controlli la cwd. Se lo
 ometti partendo dalla cartella sbagliata ottieni un board vuoto del progetto sbagliato, senza
@@ -34,6 +38,7 @@ occupata, l'avvio fallisce con `PORT_IN_USE` invece di restare a metà.
 
 | `code` | Quando |
 |---|---|
+| `UNKNOWN_ARGUMENT` | un flag che lo script non dichiara |
 | `FILE_NOT_FOUND` | `--project-dir` non esiste |
 | `PORT_IN_USE` | la porta richiesta è occupata |
 | `ERROR` | errore imprevisto all'avvio |

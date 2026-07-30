@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T12:58:37Z",
+  "last_updated": "2026-07-30T13:11:01Z",
   "rules": {
     "single_active_issue": false
   },
@@ -899,6 +899,19 @@
       },
       "created_at": "2026-07-30T12:32:24Z",
       "updated_at": "2026-07-30T12:55:01Z"
+    },
+    {
+      "id": "81e2a7f8-d9cd-472a-8913-b0e8b1d053f2",
+      "title": "board-server: strict false ingoia i flag sconosciuti e avvia comunque",
+      "description": "In questa sessione il board e' stato avviato due volte per errore: prima con --start, poi con --stop al clock-out. Nessuno dei due flag esiste, ma board-server.mjs li ha ignorati in silenzio e ha avviato un server ogni volta, lasciando due processi orfani su due porte diverse.\n\nLa causa e' a scripts/board-server.mjs:76: parseArgs viene chiamato con strict: false, quindi qualunque argomento non dichiarato passa senza un errore. issue-manager.mjs invece ha UNKNOWN_COMMAND proprio per non far passare un comando che non esiste.\n\nUn flag scritto male non deve produrre un server in piu': deve fallire subito con una riga JSON di errore, coerente con il contratto di output gia' documentato in references/board.md (FILE_NOT_FOUND, PORT_IN_USE, ERROR). Serve un code nuovo per l'argomento non riconosciuto, aggiunto alla tabella dei codici della reference.\n\nAttenzione a non rompere il caso legittimo: --project-dir e --port devono continuare a funzionare, e l'avvio senza argomenti resta il default.",
+      "status": "done",
+      "tier": "economy",
+      "validation": {
+        "criteria": "PASS. 1) Flag non dichiarato rifiutato: eseguiti a mano --stop, --start, --porta 8080, positional stop, -x -> tutti exit=1, stderr vuoto, una sola riga {\"ok\":false,\"error\":\"Unknown option '--stop'. The board server takes --project-dir and --port only; it is stopped by killing its pid.\",\"code\":\"UNKNOWN_ARGUMENT\"}; nessun processo avviato. 2) code stabile UNKNOWN_ARGUMENT in scripts/board-server.mjs:90 (writeFail esce 1, board-server.mjs:36-39) e riga aggiunta alla tabella in skills/harness/references/board.md:41 piu' testata commento board-server.mjs:21. 3) Casi legittimi: spawn reale senza argomenti (cwd), con --port 0, con --project-dir e con entrambi -> {\"ok\":true,...} con url/port/pid/projectDir corretto; i 4 processi avviati sono stati uccisi e verificati assenti (Get-Process: gone 27588, 3464, 16764, 26980; nessun node.exe con board-server residuo). 4) Prova di regressione rifatta in modo indipendente: copia di scripts/+test/+package.json in directory temporanea con strict:false rimesso -> node --test test/plugin-board.test.mjs esce 1 in 13s, 16 pass / 1 fail: 'an unknown flag is refused instead of starting one more server (10014ms) AssertionError: --stop must exit 1, not run a server (status null, signal SIGTERM)'. Il test diventa rosso e non appeso (timeout 10_000 su spawnSync). Il test copre anche l'avvio legittimo ('the flags the board does declare keep working'). 5) Gate .harness/config.json verify='npm run test': tests 159, pass 159, fail 0, exit 0. Collaterali: git status --short mostra solo issues.json, scripts/board-server.mjs, skills/harness/references/board.md, test/plugin-board.test.mjs; il diff di issues.json aggiunge solo questa issue. Osservazione fuori scope (non blocca): commands/board.md:35-37 elenca ancora solo PORT_IN_USE e FILE_NOT_FOUND, e il catch etichetta UNKNOWN_ARGUMENT anche errori di valore mancante di un flag noto.",
+        "state": "pass"
+      },
+      "created_at": "2026-07-30T13:02:43Z",
+      "updated_at": "2026-07-30T13:11:01Z"
     }
   ]
 }
