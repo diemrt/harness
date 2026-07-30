@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T13:11:01Z",
+  "last_updated": "2026-07-30T13:12:21Z",
   "rules": {
     "single_active_issue": false
   },
@@ -912,6 +912,43 @@
       },
       "created_at": "2026-07-30T13:02:43Z",
       "updated_at": "2026-07-30T13:11:01Z"
+    },
+    {
+      "id": "ad5004dc-83f7-49d0-81af-51dd8d73d5f3",
+      "title": "commands/board.md non insegna cosa fare con UNKNOWN_ARGUMENT",
+      "description": "Gate documentale del commit 0eebe8b, che ha introdotto UNKNOWN_ARGUMENT in scripts/board-server.mjs.\n\nLa reference (skills/harness/references/board.md) e' stata aggiornata nello stesso commit, ma commands/board.md e' rimasto indietro: il paragrafo dopo l'avvio elenca come codici da riportare solo PORT_IN_USE e FILE_NOT_FOUND, e dice cosa fare per ciascuno. Un agente che riceve UNKNOWN_ARGUMENT non trova nessuna istruzione e finisce per ritentare alla cieca, che e' esattamente cio' che quel paragrafo vuole evitare.\n\nVa aggiunto il caso: UNKNOWN_ARGUMENT significa che il flag passato non esiste, lo script non ha sottocomandi, e lo stop si fa col pid della riga di avvio. Il posto giusto e' lo stesso elenco, non una sezione nuova.\n\nSolo documentazione del comando: nessuno script, nessun test.",
+      "status": "backlog",
+      "tier": "economy",
+      "validation": {
+        "criteria": [
+          "commands/board.md elenca UNKNOWN_ARGUMENT accanto a PORT_IN_USE e FILE_NOT_FOUND, con l'azione da intraprendere",
+          "e' scritto che lo script non ha sottocomandi e che lo stop passa dal pid, non da un flag",
+          "nessuna modifica a scripts/ o test/",
+          "npm test verde"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-07-30T13:12:20Z",
+      "updated_at": "2026-07-30T13:12:20Z"
+    },
+    {
+      "id": "70dce12a-fc0f-4fdb-8697-d2e11f22af5c",
+      "title": "board-server: UNKNOWN_ARGUMENT etichetta anche gli errori dei flag noti",
+      "description": "Segnalato dal verificatore della issue 81e2a7f8 come osservazione fuori scope.\n\nIl catch attorno a parseArgs in scripts/board-server.mjs etichetta UNKNOWN_ARGUMENT qualunque errore del parser. Ma parseArgs fallisce anche su un flag che lo script dichiara: `--port` senza valore alza un errore, e oggi esce come UNKNOWN_ARGUMENT pur non essendoci nessun argomento sconosciuto.\n\nIl messaggio di Node resta leggibile, quindi un umano capisce lo stesso; il code no, ed e' il code la parte stabile del contratto, quella su cui si scrive la logica. Un chiamante che ramifica su UNKNOWN_ARGUMENT per dire \"hai inventato un flag\" sbaglia diagnosi.\n\nVa distinto il caso: argomento sconosciuto o positional inatteso restano UNKNOWN_ARGUMENT, un flag dichiarato ma usato male prende un code suo, aggiunto alla tabella in references/board.md.",
+      "status": "backlog",
+      "tier": "standard",
+      "validation": {
+        "criteria": [
+          "`--port` senza valore non esce piu' con code UNKNOWN_ARGUMENT ma con un code proprio",
+          "un flag inesistente e un positional inatteso continuano a uscire con UNKNOWN_ARGUMENT",
+          "il code nuovo e' nella tabella dei codici di references/board.md e nell'elenco di testata dello script",
+          "un test copre i due rami e diventa rosso se il catch torna a usare un code solo",
+          "npm test verde"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-07-30T13:12:21Z",
+      "updated_at": "2026-07-30T13:12:21Z"
     }
   ]
 }
