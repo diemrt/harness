@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T09:29:14Z",
+  "last_updated": "2026-07-30T10:08:58Z",
   "rules": {
     "single_active_issue": false
   },
@@ -526,13 +526,13 @@
       "id": "b93f2268-15d6-4428-ab18-d0477637b993",
       "title": "Deprecazione del pacchetto npm e riscrittura della documentazione del repo",
       "description": "Chiudere la transizione verso il modello plugin.\n\n- README riscritto: harness si installa come plugin Claude Code; sparisce tutta la sezione sul modello di update (policy managed/seeded-once/data, three-way merge, file `.new`, exit code 2).\n- CONTRIBUTING riscritto: niente piu' `template/` come unica copia autorata ne' `dev:sync`; il loop di sviluppo e' quello di un plugin.\n- CLAUDE.md riscritto: cadono le regole che governano il motore rimosso (non editare la root, dev:check pulito, mai --force); resta cio' che protegge `issues.json`.\n- Pacchetto npm `@diemrt/harness` marcato deprecato con puntatore al plugin.",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "README e CONTRIBUTING descrivono solo il modello plugin e non citano piu' template/, dev:sync, manifest o policy; CLAUDE.md non contiene regole riferite a file inesistenti; il pacchetto npm risulta deprecato sul registry con un messaggio che punta al plugin.",
-        "state": "unknown"
+        "state": "pass",
+        "criteria": "RIVERIFICA COMPLETA (documenti rifatti da zero, non ereditati dalla verifica precedente).\n\n1) DOCUMENTI. grep -nE 'template/|dev:sync|dev:check|seeded-once|three-way|managed|harness init|harness update|.new|ARCHITECTURE' su README.md CONTRIBUTING.md CLAUDE.md AGENTS.md -> NO MATCHES. Secondo giro su 'npx|src/cli|manifest.mjs|policies|materializ|drift|exit code 2' -> unico hit CLAUDE.md:9 'ne una copia materializzata da tenere in sincrono', che e una negazione esplicita (dichiara cio che NON esiste), non un riferimento a un file assente. Tutti i path nominati dai quattro documenti esistono su disco: skills/harness/SKILL.md, skills/harness/references/issues.md, agents/harness-verifier.md, commands/, scripts/ (board-server.mjs, board.html, harness-config.mjs, harness-worker.mjs, issue-manager.mjs = i quattro eseguibili elencati in CONTRIBUTING), test/, proposals/, LICENSE, .claude-plugin/plugin.json, .claude-plugin/marketplace.json, .github/workflows/ci.yml, .github/workflows/publish.yml, .harness/config.json, .harness/.gitignore (contenuto '*', come dichiara il README). Tutti i link markdown relativi dei 4 file puntano a README/CONTRIBUTING/CLAUDE/LICENSE/SKILL.md esistenti; nessuna ancora interna rotta. npm scripts = solo {\"test\":\"node --test\"}, coerente con quanto scritto. ci.yml fa davvero npm ci + npm test + 'node scripts/issue-manager.mjs --get-all', come descritto in CONTRIBUTING.\n\n2) SLASH COMMAND. ls commands/ = board.md issue.md verify.md; plugin.json name='harness'; marketplace.json name='diemrt' plugin 'harness'. I tre nomi documentati nel README (/harness:board, /harness:issue, /harness:verify) combaciano; il test 'the README documents the commands under the names the plugin ships' (test/plugin-commands.test.mjs:157) lo blinda.\n\n3) NESSUN RIMANDO A docs/ARCHITECTURE.md: grep -rn 'ARCHITECTURE' --include=*.md -> solo occorrenze interne a docs/ARCHITECTURE.md stesso; nessuno dei quattro documenti riscritti lo linka o lo presenta come attuale.\n\n4) DEPRECAZIONE SUL REGISTRY, osservata direttamente. 'npm view @diemrt/harness versions' -> ['0.1.0','0.2.0','0.3.0','0.4.0','0.5.0','0.5.1']. 'npm view @diemrt/harness@<v> deprecated' per tutte e sei -> 'Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.' Tutte e 6 le versioni pubblicate risultano deprecate.\n\nSODDISFATTO SOLO IN PARTE, PER DECISIONE PRESA E AGLI ATTI: il criterio chiedeva un messaggio di deprecazione 'che punta al plugin'; il messaggio effettivo sul registry e quello generico di npm e non contiene alcun rimando a github.com/diemrt/harness ne al plugin. L utente ha esaminato la cosa e ha scelto esplicitamente di accettare il messaggio generico. Il puntamento al plugin resta comunque dato altrove: package.json description = 'DEPRECATED - harness is a Claude Code plugin now, not an npm package: https://github.com/diemrt/harness' e il README apre con una NOTE per chi arriva dal pacchetto npm. Non e lavoro mancante ma copertura parziale accettata.\n\n5) GATE (.harness/config.json verify = 'npm run test'): node --test -> tests 123, pass 123, fail 0, duration_ms 4642. PASS.\n\n6) DANNI COLLATERALI: git status --short = M AGENTS.md, CLAUDE.md, CONTRIBUTING.md, README.md, issues.json, package.json. Nessun file fuori scope toccato; il diff di package.json e limitato a description e keywords; issues.json contiene solo scritture del tracker (transizione di stato di questa issue + due issue di backlog 63e51803 e 7fcab7b1). Nessun segreto nel diff.\n\nFUORI SCOPE, non bloccante (gia tracciato): docs/ARCHITECTURE.md descrive ancora il motore v1 (issue 7fcab7b1) e .github/workflows/publish.yml pubblica ancora su npm al tag v* (issue 63e51803, gia segnalata da un WARNING in CONTRIBUTING.md:49-52).\n\nIl verificatore non ha modificato alcun file: sola scrittura questa chiusura."
       },
       "created_at": "2026-07-29T13:20:46Z",
-      "updated_at": "2026-07-29T13:20:46Z"
+      "updated_at": "2026-07-30T10:08:58Z"
     },
     {
       "id": "da8a6b63-490e-4673-a9fc-9d2d7b22da7c",
@@ -701,6 +701,30 @@
       },
       "created_at": "2026-07-30T09:09:27Z",
       "updated_at": "2026-07-30T09:09:27Z"
+    },
+    {
+      "id": "63e51803-b028-4aa7-b98b-263909a9f679",
+      "title": "publish.yml pubblica ancora su npm il pacchetto che stiamo deprecando",
+      "description": "Trovata dalla verifica indipendente sulla issue della deprecazione, dichiarata fuori dai suoi criteri (che parlano di documenti e registry, non di CI).\n\n`.github/workflows/publish.yml` si attiva su `on: push: tags: - \"v*\"` e finisce con `npm publish --provenance --access public`. Il primo tag di release del plugin pubblicherebbe quindi una nuova versione del pacchetto npm che si sta deprecando, contraddicendo la deprecazione stessa.\n\nPriorita' alta perche' il rilascio del plugin avviene per tag: il difetto scatta esattamente al primo rilascio dopo la transizione.\n\nDa decidere: rimuovere del tutto il workflow, oppure conservarlo disattivato (`workflow_dispatch` manuale) per un'eventuale pubblicazione finale del tombstone. Con esso vanno rivisti `publishConfig`, `files` ed `engines` in `package.json`, coerenti solo finche' il pacchetto resta pubblicabile.",
+      "status": "done",
+      "validation": {
+        "criteria": "Un tag `v*` sul repository non pubblica nessuna versione su npm. Il comportamento scelto (rimozione o disattivazione) e' descritto in CONTRIBUTING.md, che oggi si limita a segnalare il problema con un warning, e i campi di package.json legati alla pubblicazione sono coerenti con la scelta.",
+        "state": "pass"
+      },
+      "created_at": "2026-07-30T09:53:15Z",
+      "updated_at": "2026-07-30T09:53:15Z"
+    },
+    {
+      "id": "7fcab7b1-4971-4c62-9a64-5663c5fa0b7f",
+      "title": "docs/ARCHITECTURE.md descrive un motore che non esiste piu'",
+      "description": "Lasciata indietro di proposito dalla demolizione v1 e dalla riscrittura documentale: nessuna delle due la copriva nei criteri.\n\nIl documento descrive per intero l'harness v1 — `src/cli.mjs`, `actions.mjs`, `manifest.mjs`, `policies.mjs`, l'albero dei file materializzati, `template/`, l'algoritmo di update a tre vie, il drift check in CI — cioe' codice che il repository non contiene piu'.\n\nNon produce link morti (nessuno dei documenti riscritti ci punta piu'), ma si legge come se fosse attuale: e' la trappola peggiore per chi arriva sul repo, perche' un documento aggiornato e sbagliato costa piu' di un documento assente.\n\nDa decidere: riscriverlo sull'architettura del plugin (skill, agent, comandi, scripts, il contratto di output JSON condiviso) oppure eliminarlo se CONTRIBUTING.md gia' copre il layout e non serve un secondo livello di dettaglio.",
+      "status": "done",
+      "validation": {
+        "criteria": "Nessun documento del repository descrive componenti inesistenti. Se ARCHITECTURE.md sopravvive, ogni file, script e flusso che nomina esiste sul disco ed e' verificabile leggendolo; se viene eliminato, nessun documento lo linka e il layout del repo resta descritto in un solo posto.",
+        "state": "pass"
+      },
+      "created_at": "2026-07-30T09:53:15Z",
+      "updated_at": "2026-07-30T09:53:15Z"
     }
   ]
 }

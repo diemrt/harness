@@ -1,186 +1,83 @@
 <div align="center">
 
-<h1><code>@diemrt/harness</code></h1>
+<h1><code>harness</code></h1>
 
-**A controlled development harness for AI agents — an issue tracker, a stack-agnostic task
-runner, and a set of agent operating rules — that you drop into any repo with one command
-and keep in sync as the harness improves.**
+**A controlled development harness for AI agents — an issue tracker, a live issue board, and
+a set of agent operating rules — installed as a Claude Code plugin, leaving nothing in your
+project but `issues.json`.**
 
-[![npm](https://img.shields.io/npm/v/@diemrt/harness)](https://www.npmjs.com/package/@diemrt/harness)
 [![CI](https://img.shields.io/github/actions/workflow/status/diemrt/harness/ci.yml?branch=main&label=CI)](https://github.com/diemrt/harness/actions/workflows/ci.yml)
-[![node](https://img.shields.io/node/v/@diemrt/harness)](https://nodejs.org)
-[![license](https://img.shields.io/npm/l/@diemrt/harness)](LICENSE)
+[![license](https://img.shields.io/github/license/diemrt/harness)](LICENSE)
 ![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)
 
-[Quick start](#quick-start) · [How updates work](#the-update-model) · [What you get](#what-lands-in-your-project) · [Commands](#commands) · [Contributing](CONTRIBUTING.md)
+[Install](#install) · [What it does](#what-it-does) · [What it leaves behind](#what-it-leaves-in-your-project) · [Slash commands](#slash-commands) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
 ---
 
+> [!NOTE]
+> **Arriving from the `@diemrt/harness` npm package?** That package is deprecated. Harness is
+> a Claude Code plugin now: nothing to install from npm, nothing copied into your repository,
+> nothing to keep in sync afterwards. See [Install](#install).
+
 ## Why
 
-You build a set of files that make AI agents behave in your repo — an issue tracker, a
-task runner, a set of operating rules. Then you have a second repo. You copy the files in.
-Then a third. Six months later every copy is subtly different, nobody remembers which one
-is canonical, and improving the harness means merging the same change by hand five times.
+An agent left to its own devices decides what "done" means and then agrees with itself.
+Harness takes both halves of that away: every piece of work is a tracked issue, every issue is
+verified by an agent **other** than the one that did it, and nothing is committed before that
+verification passes.
 
-`@diemrt/harness` turns that copy-paste into a managed install. `init` materializes the
-harness into a project; `update` re-syncs it and tells you exactly what it changed, what
-it left alone because it's yours, and what needs your hands.
+Earlier versions shipped those rules as files copied into each repository, then as an npm
+package that kept the copies in sync. The plugin removes the copies entirely — rules, scripts
+and board live in the plugin, your project keeps only its own data.
 
-## Quick start
+## Install
 
-```sh
-# Materialize the harness into the current directory
-npx @diemrt/harness init
+In Claude Code:
 
-# ...or into another directory
-npx @diemrt/harness init path/to/project
+```text
+/plugin marketplace add diemrt/harness
+/plugin install harness@diemrt
 ```
 
-Requires Node.js >= 18. **Nothing is installed into the target project** — no
-`node_modules`, no added dependency. The scripts the harness drops in are plain ES modules
-run with bare `node`:
+Requires Node.js >= 18. The plugin's scripts are plain ES modules run with bare `node` and
+have zero runtime dependencies; **nothing is installed into your project** — no
+`node_modules`, no added dependency.
 
-```sh
-node issue-manager.mjs ...      # create/list/update/close issues
-node init.mjs setup             # run your project's "setup" steps
-node init.mjs build             # run your project's "build" steps
-```
+Then, in any project, ask Claude to *clock in*. The first time, harness inspects the project,
+proposes a setup command and a verification command, and asks you to confirm them before
+writing anything.
 
-`issues.html` is a standalone viewer: open it in a browser and it reads `issues.json` next
-to it — no server, no build step.
+## What it does
 
-## The update model
+- **Clock in** — reads the project's configuration, prepares the environment, starts the live
+  issue board, and shows what is in flight.
+- **One issue in progress per dependency chain**, each worked by a dedicated subagent
+  (internal, or an external CLI if you opt in).
+- **Independent verification** — the worker leaves the issue in review; a separate
+  `harness-verifier` agent runs the project's verification command against the real artifacts
+  and is the only one allowed to close the issue.
+- **Commit gate** — one issue per commit, only after that verification passes.
 
-This is the core feature: `update` never silently clobbers your work, but it also never
-lets your project's copy of the harness quietly rot.
+The workflow itself is the plugin's `harness` skill, which Claude loads on its own when a
+project has an `issues.json`. [`skills/harness/SKILL.md`](skills/harness/SKILL.md) and its
+`references/` are the authoritative description; this README does not restate them.
 
-Every file the harness distributes has exactly one **policy**, defined once in
-[`src/policies.mjs`](src/policies.mjs):
+## What it leaves in your project
 
-| Policy | What `update` does | Files |
-|---|---|---|
-| **`managed`** | Keeps it in sync with the template — for as long as you haven't touched it | everything not listed below: `issue-manager.mjs`, `init.mjs`, `issues.html`, `docs/AGENTS-RULES.md`, `docs/EXTERNAL-WORKER.md`, `docs/GIT.md`, `docs/ISSUES.md`, `hooks/*`, `.gitignore` |
-| **`seeded-once`** | Written once by `init`, then yours forever — never overwritten, even if the template changes | `AGENTS.md`, `docs/ARCHITECTURE.md`, `init.config.json` |
-| **`data`** | Never overwritten once it exists | `issues.json` |
+| Path | What it is |
+|---|---|
+| `issues.json` | the tracker's data, at the project root — the only file harness adds to git |
+| `.harness/` | per-clone configuration and worker logs; ships its own `.gitignore` with `*`, so it never reaches git and never touches yours |
 
-`managed` is the default: new files added to the template in future versions land in this
-bucket automatically.
+Nothing else: no scripts, no documents, no HTML viewer to keep in sync. A teammate who does
+not use harness sees one JSON file.
 
-### How `update` decides what's safe to touch
+## Slash commands
 
-For every `managed` file, `update` does a three-way comparison: the **new template's**
-hash, the hash the **manifest** recorded the last time the harness wrote that file, and
-the file's **current** hash on disk.
-
-- **Disk still matches the manifest** → you never touched it. It's *pristine*, so `update`
-  overwrites it in place and reports `updated`.
-- **Disk has diverged from the manifest** → you edited it. `update` leaves your file
-  alone, writes the incoming version alongside it as `<file>.new`, and reports a
-  `conflict` — which is what drives exit code `2`.
-
-So a real run, after you'd hand-edited `docs/GIT.md`, looks like this:
-
-```console
-$ npx @diemrt/harness update
-  skipped   AGENTS.md
-  skipped   init.config.json
-  skipped   issue-manager.mjs
-  ...
-  conflicts docs/GIT.md -- your version differs from the harness template; see docs/GIT.md.new (the incoming version); resolve manually, then re-run with --force or delete the .new file
-harness v0.5.0: update finished with 1 conflict(s); resolve them and re-run (exit code 2).
-
-$ echo $?
-2
-```
-
-Resolve it by hand: merge what you want from `docs/GIT.md.new` into `docs/GIT.md`, delete
-the `.new` file, and re-run `update`.
-
-`seeded-once` and `data` files are simpler: once they exist, `update` never touches them —
-template changes or not, `--force` or not. Only `init --force` can overwrite them.
-
-Files that a newer harness version has **dropped** from its template follow the same
-principle: still pristine on disk → `update` deletes it (`removed`); edited by you →
-`update` leaves it alone and reports it as `orphaned`, for you to decide.
-
-> [!WARNING]
-> `update --force` skips the pristine check entirely and overwrites every `managed` file
-> in place, discarding local edits. `init --force` goes further and overwrites
-> `seeded-once` and `data` files too — including `issues.json`. Use both deliberately.
-
-## What lands in your project
-
-```
-AGENTS.md                   # project-owned operating notes (yours to edit)
-docs/
-  AGENTS-RULES.md           # invariant agent operating rules (harness-managed)
-  ARCHITECTURE.md           # project-owned architecture doc (yours to edit)
-  EXTERNAL-WORKER.md        # external worker handoff contract (harness-managed)
-  GIT.md                    # git usage guidelines (harness-managed)
-  ISSUES.md                 # guide to the issue tracker (harness-managed)
-hooks/
-  install.mjs               # git hook installer (harness-managed)
-  pre-commit                # git pre-commit entrypoint (harness-managed)
-  pre-commit.mjs            # worker-role commit guard (harness-managed)
-  post-commit               # git post-commit entrypoint (harness-managed)
-  post-commit.mjs           # docs-issue post-commit automation (harness-managed)
-  match.mjs                 # glob matcher for docsGate include/exclude (harness-managed)
-issue-manager.mjs           # issue tracker CLI (harness-managed)
-init.mjs                    # stack-agnostic setup/build runner (harness-managed)
-init.config.json            # your setup/build commands (project-owned)
-issues.html                 # standalone HTML viewer for issues.json (harness-managed)
-issues.json                 # your project's issues (never overwritten)
-.gitignore                  # root ignore rules (harness-managed)
-```
-
-Plus a hidden `.harness-manifest.json` at the root of the target directory: bookkeeping
-for `update`, not something you edit by hand.
-
-## Commands
-
-```
-harness init [targetDir]      Copy the harness template into targetDir
-harness update [targetDir]    Sync targetDir with the current template
-
-targetDir defaults to "." when omitted.
-
-Options:
-  --force        Overwrite files even if they were modified
-  --dry-run      Compute the result without writing anything to disk
-  --json         Print the result as a single line of JSON
-  -h, --help     Show this help message
-  -v, --version  Print the harness version
-```
-
-- **`init`** writes every template file that doesn't already exist at the destination.
-  Existing files are left alone (reported as `skipped`) unless `--force` is passed, in
-  which case they're overwritten (`updated`).
-- **`update`** re-syncs an already-initialized directory against the harness's current
-  template, following the [per-file policy](#the-update-model) above. If no
-  `.harness-manifest.json` is found, `update` behaves exactly like `init` (first-time
-  materialization).
-- **`--dry-run`** computes the full result — what would be added, updated, skipped,
-  conflicted, removed, or orphaned — without writing anything to disk. Combine with
-  `--json` for a CI-friendly drift check.
-- **`--json`** prints the result as a single line of JSON instead of the human-readable
-  summary.
-
-Exit codes:
-
-| Code | Meaning |
-|------|---------|
-| `0`  | Clean: no conflicts. |
-| `2`  | Completed, but one or more files are in conflict and need manual resolution. |
-| `1`  | Fatal error (bad arguments, unreadable template, etc.). |
-
-## Plugin slash commands
-
-Installed as a Claude Code plugin, the harness also exposes its three repetitive actions as
-explicit commands. They are shortcuts, not a second source of truth: the workflow itself
-lives in the `harness` skill, and each command points back at it.
+The three repetitive actions also have explicit commands. They are shortcuts, not a second
+source of truth: the workflow lives in the `harness` skill, and each command points back at it.
 
 | Command | What it does | Without arguments |
 |---|---|---|
@@ -192,22 +89,11 @@ lives in the `harness` skill, and each command points back at it.
 subagent, so the agent that did the work is never the one that closes the issue. Closing an
 issue (`done` / `pass`) is the verifier's job alone — `/harness:issue` will not do it.
 
-## `init.config.json` is yours to fill in
-
-The example commands `init.config.json` ships with (`npm install`, `npm test`, ...) are
-placeholders. Fill in whatever setup/build commands make sense for your stack — Node,
-Python, Go, .NET, or anything else. `init.mjs` just runs the `command` string for each step
-through a shell (`spawnSync(..., { shell: true })`); making sure those commands are
-portable across the shells your team and CI actually use is on you.
-
 ## Contributing
 
-This repository develops itself by dogfooding its own harness: `template/` is the single
-source of truth for everything distributed, and the repository root holds a materialized
-copy kept in sync with `npm run dev:sync`.
-
-See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the development loop and the release
-process, and [CLAUDE.md](CLAUDE.md) for the full set of rules.
+This repository is the plugin, and it develops itself with it: the issues in `issues.json`
+here are harness's own. See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the development loop
+and the release process, and [CLAUDE.md](CLAUDE.md) for the rules of this repository.
 
 ## License
 

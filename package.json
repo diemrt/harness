@@ -1,7 +1,7 @@
 {
   "name": "@diemrt/harness",
   "version": "0.5.1",
-  "description": "Controlled AI-agent development harness: issue tracker, task runner, and agent rules, installable with npx.",
+  "description": "DEPRECATED — harness is a Claude Code plugin now, not an npm package: https://github.com/diemrt/harness",
   "type": "module",
   "license": "MIT",
   "author": "diemrt",
@@ -16,11 +16,10 @@
   "keywords": [
     "harness",
     "ai-agent",
-    "scaffold",
-    "cli",
     "issue-tracker",
-    "npx",
-    "boilerplate"
+    "claude-code",
+    "plugin",
+    "deprecated"
   ],
   "engines": {
     "node": ">=18"
