@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T19:17:05Z",
+  "last_updated": "2026-07-30T19:24:06Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1034,23 +1034,25 @@
       "id": "4829cd1d-2e9a-43b5-9bad-a93126afb29c",
       "title": "board-graph.mjs: layering puro del DAG delle issue",
       "description": "Isola in scripts/board-graph.mjs la matematica del grafo, senza alcun accesso al DOM. Spec: docs/superpowers/specs/2026-07-30-board-workflow-design.md, sezione 6.\n\nCosa calcola: quali issue sono nodi (status diverso da done), quali dipendenze entrano come nodi fantasma (una dipendenza gia' done di un nodo visibile, oppure un id che non esiste piu'), il livello di ogni nodo con longest-path (0 se non ha dipendenze visibili, altrimenti max(livello dipendenza)+1), l'ordine dentro il livello con due passate di baricentro e tie-break sull'indice originale, il gruppo delle issue senza catena (ne' dipendenze ne' dipendenti), e la catena di un nodo (antenati piu' discendenti) che serve al chain lens.\n\nGuardia sui cicli: issues.json e' un file e qualcuno puo' editarlo a mano nonostante il divieto della CLI. Il layering tiene un visited-set, termina sempre e segnala gli id coinvolti invece di entrare in loop.\n\nModulo non ancora collegato alla pagina: qui si scrive solo la logica e i suoi test. Catena indipendente, puo' partire subito in parallelo.",
-      "status": "in_review",
+      "status": "done",
       "tier": "reasoning",
       "depends_on": [],
       "validation": {
-        "state": "unknown",
+        "state": "pass",
         "criteria": [
-          "scripts/board-graph.mjs esporta funzioni pure, non tocca document o window, ed e' importabile da node --test.",
-          "Il layering assegna livello 0 ai nodi senza dipendenze visibili e max(livello dipendenza)+1 agli altri.",
-          "Le issue done non sono nodi, ma una dipendenza done di un nodo visibile torna marcata come fantasma.",
-          "Un depends_on che punta a un id assente torna un fantasma marcato sconosciuto, non viene scartato in silenzio.",
-          "Le issue senza dipendenze ne' dipendenti tornano nel gruppo senza catena, distinto dal livello 0.",
-          "Su dati con un ciclo la funzione termina e riporta gli id coinvolti, senza ricorsione infinita.",
-          "test/plugin-board-graph.test.mjs copre i casi sopra e npm run test passa."
+          "Purezza e importabilita': grep di document|window|globalThis|process.|require(|fetch( su scripts/board-graph.mjs esce 1 (nessun match); probe indipendente in scratchpad importa il modulo con node ESM, verifica typeof document/window === undefined a runtime, e che JSON.stringify dell'array di input (con voci sporche: null, stringa, {id:42}, depends_on duplicati) sia identico prima e dopo buildGraph e chainOf. Export verificati: buildGraph, chainOf, GHOST_DONE='done', GHOST_UNKNOWN='unknown'; chiavi del nodo = dependents,dependsOn,ghost,id,index,issue,level,order,unchained; chiavi del grafo = byId,cycle,edges,levels,nodes,unchained.",
+          "Longest-path: probe su diamante a=0 -> b=1 / c1=1 -> c2=2 -> d=3 eseguito su tutte e 120 le permutazioni dell'ordine dell'array (l'ordine di visita del DFS non cambia il risultato): d resta 3, mai 2, levels.length=4. Nodo senza dipendenze visibili a livello 0 confermato.",
+          "Fantasma done: buildGraph([done1(done), open depends_on done1]) -> byId.get('done1').ghost='done', issue.status='done', level 0, open a livello 1, edge {from:'done1',to:'open'}; una issue done che nessuno referenzia (elsewhere) non entra fra i nodi. Sul tracker reale: nodes=12, ghosts=2, edges=12, cycle=false.",
+          "Fantasma sconosciuto: depends_on verso 'vanished' inesistente -> nodo con ghost='unknown', issue=null, un solo nodo condiviso da due dipendenti (dependents=['dangling','open']), edge conservato: nessuno scarto silenzioso.",
+          "Senza catena distinto dal livello 0: buildGraph([lonely, r, k(dep r), lonely2]) -> unchained=['lonely','lonely2'] con level=null e unchained=true, levels[0]=['r']; nessun nodo di levels ha unchained=true; su tracker tutto piatto levels=[] e unchained.length=2; un nodo la cui unica dipendenza e' un fantasma done NON e' unchained.",
+          "Cicli: probe eseguito sotto watchdog `timeout 90` e poi `timeout 30`, wall time reale 0.387s, exit 0. Casi: ciclo a 3 (cycle.detected=true, ids=[c1,c2,c3], 'tail' fuori dal ciclo comunque con livello numerico, 'free' in unchained), self-loop + 2-ciclo disgiunti (ids=[p,q,s]), loop di 4000 nodi (detected, 4000 nodi), chainOf su ciclo a 3 -> ids=[a,b,c] e {ancestors:[],descendants:[],ids:[]} per id ignoto. Nessuna ricorsione infinita.",
+          "DFS iterativo messo alla prova: catene lineari da 5000 e 50000 nodi -> nessun RangeError, level(n4999)=4999, level(n49999)=49999, levels.length=N; stessa catena da 20000 fornita in ordine array inverso -> level corretto; chainOf su catena 5000 da n2500 -> 2500 antenati, 2499 discendenti, 5000 ids.",
+          "Test e gate: test/plugin-board-graph.test.mjs presente e importato per davvero (non estrazione da stringa); gate `npm run test` (verify di .harness/config.json) eseguito sulla suite intera: tests 195, pass 195, fail 0, duration_ms 8917. Nell'output compaiono i test del file nuovo (importabile/no-browser, longest path, ghost done, ghost unknown, due tipi distinti, senza catena, baricentro, ciclo, self-dependency, catena lunga, chainOf).",
+          "Collaterale: `git status --short` = ' M issues.json' + i due file nuovi non tracciati; `git diff HEAD -- scripts/board.html scripts/board-server.mjs scripts/board.js scripts/board.css test/plugin-board.test.mjs` vuoto, quindi il modulo non e' stato collegato alla pagina come richiesto. Il diff di issues.json contiene solo l'inserimento della issue 8010ce76 fatto dall'orchestratore. Nessun file modificato dal verificatore."
         ]
       },
       "created_at": "2026-07-30T15:38:42Z",
-      "updated_at": "2026-07-30T19:17:05Z"
+      "updated_at": "2026-07-30T19:24:06Z"
     },
     {
       "id": "1f4c689e-6087-4536-a995-2c31b856e171",
@@ -1174,6 +1176,27 @@
       },
       "created_at": "2026-07-30T15:38:42Z",
       "updated_at": "2026-07-30T15:58:07Z"
+    },
+    {
+      "id": "8010ce76-46c9-4234-a752-3d3d5be6023a",
+      "title": "commands/board.md non documenta INVALID_ARGUMENT",
+      "description": "Gate documentale del commit bd741a9, che ha introdotto INVALID_ARGUMENT in scripts/board-server.mjs distinguendolo da UNKNOWN_ARGUMENT.\n\nLa reference (skills/harness/references/board.md) e' stata aggiornata nello stesso commit, commands/board.md no. Il paragrafo dopo l'avvio elenca i code da riportare e dice cosa fare per ciascuno: oggi conosce PORT_IN_USE, FILE_NOT_FOUND e UNKNOWN_ARGUMENT, e presenta quest'ultimo come \"il flag passato non esiste\". Da bd741a9 quella frase e' incompleta: un flag dichiarato ma usato male, tipo --port senza valore, esce con INVALID_ARGUMENT, e un agente che riceve quel code non trova nessuna istruzione.\n\nVa aggiunto il caso allo stesso elenco: INVALID_ARGUMENT significa che il flag esiste ma e' stato usato male, quindi si corregge l'invocazione invece di concludere che il flag sia inventato.\n\nCatena: dipende dalla issue che ha appena riscritto quel paragrafo, altrimenti le due modifiche si sovrappongono sulle stesse righe.\n\nSolo documentazione del comando: nessuno script, nessun test.",
+      "status": "backlog",
+      "tier": "economy",
+      "depends_on": [
+        "ad5004dc-83f7-49d0-81af-51dd8d73d5f3"
+      ],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "commands/board.md elenca INVALID_ARGUMENT accanto a PORT_IN_USE, FILE_NOT_FOUND e UNKNOWN_ARGUMENT, con l'azione da intraprendere",
+          "il testo distingue il flag inesistente (UNKNOWN_ARGUMENT) dal flag dichiarato ma usato male (INVALID_ARGUMENT)",
+          "nessuna modifica a scripts/ o test/",
+          "npm run test passa"
+        ]
+      },
+      "created_at": "2026-07-30T19:17:42Z",
+      "updated_at": "2026-07-30T19:17:42Z"
     }
   ]
 }
