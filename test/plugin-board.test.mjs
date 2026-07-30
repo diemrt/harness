@@ -452,6 +452,48 @@ test("an unknown flag is refused instead of starting one more server", async () 
   }
 });
 
+test("a declared flag used badly gets its own code, not UNKNOWN_ARGUMENT", async () => {
+  // --port is a flag the script *does* declare: leaving off its value is a different mistake
+  // from inventing a flag, and the code must say so, or a caller branching on UNKNOWN_ARGUMENT
+  // to mean "you made up a flag" gets the wrong diagnosis.
+  const dir = tempProject(seed());
+  try {
+    const run = spawnSync(process.execPath, [SERVER_PATH, "--project-dir", dir, "--port"], {
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+    assert.equal(run.status, 1, `--port with no value must exit 1, not run a server (status ${run.status})`);
+    const lines = run.stdout.trim().split("\n");
+    assert.equal(lines.length, 1, "exactly one line of JSON, as for every other plugin script");
+    const parsed = JSON.parse(lines[0]);
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.code, "INVALID_ARGUMENT", "a known flag used badly is not an unknown argument");
+    assert.equal("data" in parsed, false, "a refused start must not report a url or a pid");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an unknown flag and an unexpected positional still get UNKNOWN_ARGUMENT", async () => {
+  // The other branch of the same catch: nothing here is a declared flag misused, so the code
+  // must stay UNKNOWN_ARGUMENT, not fall back to the new INVALID_ARGUMENT code.
+  const dir = tempProject(seed());
+  try {
+    for (const argv of [["--bogus", "1"], ["extra"]]) {
+      const run = spawnSync(process.execPath, [SERVER_PATH, "--project-dir", dir, ...argv], {
+        encoding: "utf8",
+        timeout: 10_000,
+      });
+      assert.equal(run.status, 1, `${argv.join(" ")} must exit 1 (status ${run.status})`);
+      const parsed = JSON.parse(run.stdout.trim().split("\n")[0]);
+      assert.equal(parsed.ok, false);
+      assert.equal(parsed.code, "UNKNOWN_ARGUMENT", `${argv.join(" ")} must stay UNKNOWN_ARGUMENT`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("the flags the board does declare keep working", async () => {
   // The other half of the strict parser: refusing the unknown must not refuse the known.
   const dir = tempProject(seed([issue("11111111-1111-1111-1111-111111111111")]));

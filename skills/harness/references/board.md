@@ -16,8 +16,10 @@ node "$SCRIPTS/board-server.mjs" [--project-dir <path>] [--port <n>]
 ```
 
 Non ci sono sottocomandi: lo script avvia e basta, e si ferma uccidendo il suo `pid`. Un flag
-che non sia `--project-dir` o `--port` viene **rifiutato** con `UNKNOWN_ARGUMENT` — inventarsi
-uno `--stop` non ferma niente, e prima che lo script fosse severo avviava un secondo server.
+che non sia `--project-dir` o `--port`, o un positional, viene **rifiutato** con
+`UNKNOWN_ARGUMENT` — inventarsi uno `--stop` non ferma niente, e prima che lo script fosse
+severo avviava un secondo server. Un flag che lo script dichiara ma usato male (`--port` senza
+valore) è un errore diverso: non hai inventato niente, e il code lo dice, `INVALID_ARGUMENT`.
 
 Il progetto è risolto come per gli altri script del plugin: **default la directory corrente
 del processo**, `--project-dir` come override esplicito quando non controlli la cwd. Se lo
@@ -38,7 +40,8 @@ occupata, l'avvio fallisce con `PORT_IN_USE` invece di restare a metà.
 
 | `code` | Quando |
 |---|---|
-| `UNKNOWN_ARGUMENT` | un flag che lo script non dichiara |
+| `UNKNOWN_ARGUMENT` | un flag che lo script non dichiara, o un positional inatteso |
+| `INVALID_ARGUMENT` | un flag dichiarato ma usato male (es. `--port` senza valore) |
 | `FILE_NOT_FOUND` | `--project-dir` non esiste |
 | `PORT_IN_USE` | la porta richiesta è occupata |
 | `ERROR` | errore imprevisto all'avvio |

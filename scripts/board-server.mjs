@@ -18,7 +18,7 @@
 //   {"ok":true,"data":{"url":"...","port":1234,"pid":999,"projectDir":"..."}}
 //   {"ok":false,"error":"<message>","code":"<CODE>"}
 //
-// Error codes: UNKNOWN_ARGUMENT, FILE_NOT_FOUND, PORT_IN_USE, ERROR.
+// Error codes: UNKNOWN_ARGUMENT, INVALID_ARGUMENT, FILE_NOT_FOUND, PORT_IN_USE, ERROR.
 
 import { createServer } from "node:http";
 import { existsSync, readFileSync, statSync, watch } from "node:fs";
@@ -85,9 +85,16 @@ function main() {
       },
     }));
   } catch (error) {
+    // node:util distingue i due casi nel proprio error.code: un flag mai dichiarato o un
+    // positional inatteso restano ERR_PARSE_ARGS_UNKNOWN_OPTION / ERR_PARSE_ARGS_UNEXPECTED_POSITIONAL
+    // e mappano su UNKNOWN_ARGUMENT ("hai inventato qualcosa"); un flag che lo script dichiara ma
+    // usato male (--port senza valore, o reso ambiguo dal token successivo) è
+    // ERR_PARSE_ARGS_INVALID_OPTION_VALUE e prende un code suo, INVALID_ARGUMENT: chi ramifica su
+    // UNKNOWN_ARGUMENT per dire "hai inventato un flag" altrimenti sbaglierebbe diagnosi.
+    const code = error.code === "ERR_PARSE_ARGS_INVALID_OPTION_VALUE" ? "INVALID_ARGUMENT" : "UNKNOWN_ARGUMENT";
     writeFail(
       `${error.message.replace(/\.?$/, ".")} The board server takes --project-dir and --port only; it is stopped by killing its pid.`,
-      "UNKNOWN_ARGUMENT"
+      code
     );
   }
 

@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T15:58:22Z",
+  "last_updated": "2026-07-30T19:16:52Z",
   "rules": {
     "single_active_issue": false
   },
@@ -917,38 +917,35 @@
       "id": "ad5004dc-83f7-49d0-81af-51dd8d73d5f3",
       "title": "commands/board.md non insegna cosa fare con UNKNOWN_ARGUMENT",
       "description": "Gate documentale del commit 0eebe8b, che ha introdotto UNKNOWN_ARGUMENT in scripts/board-server.mjs.\n\nLa reference (skills/harness/references/board.md) e' stata aggiornata nello stesso commit, ma commands/board.md e' rimasto indietro: il paragrafo dopo l'avvio elenca come codici da riportare solo PORT_IN_USE e FILE_NOT_FOUND, e dice cosa fare per ciascuno. Un agente che riceve UNKNOWN_ARGUMENT non trova nessuna istruzione e finisce per ritentare alla cieca, che e' esattamente cio' che quel paragrafo vuole evitare.\n\nVa aggiunto il caso: UNKNOWN_ARGUMENT significa che il flag passato non esiste, lo script non ha sottocomandi, e lo stop si fa col pid della riga di avvio. Il posto giusto e' lo stesso elenco, non una sezione nuova.\n\nSolo documentazione del comando: nessuno script, nessun test.",
-      "status": "backlog",
+      "status": "done",
       "tier": "economy",
+      "depends_on": [],
       "validation": {
-        "criteria": [
-          "commands/board.md elenca UNKNOWN_ARGUMENT accanto a PORT_IN_USE e FILE_NOT_FOUND, con l'azione da intraprendere",
-          "e' scritto che lo script non ha sottocomandi e che lo stop passa dal pid, non da un flag",
-          "nessuna modifica a scripts/ o test/",
-          "npm test verde"
-        ],
-        "state": "unknown"
+        "criteria": "commands/board.md righe 35-37 (git diff): aggiunta UNKNOWN_ARGUMENT allo stesso elenco di PORT_IN_USE/FILE_NOT_FOUND, con testo 'il flag passato non esiste, lo script non ha sottocomandi, fermalo col pid della riga di avvio' - soddisfa criteri 1 e 2 letteralmente (spiegazione + azione + nota sottocomandi + stop via pid). git diff -- scripts/ test/ mostra che l'unico file toccato da questa issue e' commands/board.md; le modifiche a scripts/board-server.mjs, test/plugin-board.test.mjs, scripts/board-graph.mjs (nuovo) appartengono alle issue concorrenti 70dce12a e 4829cd1d, confermato anche dal diff di issues.json (70dce12a chiusa done da altro verificatore, 4829cd1d in_progress). Criterio 3 soddisfatto per lo scope di questa issue. npm run test (node --test): 177 pass, 0 fail, 0 cancelled - criterio 4 soddisfatto. Nota fuori scope: il testo aggiunto resta corretto anche dopo l'introduzione di INVALID_ARGUMENT nella issue 70dce12a, perche' UNKNOWN_ARGUMENT e' definito in skills/harness/references/board.md riga 43 come 'un flag che lo script non dichiara, o un positional inatteso', coerente con 'il flag passato non esiste, lo script non ha sottocomandi'; commands/board.md non era tenuto a documentare INVALID_ARGUMENT, nato in un'altra issue.",
+        "state": "pass"
       },
       "created_at": "2026-07-30T13:12:20Z",
-      "updated_at": "2026-07-30T13:12:20Z"
+      "updated_at": "2026-07-30T19:16:52Z"
     },
     {
       "id": "70dce12a-fc0f-4fdb-8697-d2e11f22af5c",
       "title": "board-server: UNKNOWN_ARGUMENT etichetta anche gli errori dei flag noti",
       "description": "Segnalato dal verificatore della issue 81e2a7f8 come osservazione fuori scope.\n\nIl catch attorno a parseArgs in scripts/board-server.mjs etichetta UNKNOWN_ARGUMENT qualunque errore del parser. Ma parseArgs fallisce anche su un flag che lo script dichiara: `--port` senza valore alza un errore, e oggi esce come UNKNOWN_ARGUMENT pur non essendoci nessun argomento sconosciuto.\n\nIl messaggio di Node resta leggibile, quindi un umano capisce lo stesso; il code no, ed e' il code la parte stabile del contratto, quella su cui si scrive la logica. Un chiamante che ramifica su UNKNOWN_ARGUMENT per dire \"hai inventato un flag\" sbaglia diagnosi.\n\nVa distinto il caso: argomento sconosciuto o positional inatteso restano UNKNOWN_ARGUMENT, un flag dichiarato ma usato male prende un code suo, aggiunto alla tabella in references/board.md.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
+      "depends_on": [],
       "validation": {
         "criteria": [
-          "`--port` senza valore non esce piu' con code UNKNOWN_ARGUMENT ma con un code proprio",
-          "un flag inesistente e un positional inatteso continuano a uscire con UNKNOWN_ARGUMENT",
-          "il code nuovo e' nella tabella dei codici di references/board.md e nell'elenco di testata dello script",
-          "un test copre i due rami e diventa rosso se il catch torna a usare un code solo",
-          "npm test verde"
+          "`--port` senza valore: `node scripts/board-server.mjs --port` -> {\"ok\":false,\"error\":\"Option '--port <value>' argument missing...\",\"code\":\"INVALID_ARGUMENT\"}, exit 1 (eseguito realmente)",
+          "flag inventato: `node scripts/board-server.mjs --start` -> code UNKNOWN_ARGUMENT, exit 1; positional inatteso: `node scripts/board-server.mjs foo` -> code UNKNOWN_ARGUMENT, exit 1 (entrambi eseguiti realmente)",
+          "INVALID_ARGUMENT presente in skills/harness/references/board.md righe 22 e 44 (tabella codici) e nel commento di testata scripts/board-server.mjs riga 21 (`Error codes: UNKNOWN_ARGUMENT, INVALID_ARGUMENT, FILE_NOT_FOUND, PORT_IN_USE, ERROR.`)",
+          "test/plugin-board.test.mjs righe 455-495: due test nuovi, uno asserisce code===INVALID_ARGUMENT su --port senza valore, l'altro asserisce code===UNKNOWN_ARGUMENT su --bogus ed 'extra'; entrambi diventano rossi se il catch tornasse a un code solo, dato che assertano codici diversi sullo stesso branch",
+          "npm run test: 177/177 pass, 0 fail (output completo raccolto)"
         ],
-        "state": "unknown"
+        "state": "pass"
       },
       "created_at": "2026-07-30T13:12:21Z",
-      "updated_at": "2026-07-30T13:12:21Z"
+      "updated_at": "2026-07-30T19:16:20Z"
     },
     {
       "id": "2e2e7220-b660-4ad9-ae49-c765ca416a4a",
@@ -1037,7 +1034,7 @@
       "id": "4829cd1d-2e9a-43b5-9bad-a93126afb29c",
       "title": "board-graph.mjs: layering puro del DAG delle issue",
       "description": "Isola in scripts/board-graph.mjs la matematica del grafo, senza alcun accesso al DOM. Spec: docs/superpowers/specs/2026-07-30-board-workflow-design.md, sezione 6.\n\nCosa calcola: quali issue sono nodi (status diverso da done), quali dipendenze entrano come nodi fantasma (una dipendenza gia' done di un nodo visibile, oppure un id che non esiste piu'), il livello di ogni nodo con longest-path (0 se non ha dipendenze visibili, altrimenti max(livello dipendenza)+1), l'ordine dentro il livello con due passate di baricentro e tie-break sull'indice originale, il gruppo delle issue senza catena (ne' dipendenze ne' dipendenti), e la catena di un nodo (antenati piu' discendenti) che serve al chain lens.\n\nGuardia sui cicli: issues.json e' un file e qualcuno puo' editarlo a mano nonostante il divieto della CLI. Il layering tiene un visited-set, termina sempre e segnala gli id coinvolti invece di entrare in loop.\n\nModulo non ancora collegato alla pagina: qui si scrive solo la logica e i suoi test. Catena indipendente, puo' partire subito in parallelo.",
-      "status": "backlog",
+      "status": "in_progress",
       "tier": "reasoning",
       "depends_on": [],
       "validation": {
@@ -1053,7 +1050,7 @@
         ]
       },
       "created_at": "2026-07-30T15:38:42Z",
-      "updated_at": "2026-07-30T15:58:22Z"
+      "updated_at": "2026-07-30T19:10:55Z"
     },
     {
       "id": "1f4c689e-6087-4536-a995-2c31b856e171",
