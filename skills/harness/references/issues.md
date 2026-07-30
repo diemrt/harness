@@ -97,6 +97,7 @@ eccezione: testo semplice). Su stderr non viene scritto nulla.
   "title": "<string>",
   "description": "<string>",
   "status": "backlog|in_progress|in_review|blocked|done",
+  "tier": "economy|standard|reasoning",
   "validation": { "criteria": ["<string>"], "state": "unknown|pass|fail" },
   "created_at": "<datetime>",
   "updated_at": "<datetime>"
@@ -105,6 +106,12 @@ eccezione: testo semplice). Su stderr non viene scritto nulla.
 
 `validation` può essere `null` (nessun criterio definito: vedi la verifica leggera in
 [SKILL.md](../SKILL.md)).
+
+**`tier`** dichiara quanto costa il lavoro della issue, così chi dispatcha legge un dato invece
+di ridedurlo dalla description: `economy`, `standard`, `reasoning`. È opzionale e può essere
+`null` — assente vale `standard`. Un `null` esplicito in `--update` lo azzera: è un **hint**, e
+un tier rimasto indietro dopo un cambio di scope va corretto, non conservato. La mappatura su
+modello e reasoning effort sta in [SKILL.md](../SKILL.md), non nei dati.
 
 **Semantica di `validation`:** `criteria` descrive cosa rende la issue accettabile.
 - **alla creazione** — `criteria` con i criteri di accettazione, `state: "unknown"`;
@@ -171,6 +178,7 @@ il verificatore indipendente porta poi la issue a `done`/`pass` oppure `blocked`
 | `title` | string | obbligatorio | opzionale | non vuoto, max 80 caratteri |
 | `description` | string | obbligatorio | opzionale | non vuoto, max 1200 caratteri |
 | `status` | string | obbligatorio | opzionale | `backlog`, `in_progress`, `in_review`, `blocked`, `done` |
+| `tier` | string \| null | opzionale | opzionale | `economy`, `standard`, `reasoning`, oppure `null` |
 | `validation` | object \| null | opzionale | opzionale | `null` oppure `{ criteria, state: unknown\|pass\|fail }`; `criteria` array a `state: unknown`, stringa o array alla chiusura |
 
 In `--update` i campi omessi restano invariati, ma un campo **presente** deve essere valido:
@@ -186,6 +194,7 @@ Il `code` è stabile: usalo per la logica, il messaggio è per gli umani.
 | `INVALID_ID` | `--issue-id` non è un GUID valido |
 | `INVALID_STATUS` | `status` fuori dai valori ammessi |
 | `INVALID_STATE` | `validation.state` fuori da `unknown`, `pass`, `fail` |
+| `INVALID_TIER` | `tier` fuori da `economy`, `standard`, `reasoning` (un `null` esplicito è valido) |
 | `INVALID_INPUT` | campo sconosciuto, obbligatorio mancante o vuoto, payload `{}` in update, `page-size` < 1, `criteria` di forma sbagliata (stringa a `state: unknown`, array vuoto, elemento non stringa o vuoto) |
 | `LIMIT_EXCEEDED` | `title`, `description` o un criterio oltre il limite di caratteri, o più di 7 criteri |
 | `INVALID_JSON` | payload non JSON valido |

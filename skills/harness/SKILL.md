@@ -107,22 +107,35 @@ Questi tre punti valgono qualunque sia il grado di parallelismo e qualunque sia 
 subagent usato. Nel modello plugin non esiste più un hook git che li imponga a livello di
 processo: reggono perché li applichi tu.
 
-## Scelta del tier per i subagent
+## Tier: quanto costa il lavoro di una issue
 
 Harness non pinna modelli per nome: definisce tier che l'orchestratore mappa sui modelli
 disponibili. A parità di esito atteso, scegli il tier che consuma meno token.
 
-- **Economico** — lavoro meccanico, deterministico, a basso rischio.
-- **Standard** — default; implementazione ordinaria con decisioni locali limitate.
-- **Reasoning** — ragionamento esteso, giudizio architetturale, trade-off critici.
+Il tier sta **sulla issue**, nel campo `tier` ([references/issues.md](references/issues.md)),
+così la decisione si prende una volta e la legge chi dispatcha, invece di ridedurla dalla
+description a ogni giro.
 
-Segnali: numero di file toccati e superficie di impatto; ambiguità di `description` e
-`validation.criteria`; esecuzione meccanica vs decisioni di design; posizione nella catena
-(bloccante o terminale); trade-off in conflitto.
+| `tier` | Quando | Come si mappa |
+|---|---|---|
+| `economy` | lavoro meccanico, deterministico, a basso rischio | modello economico, reasoning minimo |
+| `standard` | implementazione ordinaria, decisioni locali limitate | modello di default, reasoning medio |
+| `reasoning` | ragionamento esteso, giudizio architetturale, trade-off critici | modello più capace, reasoning alto |
+
+`tier` assente vale `standard`: è il default, non un dato mancante da riempire.
+
+Segnali per scegliere: numero di file toccati e superficie di impatto; ambiguità di
+`description` e `validation.criteria`; esecuzione meccanica vs decisioni di design; posizione
+nella catena (bloccante o terminale); trade-off in conflitto.
 
 In dubbio fra due tier, **sali**: un fail in verifica costa più della differenza di token.
-Il verificatore usa un tier **>=** a quello del worker, mai inferiore. Policy di efficienza,
-non invariante.
+Il verificatore usa un tier **>=** a quello del worker, mai inferiore — con il campo valorizzato
+è un confronto, non una stima. Policy di efficienza, non invariante.
+
+Il tier è un **hint**, non un vincolo: se lo scope cambia, il tier scritto resta indietro e non
+è un difetto. Chi dispatcha può scegliere diversamente, e in quel caso aggiorna il campo
+(`--update` con il nuovo valore, o `null` per azzerarlo) invece di lasciare un dato che
+contraddice la realtà.
 
 ## Verifica leggera: issue che nascono senza criteri
 

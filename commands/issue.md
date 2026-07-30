@@ -48,9 +48,13 @@ Trasforma la descrizione dell'utente in `title`, `description` e `validation.cri
 I criteri sono la parte che conta: devono essere verificabili da un altro agente che non ha
 visto questa conversazione — "funziona bene" non lo è, "il comando X esce 0 e stampa Y" sì.
 
-`criteria` è un **array**: un elemento per criterio, al massimo 7, ognuno entro 200 caratteri.
-Il `title` sta in 80 caratteri, la `description` in 1200 e va scritta in **paragrafi separati
-da riga vuota**, non come un blocco unico: la legge una persona.
+`criteria` è un **array**, un elemento per criterio; `title`, `description` e criteri hanno
+limiti di lunghezza, e la `description` va in paragrafi separati da riga vuota. Valori e regole
+stanno in `references/issues.md`, sezione "Limiti di formato": leggili invece di indovinare.
+
+Proponi anche un `tier` (`economy`, `standard`, `reasoning`) dicendo perché: lo userà chi
+dispatcha per scegliere l'agente. Se il lavoro non è inquadrabile ometti il campo — assente vale
+`standard`, meglio di un tier inventato.
 
 Scrivi il payload **su file** e passalo con `--issue-data-file` (nessun escaping di quote da
 gestire nella shell), con `"status":"backlog"` e
@@ -58,18 +62,10 @@ gestire nella shell), con `"status":"backlog"` e
 chiedi conferma **prima** di scrivere. L'id della issue creata si legge da `.data.id` della
 risposta, non dal testo del messaggio.
 
-### Se il testo non ci sta
-
-`LIMIT_EXCEEDED` non si risolve comprimendo il testo: tieni un riassunto nel campo e **rimanda a
-un documento** del progetto, scrivendone il path nella description. Un contenuto che sfora non è
-una issue, è un documento a cui la issue punta.
-
-Il documento lo scrive l'utente, eventualmente con le skill di spec presenti nell'ambiente
-(`superpowers:brainstorming`, `core-dev-toolkit:spec` e simili) — proponile se ci sono. Harness
-non le invoca da sé e non crea file nel progetto.
-
-Se invece la CLI risponde `INVALID_INPUT` non è una questione di lunghezza ma di forma del
-payload: rileggi il contratto in `references/issues.md` invece di accorciare a caso.
+Se la CLI risponde `LIMIT_EXCEEDED`, non comprimere il testo: tieni un riassunto nel campo e
+rimanda a un documento del progetto, col path nella description. Il documento lo scrive
+l'utente, eventualmente con le skill di spec presenti nell'ambiente — proponile se ci sono,
+harness non le invoca da sé.
 
 ## `update <id> <modifica>` → aggiornare
 
@@ -85,5 +81,5 @@ svolto il lavoro, e si lancia con `/harness:verify`. Il worker arriva al massimo
 ## Errori
 
 Su stdout c'è sempre una sola riga JSON. Se `ok` è `false`, riporta `code` e `error` così
-come sono: `INVALID_ID`, `NOT_FOUND`, `INVALID_INPUT`, `FORBIDDEN_ROLE` dicono già cosa è
-andato storto, non tirare a indovinare una correzione.
+come sono: `INVALID_ID`, `NOT_FOUND`, `INVALID_INPUT`, `INVALID_TIER`, `LIMIT_EXCEEDED`,
+`FORBIDDEN_ROLE` dicono già cosa è andato storto, non tirare a indovinare una correzione.

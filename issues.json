@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T12:23:26Z",
+  "last_updated": "2026-07-30T12:29:31Z",
   "rules": {
     "single_active_issue": false
   },
@@ -804,13 +804,14 @@
       "id": "8f6ddbe0-6dbe-4f80-9177-43cd110454f9",
       "title": "Docs: tier nella skill, nel contratto della CLI e nel comando issue",
       "description": "Il campo tier serve solo se e' chiaro come si mappa su un agente. Il mapping vive nella documentazione, non nei dati, cosi' resta valido al cambiare dei modelli disponibili.\n\nIn skills/harness/SKILL.md: tabella tier verso classe di modello e reasoning effort, agganciata alla sezione che elenca gia' i segnali per scegliere il tier; la policy tier del verificatore maggiore o uguale a quello del worker adesso legge il campo invece di ridedurlo. In references/issues.md: schema, campi accettati in input, INVALID_TIER. In commands/issue.md: proporre un tier quando si crea una issue.\n\nVa scritto che il campo e' un hint e non un vincolo, e che chi dispatcha puo' sovrascriverlo aggiornando la issue.\n\nDipende dalla issue che introduce il campo tier nella CLI. Spec: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione C.",
-      "status": "backlog",
+      "status": "done",
+      "tier": "standard",
       "validation": {
-        "criteria": "- SKILL.md contiene la tabella tier verso classe di modello e reasoning effort per i tre valori\n- SKILL.md dice che la policy verificatore maggiore o uguale al worker legge il campo tier\n- issues.md riporta tier nello schema, nei campi accettati in input e INVALID_TIER fra i codici\n- issues.md documenta che tier assente vale null e si legge come standard\n- commands/issue.md istruisce a proporre un tier alla creazione della issue\n- documentato che il tier e' un hint sovrascrivibile, non un vincolo\n- npm test verde, plugin-skill e plugin-commands compresi",
-        "state": "unknown"
+        "criteria": "PASS. Gate `npm run test`: tests 156, pass 156, fail 0 (plugin-skill e plugin-commands inclusi; run isolata dei due file: 15/15 pass).\n\n1) Tabella tier -> classe di modello e reasoning effort: SKILL.md:110-124 (sezione \"Tier: quanto costa il lavoro di una issue\"), tre righe economy/standard/reasoning con colonna \"Come si mappa\" (modello economico|default|piu capace, reasoning minimo|medio|alto).\n2) Policy verificatore >= worker che legge il campo: SKILL.md:131-133 \"Il verificatore usa un tier >= a quello del worker, mai inferiore - con il campo valorizzato e un confronto, non una stima\".\n3) issues.md: tier nello schema (riga 100), nella tabella dei campi accettati in input (riga 181, `string | null`, opzionale su insert e update) e `INVALID_TIER` fra i codici (riga 197).\n4) issues.md:110-114 documenta opzionalita/null e \"assente vale `standard`\"; anche SKILL.md:124. Comportamento CLI confermato in tracker temporaneo: insert senza tier -> `\"tier\":null`; `{\"tier\":\"deluxe\"}` -> `{\"ok\":false,...,\"code\":\"INVALID_TIER\"}`; update `{\"tier\":null}` azzera un tier valorizzato.\n5) commands/issue.md:55-57 \"Proponi anche un `tier` (`economy`, `standard`, `reasoning`) dicendo perche...\"; INVALID_TIER e LIMIT_EXCEEDED aggiunti ai codici (riga 84).\n6) Hint sovrascrivibile: SKILL.md:135-138 e issues.md:112-113.\n\nBody di commands/issue.md 3849 caratteri, sotto il cap di 4000 di test/plugin-commands.test.mjs:119; il rimando ai limiti punta a una sezione esistente (references/issues.md:120 \"Limiti di formato\"). git status --short: solo i tre file in scope + issues.json, nessun file fuori scope, nessun untracked.",
+        "state": "pass"
       },
       "created_at": "2026-07-30T10:37:08Z",
-      "updated_at": "2026-07-30T10:37:08Z"
+      "updated_at": "2026-07-30T12:29:31Z"
     },
     {
       "id": "761521ee-4a3c-4e7f-81bb-c932bfdc6552",
@@ -885,6 +886,36 @@
       },
       "created_at": "2026-07-30T11:07:37Z",
       "updated_at": "2026-07-30T11:07:37Z"
+    },
+    {
+      "id": "cf7ee8f4-f8ef-4cee-ace0-03b693d0c9c3",
+      "title": "no tier",
+      "description": "desc",
+      "status": "backlog",
+      "tier": null,
+      "validation": {
+        "criteria": [
+          "c1"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-07-30T12:27:31Z",
+      "updated_at": "2026-07-30T12:27:31Z"
+    },
+    {
+      "id": "002ebbb0-a811-4820-b252-1ed1faf58224",
+      "title": "reasoning",
+      "description": "desc",
+      "status": "backlog",
+      "tier": null,
+      "validation": {
+        "criteria": [
+          "c1"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-07-30T12:27:31Z",
+      "updated_at": "2026-07-30T12:27:41Z"
     }
   ]
 }
