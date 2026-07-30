@@ -1,5 +1,0 @@
-node_modules/
-*.tgz
-*.new
-.harness/runs/
-.claude/settings.local.json
