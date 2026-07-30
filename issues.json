@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T10:08:58Z",
+  "last_updated": "2026-07-30T10:52:15Z",
   "rules": {
     "single_active_issue": false
   },
@@ -725,6 +725,138 @@
       },
       "created_at": "2026-07-30T09:53:15Z",
       "updated_at": "2026-07-30T09:53:15Z"
+    },
+    {
+      "id": "2b1ac1a6-740c-4298-af9b-01315fffdf12",
+      "title": "CLI: limiti di lunghezza su title e description",
+      "description": "Le issue reali del tracker arrivano a 99 caratteri di title e 4150 di description: testo che non e' piu' leggibile da una persona. I limiti vanno imposti dalla CLI, perche' una regola scritta solo in un markdown drifta.\n\nIn scripts/issue-manager.mjs: costanti di modulo per title (80) e description (1200), misurate sulla stringa trimmata in caratteri JavaScript. Nuovo codice d'errore LIMIT_EXCEEDED, distinto da INVALID_INPUT che resta per la forma: l'agente reagisce in modo diverso, su una violazione di forma corregge il payload, su un limite deve spezzare il testo o rimandare a un documento.\n\nApplicati su --insert e sui soli campi presenti in --update: il merge non rivalida i campi omessi, quindi le 59 issue esistenti restano aggiornabili. Nessuna migrazione di issues.json.\n\nDettagli e formato dei messaggi: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione A.",
+      "status": "done",
+      "validation": {
+        "criteria": "Verifica indipendente con la CLI reale su progetti temporanei (--project-dir), non tramite i test del worker.\n1) --insert title 81 char: {\"ok\":false,\"error\":\"'title' is 81 characters long, the maximum is 80.\",\"code\":\"LIMIT_EXCEEDED\"} exit=1 (nomina 81 e 80).\n2) --insert description 1201 char: {\"ok\":false,\"error\":\"'description' is 1201 characters long, the maximum is 1200.\",\"code\":\"LIMIT_EXCEEDED\"} exit=1.\n3) title 80 + description 1200 esatti: ok=true titleLen=80 descLen=1200, exit=0.\n4) title/description con padding ' '*3 attorno a 80/1200 char: accettati, exit=0 (misura su valore trimmato; validateLength usa value.trim().length, scripts/issue-manager.mjs:140-145).\n5) issue seed con title 99 e description 4150 char, --update --issue-data '{\"status\":\"in_progress\"}': exit=0, ok=true status=in_progress titleLen=99 descLen=4150 (merge non rivalida i campi omessi).\n6) --help riga 20: 'LIMIT_EXCEEDED, NOT_FOUND, FILE_NOT_FOUND, MISSING_ARGS, UNKNOWN_COMMAND,'; righe 39-40: 'title : non-empty string, at most 80 characters' / 'description : non-empty string, at most 1200 characters'.\n7) Gate npm run test: tests 136, pass 136, fail 0, duration_ms 5236. I 7 nuovi casi girano: 'LIMIT_EXCEEDED: --insert with a title one character over the cap', '... description one character over the cap', 'a title and a description exactly at the cap are accepted', 'the cap is measured on the trimmed value...', 'the cap applies to --update too...', 'an --update that omits an over-limit field still succeeds...', '--help documents LIMIT_EXCEEDED and the caps'.\nLIMITS costante di modulo (title 80, description 1200) a scripts/issue-manager.mjs:76-79. Input non-stringa restano INVALID_INPUT (nessun crash in validateLength). Diff limitato a scripts/issue-manager.mjs e test/plugin-issue-manager.test.mjs (piu issues.json di tracker e i file dell'issue parallela 8c89bdd3). Nessun file modificato dal verificatore.",
+        "state": "pass"
+      },
+      "created_at": "2026-07-30T10:37:08Z",
+      "updated_at": "2026-07-30T10:51:56Z"
+    },
+    {
+      "id": "903cd6e8-9ede-4957-aa0b-aec337386fdb",
+      "title": "CLI: criteria come lista, limiti condizionati a validation.state",
+      "description": "validation.criteria e' un campo sovraccarico: alla creazione porta i criteri, alla chiusura l'evidenza dei comandi eseguiti, che e' legittimamente lunga (max attuale 6482 caratteri). I limiti valgono quindi solo sulla fase in cui porta criteri.\n\nIn scripts/issue-manager.mjs: con state unknown, criteria deve essere un array di stringhe non vuote, da 1 a 7 elementi, ognuno entro 200 caratteri; una stringa e' rifiutata. Con state pass o fail, criteria accetta stringa o array senza limiti. La forma fornita viene salvata come e': nessuna normalizzazione, cosi' le 59 issue con criteria stringa restano leggibili.\n\nDipende dalla issue dei limiti su title e description, che introduce LIMIT_EXCEEDED e le costanti di modulo.\n\nSpec: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione A.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "- con state unknown, criteria stringa e' rifiutato con code INVALID_INPUT\n- con state unknown, un array da 1 a 7 stringhe entro 200 caratteri e' accettato, exit 0\n- 8 elementi escono 1 con LIMIT_EXCEEDED e un messaggio che nomina 8 e 7\n- un elemento da 201 caratteri esce 1 con LIMIT_EXCEEDED e un messaggio che nomina il suo indice\n- array vuoto, elemento non stringa o elemento vuoto escono 1 con INVALID_INPUT\n- con state pass o fail, stringa e array di qualsiasi lunghezza sono accettati, exit 0\n- la forma e' salvata come fornita, verificato rileggendo la issue con --get; npm test verde",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-30T10:37:08Z",
+      "updated_at": "2026-07-30T10:37:08Z"
+    },
+    {
+      "id": "74cb0bdd-4de8-49cd-8564-55c6c8f743a0",
+      "title": "Board: render di criteria come lista, con fallback sulla forma stringa",
+      "description": "Il board rende oggi validation.criteria come un solo paragrafo preserve-newlines (scripts/board.html, intorno alla riga 316). Con criteria diventato array serve una lista, e la forma stringa deve continuare a funzionare per le 59 issue esistenti, che non vengono migrate.\n\nIn scripts/board.html: array reso come ul con un li per criterio, stringa resa come oggi. Ogni criterio passa da escapeHtml come il resto dei campi: il board e' servito su loopback ma il contenuto arriva da issues.json, non e' fidato.\n\nDipende dalla issue che introduce criteria array nella CLI.\n\nSpec: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione A.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "- una issue con criteria array viene resa come ul, un li per criterio, nell'ordine dell'array\n- una issue con criteria stringa continua a rendersi come paragrafo preserve-newlines\n- una issue con validation null non rende alcun blocco di validazione, come oggi\n- ogni criterio e' escapato: un criterio contenente <script> compare come testo, non come markup\n- test/plugin-board.test.mjs copre entrambe le forme di criteria\n- npm test verde",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-30T10:37:08Z",
+      "updated_at": "2026-07-30T10:37:08Z"
+    },
+    {
+      "id": "fdc1e6d9-d93a-497c-9efd-009da2ce9cda",
+      "title": "Docs: limiti di formato delle issue in issues.md e issue.md",
+      "description": "I limiti imposti dalla CLI vanno documentati dove gli agenti li leggono, insieme alle regole che il codice non puo' misurare: paragrafi nella description, e rimando a un documento del progetto quando il testo sfora invece di comprimerlo.\n\nIn skills/harness/references/issues.md: limiti, forma di criteria condizionata a validation.state, LIMIT_EXCEEDED nella tabella dei codici, schema aggiornato. In commands/issue.md: come si compone un criteria array e cosa fare quando la CLI risponde LIMIT_EXCEEDED.\n\nLe skill di spec eventualmente installate (superpowers:brainstorming, core-dev-toolkit:spec) vanno menzionate come opzione per produrre quel documento, con nota esplicita che harness non le invoca e non crea file: continua a valere che harness non semina file nel progetto.\n\nDipende dalla issue che introduce criteria array nella CLI. Spec: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione A.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "- issues.md riporta i quattro limiti con i valori 80, 1200, 200 e 7, e la misura sulla stringa trimmata\n- issues.md documenta che criteria e' array con state unknown, stringa o array con pass o fail\n- LIMIT_EXCEEDED compare nella tabella dei codici d'errore di issues.md\n- commands/issue.md spiega come comporre criteria come array e come reagire a LIMIT_EXCEEDED\n- documentata la regola dei paragrafi e il rimando a un documento del progetto sopra il limite\n- le skill di spec sono citate come opzionali, con la nota che harness non crea file\n- npm test verde, plugin-skill e plugin-commands compresi",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-30T10:37:08Z",
+      "updated_at": "2026-07-30T10:37:08Z"
+    },
+    {
+      "id": "497230cc-342f-4841-9fa8-9f9e083b5710",
+      "title": "CLI: campo tier sulla issue, con codice INVALID_TIER",
+      "description": "Serve un dato che dichiari il costo di sviluppo della issue, cosi' che chi dispatcha sappia quale agente invocare senza ridedurlo ogni volta. SKILL.md ha gia' i tre tier, ma decisi ad hoc al momento del dispatch.\n\nIn scripts/issue-manager.mjs: nuovo campo input opzionale tier, valori economy, standard, reasoning. Assente all'insert viene salvato null, che si legge come standard. In --update un tier presente deve essere valido, un null esplicito lo azzera. Valore fuori enum rifiutato con il nuovo codice INVALID_TIER, coerente con INVALID_STATUS e INVALID_STATE: un codice per campo, cosi' l'agente sa dove guardare.\n\nIl campo e' un hint, non un vincolo: un tier stantio dopo un cambio di scope non e' un difetto.\n\nSpec: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione C.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "- --insert con \"tier\":\"economy\", \"standard\" o \"reasoning\" esce 0 e la issue riletta con --get riporta il valore\n- --insert senza tier esce 0 e la issue salvata ha tier null\n- --insert o --update con un tier fuori enum escono 1 con code INVALID_TIER\n- --update con \"tier\":null azzera il campo; --update con solo tier non altera gli altri campi\n- un campo sconosciuto diverso da tier resta rifiutato con INVALID_INPUT\n- --help elenca tier fra i campi accettati e INVALID_TIER fra i codici\n- npm test verde",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-30T10:37:08Z",
+      "updated_at": "2026-07-30T10:37:08Z"
+    },
+    {
+      "id": "a14f5543-f53a-4398-9cae-7d7773a8930e",
+      "title": "Board: badge del tier sulla card della issue",
+      "description": "Il tier serve a chi guarda il board per decidere il dispatch: va visto senza aprire il JSON. Badge sulla card, accanto agli altri metadati, nascosto quando il campo e' null cosi' le 59 issue esistenti non mostrano un badge vuoto.\n\nIn scripts/board.html, sulla stessa card dove stanno oggi status e validazione.\n\nDipende dalla issue che introduce il campo tier nella CLI.\n\nSpec: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione C.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "- una issue con tier valorizzato mostra un badge con quel valore sulla card\n- una issue con tier null o assente non mostra alcun badge di tier\n- il valore del badge e' escapato come gli altri campi resi dal board\n- test/plugin-board.test.mjs copre il caso con tier e quello senza\n- npm test verde",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-30T10:37:08Z",
+      "updated_at": "2026-07-30T10:37:08Z"
+    },
+    {
+      "id": "8f6ddbe0-6dbe-4f80-9177-43cd110454f9",
+      "title": "Docs: tier nella skill, nel contratto della CLI e nel comando issue",
+      "description": "Il campo tier serve solo se e' chiaro come si mappa su un agente. Il mapping vive nella documentazione, non nei dati, cosi' resta valido al cambiare dei modelli disponibili.\n\nIn skills/harness/SKILL.md: tabella tier verso classe di modello e reasoning effort, agganciata alla sezione che elenca gia' i segnali per scegliere il tier; la policy tier del verificatore maggiore o uguale a quello del worker adesso legge il campo invece di ridedurlo. In references/issues.md: schema, campi accettati in input, INVALID_TIER. In commands/issue.md: proporre un tier quando si crea una issue.\n\nVa scritto che il campo e' un hint e non un vincolo, e che chi dispatcha puo' sovrascriverlo aggiornando la issue.\n\nDipende dalla issue che introduce il campo tier nella CLI. Spec: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione C.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "- SKILL.md contiene la tabella tier verso classe di modello e reasoning effort per i tre valori\n- SKILL.md dice che la policy verificatore maggiore o uguale al worker legge il campo tier\n- issues.md riporta tier nello schema, nei campi accettati in input e INVALID_TIER fra i codici\n- issues.md documenta che tier assente vale null e si legge come standard\n- commands/issue.md istruisce a proporre un tier alla creazione della issue\n- documentato che il tier e' un hint sovrascrivibile, non un vincolo\n- npm test verde, plugin-skill e plugin-commands compresi",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-30T10:37:08Z",
+      "updated_at": "2026-07-30T10:37:08Z"
+    },
+    {
+      "id": "761521ee-4a3c-4e7f-81bb-c932bfdc6552",
+      "title": "Verifica leggera: whitelist chiusa nella skill e gate con criteria null",
+      "description": "Oggi ogni issue nasce con dei criteri, anche quando il lavoro e' un typo in un commento: criteri inventati per rispettare una regola sono rumore. Lo schema ammette gia' validation null, quindi non serve un campo nuovo, serve una regola stretta su quando e' ammesso.\n\nIn skills/harness/SKILL.md: whitelist chiusa a quattro casi (typo o riformulazione in doc e commenti senza toccare codice eseguibile, rename meccanico senza cambio di comportamento, bump di versione o dipendenza senza cambio d'API, spostamento di file a contenuto identico). Decide chi crea la issue e lo motiva con una riga in description: \"Verifica leggera: <motivo>\". Al worker e' vietato declassare a posteriori una issue che ha gia' criteri, sarebbe self-validation travestita.\n\nIn references/verification.md: con criteria null il gate resta il comando verify piu' il controllo del diff contro la classe dichiarata, e la chiusura scrive comunque validation come oggetto con state ed evidenza.\n\nSpec: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione B.",
+      "status": "in_progress",
+      "validation": {
+        "criteria": "- SKILL.md elenca i quattro casi della whitelist e dice esplicitamente che la lista e' chiusa\n- SKILL.md richiede la riga \"Verifica leggera: <motivo>\" nella description di quelle issue\n- SKILL.md vieta al worker di declassare a posteriori una issue che ha criteri\n- verification.md descrive il gate con criteria null: comando verify piu' controllo del diff\n- verification.md dice che la chiusura porta validation da null a oggetto con state ed evidenza\n- resta scritto che i tre invarianti valgono anche sulle issue a verifica leggera\n- npm test verde, plugin-skill compreso",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-30T10:37:08Z",
+      "updated_at": "2026-07-30T10:52:15Z"
+    },
+    {
+      "id": "55b06dcb-8530-4059-bc19-5210d136be2c",
+      "title": "Agent harness-verifier: gate su una issue senza criteri",
+      "description": "Il verificatore oggi confronta validation.criteria con gli artefatti reali. Su una issue a verifica leggera quei criteri non esistono, e senza istruzioni l'agente o si blocca o passa tutto per default: entrambi gli esiti sono peggiori di nessuna verifica, perche' danno l'illusione del gate.\n\nIn agents/harness-verifier.md: con criteria null il gate e' il comando verify di configurazione piu' il confronto del diff con la classe di lavoro dichiarata nella description. Un typo in un commento che tocca codice eseguibile e' un fail. La chiusura scrive validation come oggetto, con state e l'evidenza dei comandi eseguiti.\n\nDipende dalla issue che definisce la whitelist in SKILL.md e verification.md.\n\nSpec: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione B.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "- harness-verifier.md istruisce cosa fare quando validation e' null: verify piu' controllo del diff\n- e' scritto che un diff fuori dalla classe dichiarata e' un fail, non una nota\n- e' scritto che la chiusura passa validation da null a oggetto con state ed evidenza\n- resta scritto che il verificatore non corregge il lavoro\n- test/plugin-agent.test.mjs copre le nuove istruzioni\n- npm test verde",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-30T10:37:08Z",
+      "updated_at": "2026-07-30T10:37:08Z"
+    },
+    {
+      "id": "8c89bdd3-f8d8-4489-830a-4e7422bae125",
+      "title": "Config: blocco execution con la modalita' di dispatch",
+      "description": "La scelta fra subagent e lavoro inline dipende dal progetto, non solo dalla singola issue: va dichiarata in configurazione, con un default che lascia decidere all'euristica.\n\nIn scripts/harness-config.mjs: nuovo blocco execution con un campo mode, valori auto, inline, subagent, default auto. Merge per campo come docsGate ed externalWorker: un execution omesso viene scritto col default, un mode fuori enum e' INVALID_INPUT, i campi sconosciuti dentro execution sono rifiutati invece di essere scritti e ignorati a valle. --detect non propone execution: non c'e' niente nel progetto da ispezionare che lo suggerisca.\n\nDocumentato in skills/harness/references/config.md, insieme alla tabella dei default che il file riporta gia'.\n\nSpec: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione D.",
+      "status": "in_review",
+      "validation": {
+        "criteria": "- --init senza execution scrive {\"execution\":{\"mode\":\"auto\"}} nel config.json\n- --init con mode auto, inline o subagent scrive il valore fornito, exit 0\n- --init con un mode fuori enum esce 1 con code INVALID_INPUT\n- un campo sconosciuto dentro execution esce 1 con INVALID_INPUT\n- --get su un progetto configurato restituisce il blocco execution; --detect non lo propone\n- config.md documenta il blocco e il suo default nella tabella dei campi omessi\n- npm test verde, con i nuovi casi in test/plugin-config.test.mjs",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-30T10:37:08Z",
+      "updated_at": "2026-07-30T10:51:45Z"
+    },
+    {
+      "id": "107fda1e-868e-41e9-bc59-9638db91ea8c",
+      "title": "SKILL: regola 1-WIP riscritta, euristica di dispatch e guard inline",
+      "description": "Avviare un subagent per ogni issue non e' sempre sensato: su lavoro piccolo l'unico beneficio e' preservare il contesto dell'orchestratore, e il costo non lo giustifica. La regola diventa una scelta motivata invece di un obbligo.\n\nIn skills/harness/SKILL.md: sotto execution.mode auto, subagent quando la superficie e' ampia o l'output rumoroso, tier reasoning, o ci sono catene indipendenti da far avanzare in parallelo; inline quando la catena e' una, la superficie e' piccola, il contesto e' sano, tier economy o standard.\n\nIl punto critico e' il guard: HARNESS_ROLE=worker vive nell'environment del processo del subagent, quindi lavorando inline la self-validation torna tecnicamente possibile. Ogni mutazione del tracker fatta inline va lanciata col ruolo esplicito, nelle due forme, PowerShell e bash, perche' su PowerShell la forma VAR=x comando non esiste.\n\nVa scritto che execution.mode non tocca la verifica: sempre agent harness-verifier distinto, sempre parallela fra issue, anche con mode inline. Dipende dalla issue del blocco execution in configurazione. Spec: sezione D dello spec.",
+      "status": "backlog",
+      "validation": {
+        "criteria": "- SKILL.md non impone piu' un subagent per issue e riporta i segnali per scegliere subagent o inline\n- SKILL.md documenta execution.mode e come i tre valori cambiano la scelta\n- il guard inline e' scritto in entrambe le forme, PowerShell con $env: e bash con il prefisso\n- e' scritto perche' serve: senza subagent il processo non ha HARNESS_ROLE e potrebbe auto-chiudere\n- e' esplicito che execution.mode non riguarda la verifica, distinta e parallela anche con mode inline\n- verification.md riporta il guard inline; le skill esterne sono citate come opzione, non integrate\n- npm test verde, plugin-skill compreso",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-30T10:37:09Z",
+      "updated_at": "2026-07-30T10:37:09Z"
     }
   ]
 }

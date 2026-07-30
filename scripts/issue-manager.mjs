@@ -24,7 +24,13 @@
 // Exception: --help prints plain text.
 //
 // Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_INPUT, INVALID_JSON,
-//              NOT_FOUND, FILE_NOT_FOUND, MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE.
+//              LIMIT_EXCEEDED, NOT_FOUND, FILE_NOT_FOUND, MISSING_ARGS, UNKNOWN_COMMAND,
+//              FORBIDDEN_ROLE.
+//
+// Length limits: title and description are capped (see LIMITS) so an issue stays readable by a
+// human instead of turning into an untitled document. Over the cap the payload is rejected with
+// LIMIT_EXCEEDED, kept distinct from INVALID_INPUT on purpose: a shape violation is fixed by
+// correcting the payload, a limit violation by splitting the text or pointing at a document.
 //
 // Role guard: when the HARNESS_ROLE environment variable is set to "worker", a worker process
 // cannot self-validate its own work. Any --insert/--update payload that sets
@@ -63,6 +69,14 @@ import path from "node:path";
 
 // Resolved in main() from --project-dir (or the cwd) before any command runs.
 let issuesFilePath = null;
+
+// Length caps on the free text of an issue. Deliberately not configurable: a limit a project can
+// raise is a limit nobody hits. Measured in JavaScript characters on the trimmed string, so
+// padding whitespace never decides whether a payload is accepted.
+const LIMITS = {
+  title: 80,
+  description: 1200,
+};
 
 // Helper: exception carrying the failure envelope fields, thrown by any validator/reader and
 // caught once at the top level so exactly one JSON line is ever emitted.
@@ -121,6 +135,15 @@ function resolveIssuesFilePath(projectDir) {
   return path.join(dir, "issues.json");
 }
 
+// Helper: enforce a length cap on a free-text field. Reports the measured length next to the
+// maximum, so the caller knows how much to cut instead of guessing.
+function validateLength(fieldName, value, max) {
+  const length = value.trim().length;
+  if (length > max) {
+    fail(`'${fieldName}' is ${length} characters long, the maximum is ${max}.`, "LIMIT_EXCEEDED");
+  }
+}
+
 // Helper: validate the provided status value
 function validateStatus(status) {
   const validStatuses = ["backlog", "in_progress", "in_review", "blocked", "done"];
@@ -173,6 +196,7 @@ function validateIssueInput(issue, partial = false) {
     if (isNullOrWhitespace(issue.title)) {
       fail("'title' must be a non-empty string.", "INVALID_INPUT");
     }
+    validateLength("title", issue.title, LIMITS.title);
   } else if (!partial) {
     fail("'title' is required and must be a non-empty string.", "INVALID_INPUT");
   }
@@ -182,6 +206,7 @@ function validateIssueInput(issue, partial = false) {
     if (isNullOrWhitespace(issue.description)) {
       fail("'description' must be a non-empty string.", "INVALID_INPUT");
     }
+    validateLength("description", issue.description, LIMITS.description);
   } else if (!partial) {
     fail("'description' is required and must be a non-empty string.", "INVALID_INPUT");
   }
@@ -324,7 +349,8 @@ function showHelp() {
     "Nothing is written to stderr: pipe stdout to JSON.parse in both cases.",
     "",
     "Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_INPUT, INVALID_JSON,",
-    "             NOT_FOUND, FILE_NOT_FOUND, MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE",
+    "             LIMIT_EXCEEDED, NOT_FOUND, FILE_NOT_FOUND, MISSING_ARGS, UNKNOWN_COMMAND,",
+    "             FORBIDDEN_ROLE",
     "",
     "Role guard: when env var HARNESS_ROLE=worker, --insert/--update requests that set",
     "status=done or validation.state=pass are rejected with FORBIDDEN_ROLE (no self-validation).",
@@ -342,13 +368,16 @@ function showHelp() {
     "  --issue-data '<json>'     inline JSON; mutually exclusive with --issue-data-file",
     "",
     "Allowed input fields for --insert/--update: title, description, status, validation",
-    "  title        : non-empty string",
-    "  description  : non-empty string",
+    `  title        : non-empty string, at most ${LIMITS.title} characters`,
+    `  description  : non-empty string, at most ${LIMITS.description} characters`,
     "  status       : backlog | in_progress | in_review | blocked | done",
     "  validation   : null OR { criteria: <non-empty string>, state: unknown|pass|fail }",
     "                 Set criteria at creation (state=unknown); update with evidence at closure (state=pass|fail).",
     "--insert requires title, description and status.",
     '--update merges: omitted fields keep their current value; an explicit "validation": null clears it.',
+    "Length limits are checked on --insert and on the fields actually present in --update, and are",
+    "measured on the trimmed value. Over the limit the payload is rejected with LIMIT_EXCEEDED:",
+    "keep a summary in the field and point at a document in the project instead of compressing it.",
     "Note: id, created_at, updated_at are auto-managed and must NOT be provided.",
   ];
   process.stdout.write(lines.join("\n") + "\n");

@@ -395,6 +395,121 @@ test("INVALID_INPUT: empty object {} rejected on --update", () => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// LIMIT_EXCEEDED — length caps on the free text of an issue
+// ---------------------------------------------------------------------------
+
+const TITLE_MAX = 80;
+const DESCRIPTION_MAX = 1200;
+
+test("LIMIT_EXCEEDED: --insert with a title one character over the cap", () => {
+  const { dir } = setupTempProject();
+  try {
+    const payload = JSON.stringify({
+      title: "t".repeat(TITLE_MAX + 1),
+      description: "d",
+      status: "backlog",
+    });
+    const result = run(dir, ["--insert", "--issue-data", payload]);
+    const parsed = assertFail(result, "LIMIT_EXCEEDED");
+    // The message must name both the measured length and the maximum: the caller has to know how
+    // much to cut, not just that it cut too little.
+    assert.match(parsed.error, /'title'/);
+    assert.match(parsed.error, new RegExp(String(TITLE_MAX + 1)));
+    assert.match(parsed.error, new RegExp(String(TITLE_MAX)));
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("LIMIT_EXCEEDED: --insert with a description one character over the cap", () => {
+  const { dir } = setupTempProject();
+  try {
+    const payload = JSON.stringify({
+      title: "t",
+      description: "d".repeat(DESCRIPTION_MAX + 1),
+      status: "backlog",
+    });
+    const result = run(dir, ["--insert", "--issue-data", payload]);
+    const parsed = assertFail(result, "LIMIT_EXCEEDED");
+    assert.match(parsed.error, /'description'/);
+    assert.match(parsed.error, new RegExp(String(DESCRIPTION_MAX + 1)));
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("a title and a description exactly at the cap are accepted", () => {
+  const { dir } = setupTempProject();
+  try {
+    const payload = JSON.stringify({
+      title: "t".repeat(TITLE_MAX),
+      description: "d".repeat(DESCRIPTION_MAX),
+      status: "backlog",
+    });
+    const data = assertOk(run(dir, ["--insert", "--issue-data", payload]));
+    assert.equal(data.title.length, TITLE_MAX);
+    assert.equal(data.description.length, DESCRIPTION_MAX);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("the cap is measured on the trimmed value, so padding never decides the outcome", () => {
+  const { dir } = setupTempProject();
+  try {
+    const payload = JSON.stringify({
+      title: `   ${"t".repeat(TITLE_MAX)}   `,
+      description: "d",
+      status: "backlog",
+    });
+    assertOk(run(dir, ["--insert", "--issue-data", payload]));
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("LIMIT_EXCEEDED: the cap applies to --update too, on the fields it carries", () => {
+  const { dir } = setupTempProject();
+  try {
+    const payload = JSON.stringify({ title: "t".repeat(TITLE_MAX + 1) });
+    const result = run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", payload]);
+    assertFail(result, "LIMIT_EXCEEDED");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("an --update that omits an over-limit field still succeeds: the merge does not revalidate it", () => {
+  // The issues already in a real tracker predate the caps. Updating their status must keep working,
+  // or the caps would freeze every issue written before them.
+  const seed = baseSeed();
+  seed.issues[0].description = "d".repeat(4150);
+  const { dir } = setupTempProject(seed);
+  try {
+    const data = assertOk(
+      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", '{"status":"in_progress"}'])
+    );
+    assert.equal(data.status, "in_progress");
+    assert.equal(data.description.length, 4150);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--help documents LIMIT_EXCEEDED and the caps", () => {
+  const { dir } = setupTempProject();
+  try {
+    const result = run(dir, ["--help"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /LIMIT_EXCEEDED/);
+    assert.match(result.stdout, new RegExp(String(TITLE_MAX)));
+    assert.match(result.stdout, new RegExp(String(DESCRIPTION_MAX)));
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("INVALID_INPUT: --page-size 0 is rejected", () => {
   const { dir } = setupTempProject();
   try {
