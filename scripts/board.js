@@ -8,22 +8,55 @@
 // that touches the DOM at module load — runs only when `document` exists, which it does not under
 // `node --test`.
 
+// --- Icons ------------------------------------------------------------------------
+// Inline SVG, hand-drawn to match the icon names the board already used. No icon font, no CDN,
+// no runtime "refresh" pass: each render call embeds the markup directly, so it exists the moment
+// innerHTML is set.
+export const ICONS = {
+  "layout-list": '<rect x="3" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><path d="M14 4h7M14 9h7M14 15h7M14 20h7"></path>',
+  radio: '<circle cx="12" cy="12" r="2"></circle><path d="M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.5 5.5a9 9 0 0 0 0 13M18.5 5.5a9 9 0 0 1 0 13"></path>',
+  "file-json": '<path d="M6 2h8l6 6v14H6z"></path><path d="M14 2v6h6"></path>',
+  search: '<circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path>',
+  "alert-triangle": '<path d="M12 3 2 20h20z"></path><path d="M12 9v5"></path><path d="M12 16.5v.01"></path>',
+  inbox: '<path d="M3 8l2-5h14l2 5"></path><path d="M3 8v11h18V8"></path><path d="M3 8h5a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2h5"></path>',
+  "circle-dashed": '<circle cx="12" cy="12" r="9" stroke-dasharray="4 3"></circle>',
+  loader: '<path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"></path>',
+  eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"></path><circle cx="12" cy="12" r="3"></circle>',
+  ban: '<circle cx="12" cy="12" r="9"></circle><path d="M5.5 5.5l13 13"></path>',
+  "check-circle": '<circle cx="12" cy="12" r="9"></circle><path d="M8 12l3 3 5-6"></path>',
+  gauge: '<path d="M4 14a8 8 0 1 1 16 0"></path><path d="M12 14l3-4"></path><circle cx="12" cy="14" r="1"></circle>',
+  "clipboard-check": '<rect x="6" y="4" width="12" height="17" rx="2"></rect><path d="M9 4V2h6v2"></path><path d="M9 12l2 2 4-4"></path>',
+  check: '<path d="M20 6 9 17l-5-5"></path>',
+  x: '<path d="M18 6 6 18M6 6l12 12"></path>',
+  "help-circle": '<circle cx="12" cy="12" r="9"></circle><path d="M9.1 9a3 3 0 1 1 4.6 2.6c-1 .6-1.7 1.2-1.7 2.4"></path><path d="M12 17.5v.01"></path>',
+  hash: '<path d="M5 9h14M5 15h14M9 4l-2 16M17 4l-2 16"></path>',
+  "calendar-plus": '<rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M16 3v4M8 3v4M3 10h18"></path><path d="M12 14v6M9 17h6"></path>',
+  "calendar-clock": '<rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M16 3v4M8 3v4M3 10h18"></path><circle cx="16" cy="16.5" r="3.5"></circle><path d="M16 15v1.5l1 1"></path>',
+  layers: '<path d="M12 3 2 8l10 5 10-5z"></path><path d="M2 13l10 5 10-5"></path>',
+};
+
+export function svgIcon(name, cls) {
+  const inner = ICONS[name] || "";
+  const extra = cls ? ` ${cls}` : "";
+  return `<svg class="icon${extra}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+}
+
 // --- Status presentation config -------------------------------------------------
 export const STATUS_META = {
-  backlog:     { label: "Backlog",     badge: "badge-neutral", text: "text-neutral",  icon: "circle-dashed", dot: "bg-neutral" },
-  in_progress: { label: "In Progress", badge: "badge-info",    text: "text-info",     icon: "loader",        dot: "bg-info" },
-  in_review:   { label: "In review",   badge: "badge-warning", text: "text-warning",  icon: "eye",           dot: "bg-warning" },
-  blocked:     { label: "Blocked",     badge: "badge-error",   text: "text-error",    icon: "ban",           dot: "bg-error" },
-  done:        { label: "Done",        badge: "badge-success", text: "text-success",  icon: "check-circle",  dot: "bg-success" },
+  backlog:     { label: "Backlog",     icon: "circle-dashed" },
+  in_progress: { label: "In Progress", icon: "loader" },
+  in_review:   { label: "In review",   icon: "eye" },
+  blocked:     { label: "Blocked",     icon: "ban" },
+  done:        { label: "Done",        icon: "check-circle" },
 };
 export const STATUS_ORDER = ["backlog", "in_progress", "in_review", "blocked", "done"];
 // WIP view: priorità di raggruppamento (prima "cosa non va", poi "in corso", poi "in review", poi "da fare").
 export const WIP_PRIORITY = { blocked: 0, in_progress: 1, in_review: 2, backlog: 3 };
 
 export const VALIDATION_META = {
-  pass:    { badge: "badge-success", icon: "check", label: "pass" },
-  fail:    { badge: "badge-error",   icon: "x",     label: "fail" },
-  unknown: { badge: "badge-ghost",   icon: "help-circle", label: "unknown" },
+  pass:    { modifier: "pass",    icon: "check",       label: "pass" },
+  fail:    { modifier: "fail",    icon: "x",           label: "fail" },
+  unknown: { modifier: "unknown", icon: "help-circle",  label: "unknown" },
 };
 
 // --- App state ------------------------------------------------------------------
@@ -76,7 +109,7 @@ export function formatDate(iso) {
 }
 
 export function statusMeta(status) {
-  return STATUS_META[status] || { label: status || "—", badge: "badge-ghost", text: "", icon: "circle", dot: "bg-base-300" };
+  return STATUS_META[status] || { label: status || "—", icon: "circle-dashed" };
 }
 
 // The historical UI showed issues.json's `project` field. The minimal seed the plugin writes
@@ -89,12 +122,6 @@ export function projectNameFrom(project, projectDir) {
   return parts.length ? parts[parts.length - 1] : "Issue Board";
 }
 
-export function refreshIcons() {
-  if (window.lucide && typeof window.lucide.createIcons === "function") {
-    window.lucide.createIcons();
-  }
-}
-
 // --- Rendering: counters --------------------------------------------------------
 export function renderCounters() {
   const counts = { all: state.issues.length };
@@ -104,24 +131,21 @@ export function renderCounters() {
   }
 
   const cards = [];
-  cards.push(counterCard("all", "Totale", counts.all, "layers", "text-primary"));
+  cards.push(counterCard("all", "Totale", counts.all, "layers"));
   for (const s of STATUS_ORDER) {
     const meta = statusMeta(s);
-    cards.push(counterCard(s, meta.label, counts[s] || 0, meta.icon, meta.text));
+    cards.push(counterCard(s, meta.label, counts[s] || 0, meta.icon));
   }
   el.counters.innerHTML = cards.join("");
-  refreshIcons();
 }
 
-export function counterCard(key, label, value, icon, textClass) {
+export function counterCard(key, label, value, icon) {
   return `
-    <div class="rounded-xl bg-base-100 shadow-sm p-4 flex items-center gap-3">
-      <span class="grid place-items-center w-10 h-10 rounded-lg bg-base-200 ${textClass}">
-        <i data-lucide="${icon}" class="w-5 h-5"></i>
-      </span>
+    <div class="counter-card" data-counter="${key}">
+      <span class="counter-card__icon">${svgIcon(icon)}</span>
       <div>
-        <div class="text-2xl font-bold leading-none">${value}</div>
-        <div class="text-xs text-base-content/60 mt-1">${escapeHtml(label)}</div>
+        <div class="counter-card__value">${value}</div>
+        <div class="counter-card__label">${escapeHtml(label)}</div>
       </div>
     </div>`;
 }
@@ -144,8 +168,8 @@ export function renderFilters() {
 }
 
 export function filterTab(status, label) {
-  const active = state.activeStatus === status ? "tab-active" : "";
-  return `<button type="button" role="tab" data-status="${status}" class="tab ${active} whitespace-nowrap">${escapeHtml(label)}</button>`;
+  const active = state.activeStatus === status ? " is-active" : "";
+  return `<button type="button" role="tab" data-status="${status}" class="status-filters__tab${active}">${escapeHtml(label)}</button>`;
 }
 
 // --- Filtering ------------------------------------------------------------------
@@ -185,15 +209,12 @@ export function renderIssues() {
 
   if (items.length === 0) {
     el.issuesList.innerHTML = "";
-    el.emptyState.classList.remove("hidden");
-    el.emptyState.classList.add("flex");
+    el.emptyState.classList.remove("is-hidden");
     return;
   }
-  el.emptyState.classList.add("hidden");
-  el.emptyState.classList.remove("flex");
+  el.emptyState.classList.add("is-hidden");
 
   el.issuesList.innerHTML = items.map(issueCard).join("");
-  refreshIcons();
 }
 
 // The tier says what the work of an issue is expected to cost, which is what someone looking at
@@ -201,8 +222,8 @@ export function renderIssues() {
 // purpose, so no badge at all is the normal case rather than an error to render.
 export function renderTierBadge(tier) {
   if (typeof tier !== "string" || tier.trim() === "") return "";
-  return `<span class="badge badge-sm badge-outline gap-1 shrink-0" title="Costo di sviluppo atteso">` +
-    `<i data-lucide="gauge" class="w-3 h-3"></i>${escapeHtml(tier)}</span>`;
+  return `<span class="badge" title="Costo di sviluppo atteso">` +
+    `${svgIcon("gauge", "icon--sm")}${escapeHtml(tier)}</span>`;
 }
 
 // validation.criteria reaches the page in two shapes, and neither is normalized in issues.json:
@@ -215,12 +236,12 @@ export function renderCriteria(criteria) {
   if (Array.isArray(criteria)) {
     const items = criteria.filter((entry) => typeof entry === "string" && entry.trim() !== "");
     if (items.length === 0) return "";
-    return `<ul class="text-sm opacity-80 list-disc pl-5 space-y-1">${items
+    return `<ul class="validation-block__criteria">${items
       .map((entry) => `<li class="preserve-newlines">${escapeHtml(entry)}</li>`)
       .join("")}</ul>`;
   }
   if (typeof criteria === "string" && criteria.trim() !== "") {
-    return `<p class="text-sm opacity-80 preserve-newlines">${escapeHtml(criteria)}</p>`;
+    return `<p class="validation-block__criteria validation-block__criteria--text preserve-newlines">${escapeHtml(criteria)}</p>`;
   }
   return "";
 }
@@ -233,55 +254,52 @@ export function issueCard(it) {
   const criteriaMarkup = renderCriteria(validation.criteria);
 
   const validationBlock = (criteriaMarkup || validation.state) ? `
-    <div class="mt-3 rounded-lg bg-base-200/60 p-3">
-      <div class="flex items-center gap-2 mb-1">
-        <i data-lucide="clipboard-check" class="w-4 h-4 opacity-70"></i>
-        <span class="text-xs font-semibold uppercase tracking-wide opacity-70">Validazione</span>
-        <span class="badge badge-sm ${vMeta.badge} gap-1">
-          <i data-lucide="${vMeta.icon}" class="w-3 h-3"></i>${escapeHtml(vMeta.label)}
+    <div class="validation-block">
+      <div class="validation-block__head">
+        ${svgIcon("clipboard-check", "icon--sm")}
+        <span class="validation-block__label">Validazione</span>
+        <span class="badge badge--validation-${vMeta.modifier}">
+          ${svgIcon(vMeta.icon, "icon--sm")}${escapeHtml(vMeta.label)}
         </span>
       </div>
       ${criteriaMarkup}
     </div>` : "";
 
   return `
-    <article class="issue-card card bg-base-100 shadow-sm border border-base-200 hover:shadow-md transition-shadow">
-      <div class="card-body p-5">
-        <div class="flex items-start justify-between gap-3">
-          <h2 class="card-title text-base leading-snug">${escapeHtml(it.title)}</h2>
-          <div class="flex items-center gap-2 shrink-0">
-            ${renderTierBadge(it.tier)}
-            <span class="badge ${meta.badge} gap-1 shrink-0">
-              <i data-lucide="${meta.icon}" class="w-3 h-3"></i>${escapeHtml(meta.label)}
-            </span>
-          </div>
-        </div>
-
-        ${it.description ? `<p class="text-sm text-base-content/80 mt-2 preserve-newlines">${escapeHtml(it.description)}</p>` : ""}
-
-        ${validationBlock}
-
-        <div class="mt-4 pt-3 border-t border-base-200 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/50">
-          <span class="inline-flex items-center gap-1" title="ID">
-            <i data-lucide="hash" class="w-3 h-3"></i><code>${escapeHtml(it.id)}</code>
-          </span>
-          <span class="inline-flex items-center gap-1" title="Creata">
-            <i data-lucide="calendar-plus" class="w-3 h-3"></i>${formatDate(it.created_at)}
-          </span>
-          <span class="inline-flex items-center gap-1" title="Aggiornata">
-            <i data-lucide="calendar-clock" class="w-3 h-3"></i>${formatDate(it.updated_at)}
+    <article class="issue-card">
+      <div class="issue-card__head">
+        <h2 class="issue-card__title">${escapeHtml(it.title)}</h2>
+        <div class="issue-card__badges">
+          ${renderTierBadge(it.tier)}
+          <span class="badge badge--status badge--${escapeHtml(it.status)}">
+            ${svgIcon(meta.icon, "icon--sm")}${escapeHtml(meta.label)}
           </span>
         </div>
+      </div>
+
+      ${it.description ? `<p class="issue-card__description preserve-newlines">${escapeHtml(it.description)}</p>` : ""}
+
+      ${validationBlock}
+
+      <div class="issue-card__meta">
+        <span class="issue-card__meta-item" title="ID">
+          ${svgIcon("hash", "icon--sm")}<code>${escapeHtml(it.id)}</code>
+        </span>
+        <span class="issue-card__meta-item" title="Creata">
+          ${svgIcon("calendar-plus", "icon--sm")}${formatDate(it.created_at)}
+        </span>
+        <span class="issue-card__meta-item" title="Aggiornata">
+          ${svgIcon("calendar-clock", "icon--sm")}${formatDate(it.updated_at)}
+        </span>
       </div>
     </article>`;
 }
 
 // --- Boot -----------------------------------------------------------------------
 export function showError(message) {
-  el.loadingState.classList.add("hidden");
-  el.errorState.classList.remove("hidden");
+  el.loadingState.classList.add("is-hidden");
+  el.errorState.classList.remove("is-hidden");
   el.errorDetail.textContent = message || "";
-  refreshIcons();
 }
 
 export function bindSearch() {
@@ -306,13 +324,13 @@ export async function load() {
     ? `Ultimo aggiornamento: ${formatDate(data.lastUpdated)} · ${state.issues.length} issue`
     : `${state.issues.length} issue`;
 
-  el.loadingState.classList.add("hidden");
+  el.loadingState.classList.add("is-hidden");
 
   // A partially written issues.json is reported by the server rather than crashing it.
   if (data.error) {
     showError(data.error);
   } else {
-    el.errorState.classList.add("hidden");
+    el.errorState.classList.add("is-hidden");
   }
 
   renderCounters();
@@ -321,8 +339,7 @@ export async function load() {
 }
 
 export function setLive(connected) {
-  el.liveIndicator.classList.toggle("badge-ghost", connected);
-  el.liveIndicator.classList.toggle("badge-warning", !connected);
+  el.liveIndicator.classList.toggle("is-warning", !connected);
   el.liveLabel.textContent = connected ? "live" : "riconnessione…";
 }
 
@@ -351,7 +368,6 @@ export async function init() {
 // where `document` does not exist, instead of throwing the moment it is imported.
 if (typeof document !== "undefined") {
   document.addEventListener("DOMContentLoaded", () => {
-    refreshIcons();
     init();
   });
 }

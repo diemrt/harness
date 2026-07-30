@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T20:02:53Z",
+  "last_updated": "2026-07-30T20:25:54Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1002,25 +1002,17 @@
       "id": "10067a5b-c270-45ac-a51d-0c9ec2f09b32",
       "title": "board: restyle stile Claude Code, zero dipendenze da CDN",
       "description": "Riscrive la presentazione del board senza rete e nello stile di Claude Code. Spec: docs/superpowers/specs/2026-07-30-board-workflow-design.md, sezione 5.\n\nVia Tailwind, daisyUI e Lucide: CSS scritto a mano su custom properties in scripts/board.css, icone SVG inline, font di sistema, nessun build step. Il board e' servito da un socket di loopback e deve presentarsi anche senza rete.\n\nToken (light / dark): --bg F0EEE6 / 1B1A18, --surface FAF9F5 / 232220, --ink 1F1E1C / EDEAE2, --muted 6C6A62 / 9A968B, --line DEDBD0 / 34322E, --accent D97757 / E08262. Stati: backlog 8A877D, in_progress accent, in_review 7A6BB5, blocked C0473E, done 5B8C51.\n\nTipografia, una regola sola: la macchina parla mono, l'umano parla sans. Id, tier, stati, contatori ed evidenze in stack mono di sistema; titoli e description in stack sans, perche' sono prosa lunga. Spacing su base 4px, densita' alta, radius 6px, bordi hairline 1px. Via il contenitore centrato: barra di stato, toolbar, canvas a tutta larghezza.\n\nParita' funzionale: nessuna feature nuova, il grafo arriva dopo.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
         "1d944e82-eb9e-4257-ab06-918df471320f"
       ],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "Nessun riferimento a cdn.tailwindcss.com, jsdelivr o unpkg resta nei file del board; nessun tag verso host esterni.",
-          "board.css definisce i sei token nei valori dello spec, in :root e nella variante scura, e i cinque colori di stato.",
-          "Le icone sono SVG inline: nessuna chiamata a lucide.createIcons resta nel codice.",
-          "Titoli e description usano lo stack sans, mentre id, tier, stati e contatori usano lo stack mono.",
-          "Con la rete disattivata la pagina si presenta completa: prova manuale, con screenshot o descrizione, nell'evidenza.",
-          "Contatori, filtri, ricerca, blocco Validazione e stati loading/empty/error funzionano come prima del restyle.",
-          "npm run test passa, marker test incluso."
-        ]
+        "criteria": "Verifica indipendente, 7/7 criteri soddisfatti. Gate: npm run test -> tests 197, pass 197, fail 0, duration_ms 7172. (1) Zero rete: grep -niE \"https?://|cdn|jsdelivr|unpkg|tailwind|daisy|lucide\" su board.html/css/js -> unica occorrenza scripts/board.js:12, la parola CDN in un commento; nel DOM scripts=[board.js], links=[board.css]. Runtime con Chromium headless via CDP (Network.enable) su server effimero 127.0.0.1:63530: le uniche richieste sono /, /board.css, /board.js, /api/issues, /events, /favicon.ico(404) - tutte same-origin, loadingFailed vuoto. (2) Token confrontati uno per uno in scripts/board.css:4-43 e letti da getComputedStyle: :root --bg #F0EEE6, --surface #FAF9F5, --ink #1F1E1C, --muted #6C6A62, --line #DEDBD0, --accent #D97757; [data-theme=dark] --bg #1B1A18, --surface #232220, --ink #EDEAE2, --muted #9A968B, --line #34322E, --accent #E08262. Stati renderizzati da issueCard(): backlog rgb(138,135,125)=#8A877D, in_progress rgb(217,119,87)=#D97757 (=accent), in_review rgb(122,107,181)=#7A6BB5, blocked rgb(192,71,62)=#C0473E, done rgb(91,140,81)=#5B8C51. (3) refreshIcons() e ogni <i data-lucide> spariti dal diff; a runtime typeof window.lucide=undefined, typeof window.tailwind=undefined, document.querySelectorAll('[data-lucide]').length=0, 61 <svg> inline nella pagina. (4) getComputedStyle: .issue-card__title e .issue-card__description = \"ui-sans-serif, system-ui, Segoe UI, ...\", mentre code dell'id, .badge (stato e tier), .counter-card__value/__label e .status-filters__tab = \"ui-monospace, Cascadia Code, SF Mono, Consolas, monospace\". (5) Prova senza rete: Chromium lanciato con --host-resolver-rules=\"MAP * ~NOTFOUND , EXCLUDE 127.0.0.1\"; fetch('https://cdn.tailwindcss.com') -> \"BLOCKED: Failed to fetch\", eppure la pagina si presenta completa - screenshot osservato: header crema con logo corallo, sei contatori (87/6/0/1/0/80), toolbar con ricerca e sette tab, card con badge di stato, blocco VALIDAZIONE e meta in mono; bg rgb(240,238,230), card rgb(250,249,245), 61 SVG, loading gia' nascosto, indicatore \"live\". (6) Parita' esercitata sul DOM reale: contatori all=87/backlog=6/in_progress=0/in_review=1/blocked=0/done=80 coerenti con il tracker; click sui tab -> done 80 card (solo badge Done), in_review 1, blocked 0 con emptyState display:flex, all 87, wip 7 ordinate In review poi Backlog; ricerca \"restyle\" -> 4 card pertinenti, \"zzzznomatchzzzz\" -> 0 card, issuesList vuota ed emptyState flex, campo svuotato -> 87 card; blocco Validazione presente (7 blocchi, label \"Validazione\", 47 <li> di criteri, .preserve-newlines -> white-space pre-wrap); showError() -> errorState display:block con bordo #C0473E e loadingState/emptyState none, load() successivo -> errorState none e 87 card; loadingState passa da none a flex togliendo .is-hidden, spinner rgb(217,119,87). SSE verificato su copia in directory temporanea (mai sul tracker reale): --insert su quella copia -> la pagina passa da 87 a 88 card e aggiorna \"Ultimo aggiornamento\" senza reload, indicatore \"live\" e mai is-warning. (7) test/ non toccato: git diff HEAD -- test/ vuoto (0 righe); il diff resta su scripts/board.{html,css,js} piu' il solo cambio di status in issues.json. Nessuno scope creep: nessun riferimento a board-graph.mjs, nessun drawer, scorciatoia, filtro per tier, toggle tema o modalita' compatta. Osservazione fuori contratto: i criteri di validazione sono resi in stack sans, mentre lo spec §5 elenca le evidenze di verifica fra gli elementi mono; il criterio 4 non li nomina.",
+        "state": "pass"
       },
       "created_at": "2026-07-30T15:38:42Z",
-      "updated_at": "2026-07-30T15:58:06Z"
+      "updated_at": "2026-07-30T20:25:54Z"
     },
     {
       "id": "4829cd1d-2e9a-43b5-9bad-a93126afb29c",
