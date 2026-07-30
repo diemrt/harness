@@ -268,6 +268,23 @@ function validateConfigInput(config) {
         fail(`'docsGate.${field}' must be an array of glob strings.`, "INVALID_INPUT");
       }
     }
+    // The merge above closes the case of an OMITTED `include`; an explicitly empty one is the
+    // same failure written on purpose — a gate that reports itself as active and can never match
+    // a single file. It is rejected rather than accepted-and-ignored, because a silent no-op gate
+    // reads, to whoever opens config.json later, exactly like a working one. Note this runs
+    // BEFORE the defaults are merged in, so an absent `enabled` still means the default (true):
+    // `{"docsGate":{"include":[]}}` must fail just like the explicit `enabled: true`.
+    // `exclude: []` stays legitimate: excluding nothing is a real choice, and the gate still
+    // matches whatever `include` says.
+    const enabled = gate.enabled === undefined ? DEFAULT_DOCS_GATE.enabled : gate.enabled;
+    if (enabled && Array.isArray(gate.include) && gate.include.length === 0) {
+      fail(
+        "'docsGate.include' cannot be empty while the gate is enabled: it would report itself " +
+          "as active and match no file at all. List the globs that count as code, or set " +
+          "'docsGate.enabled' to false to turn the gate off explicitly.",
+        "INVALID_INPUT"
+      );
+    }
   }
 }
 

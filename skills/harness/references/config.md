@@ -81,7 +81,11 @@ esso).
 I campi di `docsGate`, quando presenti, sono tipizzati: `enabled` deve essere booleano,
 `include`/`exclude` array di stringhe. Un tipo sbagliato (`"include": "**/*.js"` invece di
 un array) è rifiutato con `INVALID_INPUT` invece di essere scritto e ignorato in silenzio a
-valle.
+valle. Stesso rifiuto per un `include` esplicitamente vuoto a gate acceso: `include: []` con
+`enabled: true` — o con `enabled` omesso, che vale `true` per default — è lo stesso gate
+inerte del caso a `include` mancante, solo scritto apposta invece che per omissione; o elenchi
+dei glob, o metti `enabled: false`. Un `exclude: []` resta legittimo (non escludere niente è
+una scelta), e così un `include: []` a gate spento.
 
 Non c'è un task runner: i comandi vengono eseguiti direttamente. La configurazione li
 **dichiara**, così il gate è lo stesso a ogni verifica e non dipende da cosa si ricorda
@@ -118,7 +122,7 @@ niente**.
 |---|---|
 | `CONFIG_NOT_FOUND` | `.harness/config.json` non esiste |
 | `CONFIG_EXISTS` | configurazione già presente e nessun `--force` |
-| `INVALID_INPUT` | campo sconosciuto, `verify` mancante o vuoto, `setup` non stringa/`null`, worker abilitato senza `{promptFile}`, `docsGate`/`externalWorker` non un oggetto, `docsGate.enabled` non booleano, `docsGate.include`/`exclude` non un array di stringhe |
+| `INVALID_INPUT` | campo sconosciuto, `verify` mancante o vuoto, `setup` non stringa/`null`, worker abilitato senza `{promptFile}`, `docsGate`/`externalWorker` non un oggetto, `docsGate.enabled` non booleano, `docsGate.include`/`exclude` non un array di stringhe, `docsGate.include` vuoto a gate acceso |
 | `INVALID_JSON` | payload non JSON valido |
 | `FILE_NOT_FOUND` | `--config-file` o `--project-dir` inesistente |
 | `MISSING_ARGS` | payload assente, o `--config-data` e `--config-file` insieme |

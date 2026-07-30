@@ -302,6 +302,89 @@ test("docsGate with the wrong field shapes is rejected, not silently merged", ()
   }
 });
 
+// An empty `include` is the same failure as a missing one — a gate that says it is on and can
+// never match a file — only written on purpose instead of by omission, so the merge cannot catch
+// it. It has to be refused at validation time.
+test("an enabled docsGate with an explicitly empty include is rejected", () => {
+  const dir = tempProject();
+  try {
+    const explicit = JSON.stringify({
+      verify: "npm test",
+      docsGate: { enabled: true, include: [] },
+    });
+    const rejected = assertFail(run(dir, ["--init", "--config-data", explicit]), "INVALID_INPUT");
+    assert.match(
+      rejected.error,
+      /enabled/,
+      "the message must name the way out, not just the problem"
+    );
+    assert.equal(existsSync(path.join(dir, ".harness")), false, "a rejected config must write nothing");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("an empty include is rejected even when 'enabled' is omitted, because it defaults to true", () => {
+  const dir = tempProject();
+  try {
+    // Validation runs before the defaults are merged in: reading only what the caller wrote here
+    // would see `enabled: undefined` and let the empty gate through.
+    const implicit = JSON.stringify({ verify: "npm test", docsGate: { include: [] } });
+    assertFail(run(dir, ["--init", "--config-data", implicit]), "INVALID_INPUT");
+    assert.equal(existsSync(path.join(dir, ".harness")), false, "a rejected config must write nothing");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("a disabled docsGate may have an empty include: a gate that is off matches nothing by design", () => {
+  const dir = tempProject();
+  try {
+    const off = JSON.stringify({ verify: "npm test", docsGate: { enabled: false, include: [] } });
+    const written = assertOk(run(dir, ["--init", "--config-data", off]));
+
+    assert.equal(written.config.docsGate.enabled, false);
+    assert.deepEqual(written.config.docsGate.include, [], "the explicit empty array must survive");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("an empty exclude stays legitimate: excluding nothing is a choice, not a broken gate", () => {
+  const dir = tempProject();
+  try {
+    const noExclusions = JSON.stringify({
+      verify: "npm test",
+      docsGate: { enabled: true, exclude: [] },
+    });
+    const written = assertOk(run(dir, ["--init", "--config-data", noExclusions]));
+
+    assert.deepEqual(written.config.docsGate.exclude, []);
+    assert.ok(
+      written.config.docsGate.include.includes("**/*.mjs"),
+      "include still gets the defaults, so the gate can still match"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+// --force is the other way into initConfig, and it validates the payload before it decides
+// whether it is allowed to overwrite: an empty gate cannot be forced in over a good one.
+test("--force cannot smuggle an empty enabled docsGate past validation", () => {
+  const dir = tempProject();
+  try {
+    assertOk(run(dir, ["--init", "--config-data", MINIMAL]));
+    const bad = JSON.stringify({ verify: "npm test", docsGate: { enabled: true, include: [] } });
+    assertFail(run(dir, ["--init", "--config-data", bad, "--force"]), "INVALID_INPUT");
+
+    const onDisk = JSON.parse(readFileSync(path.join(dir, ".harness", "config.json"), "utf8"));
+    assert.ok(onDisk.docsGate.include.length > 0, "the previous, working gate must survive");
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("an enabled external worker must carry the {promptFile} placeholder", () => {
   const dir = tempProject();
   try {
