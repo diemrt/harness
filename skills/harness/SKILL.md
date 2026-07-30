@@ -42,13 +42,60 @@ migliora la risposta.
 **Una sola issue `in_progress` per catena di dipendenza.** Issue scorrelate (catene distinte)
 possono procedere in parallelo. Dentro una stessa catena si va in ordine, una alla volta.
 
-**Avvia un subagent per issue.** Può essere un subagent interno o un worker esterno (vedi
-[references/external-worker.md](references/external-worker.md)); harness non prescrive come
-si istanzia.
-
 **Overlap verifica → next:** puoi iniziare la issue successiva mentre la verifica della
 precedente è ancora in corso, purché le catene lo consentano. Evita attese inutili su lavori
-brevi.
+brevi. Se il lavoro successivo modifica gli **script del plugin**, però, aspetta: un
+verificatore che chiude una issue mentre `issue-manager.mjs` è a metà di una modifica fallisce
+per un errore che non è suo.
+
+## Dispatch: subagent o inline
+
+Un subagent per issue **non è un obbligo**. Su lavoro piccolo l'unico beneficio reale è tenere
+pulito il contesto dell'orchestratore, e non sempre ripaga il costo di istanziare un agente e
+di rispiegargli i vincoli.
+
+La modalità sta in `.harness/config.json`, campo `execution.mode`
+([references/config.md](references/config.md)): `auto` (default), `inline`, `subagent`. Sotto
+`auto` decidi issue per issue:
+
+- **subagent** — superficie ampia o output rumoroso (inquinerebbe il contesto), giudizio
+  architetturale, oppure catene indipendenti da far avanzare in parallelo. Può essere un
+  subagent interno o un worker esterno
+  ([references/external-worker.md](references/external-worker.md)): harness non prescrive come
+  si istanzia.
+- **inline** — catena unica, superficie piccola, contesto dell'orchestratore ancora sano,
+  lavoro meccanico o implementazione ordinaria.
+
+In dubbio, guarda quanto output ti tornerebbe addosso: è quello il costo che il subagent ti
+risparmia. Skill esterne di orchestrazione possono aiutare a spezzare il lavoro, ma i criteri
+di scelta restano questi: harness non dipende da nessuna skill di terze parti.
+
+### Lavorando inline, il ruolo va dichiarato
+
+Il guard tecnico contro la self-validation vive nell'**environment del processo**:
+`issue-manager.mjs` rifiuta `status=done` e `validation.state=pass` solo se chi lo invoca ha
+`HARNESS_ROLE=worker`. Un subagent ce l'ha; l'orchestratore che lavora inline no, e potrebbe
+chiudere la issue che ha appena svolto.
+
+Quindi, lavorando inline, **ogni mutazione del tracker si lancia col ruolo esplicito**:
+
+```powershell
+$env:HARNESS_ROLE='worker'; node "$SCRIPTS/issue-manager.mjs" --update --issue-id <id> --issue-data-file <file>
+```
+
+```bash
+HARNESS_ROLE=worker node "$SCRIPTS/issue-manager.mjs" --update --issue-id <id> --issue-data-file <file>
+```
+
+Su PowerShell la forma `VAR=x comando` non esiste: la variabile va assegnata nella stessa
+chiamata, altrimenti il guard non c'è e non te ne accorgi.
+
+### Il dispatch non tocca la verifica
+
+`execution.mode` riguarda **solo** come si svolge il lavoro. La chiusura spetta sempre
+all'agent `harness-verifier`, che è un agente distinto, e le verifiche di issue diverse
+restano parallele fra loro. Anche con `mode: "inline"`: `inline` non si legge mai come
+"verifica inline".
 
 ### Invarianti, non negoziabili
 

@@ -82,3 +82,10 @@ husky/lefthook e la configurazione di colleghi che harness non lo usano nemmeno.
 Resta un guard tecnico, quello che conta di più: `issue-manager.mjs` rifiuta con
 `FORBIDDEN_ROLE` qualunque tentativo di impostare `status=done` o `validation.state=pass` da
 un processo con `HARNESS_ROLE=worker`. Il resto è disciplina applicata dall'orchestratore.
+
+Quel guard vive nell'**environment del processo**, quindi lo si ha solo se qualcuno lo mette:
+un subagent sì, l'orchestratore che lavora inline no. Lavorando inline (`execution.mode`, vedi
+[config.md](config.md)) ogni mutazione del tracker va lanciata col ruolo esplicito —
+`$env:HARNESS_ROLE='worker'; node ...` su PowerShell, `HARNESS_ROLE=worker node ...` in bash —
+altrimenti il divieto di auto-chiusura resta scritto solo nelle regole. Dettagli in
+[SKILL.md](../SKILL.md), sezione sul dispatch.
