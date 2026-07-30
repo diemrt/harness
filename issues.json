@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T19:24:06Z",
+  "last_updated": "2026-07-30T19:42:59Z",
   "rules": {
     "single_active_issue": false
   },
@@ -988,7 +988,7 @@
       "id": "1d944e82-eb9e-4257-ab06-918df471320f",
       "title": "board-server: split di board.html in css/js e route statiche",
       "description": "Spezza scripts/board.html in tre file e li serve da route dichiarate. Spec: docs/superpowers/specs/2026-07-30-board-workflow-design.md, sezione 4.\n\nSplit meccanico, nessun restyle e nessuna feature nuova: lo <style> inline diventa scripts/board.css, lo <script> inline diventa scripts/board.js caricato come modulo. Il restyle e' un'altra issue e questa non deve anticiparlo.\n\nIn scripts/board-server.mjs una tabella statica di route (/board.css -> text/css, /board.js -> text/javascript), letta in memoria all'avvio come gia' accade per la pagina. Nessun path costruito a partire dall'URL: le route restano dichiarate una per una e tutto il resto continua a rispondere 404.\n\nboard.js esporta le funzioni pure (renderCriteria, renderTierBadge e simili) e chiama init() solo quando esiste document, cosi' i test lo importano davvero invece di ritagliarlo dall'HTML contando le graffe. extractFunctions in test/plugin-board.test.mjs sparisce, e il marker test cerca i marker nell'artefatto che ora li contiene.\n\nCatena: apre la catena del board, sblocca il restyle.",
-      "status": "backlog",
+      "status": "in_review",
       "tier": "standard",
       "depends_on": [],
       "validation": {
@@ -1004,7 +1004,7 @@
         ]
       },
       "created_at": "2026-07-30T15:38:42Z",
-      "updated_at": "2026-07-30T15:58:22Z"
+      "updated_at": "2026-07-30T19:40:27Z"
     },
     {
       "id": "10067a5b-c270-45ac-a51d-0c9ec2f09b32",
@@ -1181,22 +1181,22 @@
       "id": "8010ce76-46c9-4234-a752-3d3d5be6023a",
       "title": "commands/board.md non documenta INVALID_ARGUMENT",
       "description": "Gate documentale del commit bd741a9, che ha introdotto INVALID_ARGUMENT in scripts/board-server.mjs distinguendolo da UNKNOWN_ARGUMENT.\n\nLa reference (skills/harness/references/board.md) e' stata aggiornata nello stesso commit, commands/board.md no. Il paragrafo dopo l'avvio elenca i code da riportare e dice cosa fare per ciascuno: oggi conosce PORT_IN_USE, FILE_NOT_FOUND e UNKNOWN_ARGUMENT, e presenta quest'ultimo come \"il flag passato non esiste\". Da bd741a9 quella frase e' incompleta: un flag dichiarato ma usato male, tipo --port senza valore, esce con INVALID_ARGUMENT, e un agente che riceve quel code non trova nessuna istruzione.\n\nVa aggiunto il caso allo stesso elenco: INVALID_ARGUMENT significa che il flag esiste ma e' stato usato male, quindi si corregge l'invocazione invece di concludere che il flag sia inventato.\n\nCatena: dipende dalla issue che ha appena riscritto quel paragrafo, altrimenti le due modifiche si sovrappongono sulle stesse righe.\n\nSolo documentazione del comando: nessuno script, nessun test.",
-      "status": "backlog",
+      "status": "done",
       "tier": "economy",
       "depends_on": [
         "ad5004dc-83f7-49d0-81af-51dd8d73d5f3"
       ],
       "validation": {
-        "state": "unknown",
         "criteria": [
-          "commands/board.md elenca INVALID_ARGUMENT accanto a PORT_IN_USE, FILE_NOT_FOUND e UNKNOWN_ARGUMENT, con l'azione da intraprendere",
-          "il testo distingue il flag inesistente (UNKNOWN_ARGUMENT) dal flag dichiarato ma usato male (INVALID_ARGUMENT)",
-          "nessuna modifica a scripts/ o test/",
-          "npm run test passa"
-        ]
+          "commands/board.md, riga 37: INVALID_ARGUMENT elencato nello stesso paragrafo di PORT_IN_USE/FILE_NOT_FOUND/UNKNOWN_ARGUMENT con azione 'correggi l'invocazione' - verificato con git diff -- commands/board.md",
+          "testo distingue esplicitamente 'il flag esiste ma e' stato usato male' (INVALID_ARGUMENT) da 'il flag passato non esiste' (UNKNOWN_ARGUMENT); terminologia identica a skills/harness/references/board.md righe 43-44",
+          "git status --short: unico file con la firma di questo worker e' commands/board.md (issues.json aggiornato dal tracker); scripts/board-server.mjs, scripts/board.html, scripts/board.css, scripts/board.js, test/plugin-board.test.mjs appartengono al lavoro concorrente della issue 1d944e82, non a questa issue",
+          "npm run test: 197 pass, 0 fail (gate .harness/config.json verify='npm run test')"
+        ],
+        "state": "pass"
       },
       "created_at": "2026-07-30T19:17:42Z",
-      "updated_at": "2026-07-30T19:17:42Z"
+      "updated_at": "2026-07-30T19:42:59Z"
     }
   ]
 }

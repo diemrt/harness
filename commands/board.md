@@ -34,7 +34,7 @@ ristampa l'URL che avevi e fermati.
 
 Se `ok` è `false`, riporta `error` e `code` senza ritentare alla cieca: `PORT_IN_USE` → la
 porta richiesta è occupata, riprova senza `--port`; `FILE_NOT_FOUND` → il `--project-dir`
-passato non esiste; `UNKNOWN_ARGUMENT` → il flag passato non esiste, lo script non ha sottocomandi, fermalo col `pid` della riga di avvio.
+passato non esiste; `INVALID_ARGUMENT` → il flag esiste ma è stato usato male (es. `--port` senza valore), correggi l'invocazione; `UNKNOWN_ARGUMENT` → il flag passato non esiste, lo script non ha sottocomandi, fermalo col `pid` della riga di avvio.
 
 ## Stop (`stop`)
 
