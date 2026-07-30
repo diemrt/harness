@@ -45,6 +45,26 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id> 
 Il campo `criteria` alla chiusura va riscritto con l'**evidenza**: quali comandi sono stati
 eseguiti e con quale esito. "Verificato, tutto ok" non è evidenza; l'output di un comando lo è.
 
+## Issue senza criteri: verifica leggera
+
+Una issue della whitelist di verifica leggera (SKILL.md) nasce con `validation: null`. Non è una
+issue esente da verifica: è una issue il cui contratto non sta nei criteri ma nella **classe di
+lavoro dichiarata** nella description, dalla riga `Verifica leggera: <motivo>`.
+
+Il gate diventa:
+
+1. il comando `verify` di `.harness/config.json`, come sempre;
+2. il **confronto del diff con la classe dichiarata**. Un "typo in un commento" che tocca codice
+   eseguibile è un `fail`, non una nota: se il lavoro è uscito dalla classe, la classe era
+   sbagliata e i criteri servivano.
+
+La chiusura porta `validation` da `null` a oggetto popolato — `state` più l'evidenza — esattamente
+come su una issue con criteri. Una issue che resta a `validation: null` dopo la chiusura non è
+stata verificata, è stata archiviata.
+
+Nessuno dei tre invarianti cambia: verifica indipendente su ogni issue, commit solo dopo il
+`pass`, nessun `pass` auto-assegnato.
+
 ## Cosa rende una verifica reale
 
 - comandi **eseguiti**, non descritti;

@@ -77,6 +77,34 @@ In dubbio fra due tier, **sali**: un fail in verifica costa più della differenz
 Il verificatore usa un tier **>=** a quello del worker, mai inferiore. Policy di efficienza,
 non invariante.
 
+## Verifica leggera: issue che nascono senza criteri
+
+Su una issue banale i criteri di accettazione sono rumore: inventarne tre per rispettare una
+regola non aggiunge nessun controllo. Per questi casi `validation` può essere `null` alla
+creazione — lo schema lo ammette già ([references/issues.md](references/issues.md)).
+
+La lista è **chiusa**, e si allarga modificando questa skill, non a discrezione di chi apre la
+issue:
+
+- typo o riformulazione in documentazione o commenti, senza toccare codice eseguibile;
+- rename meccanico senza cambio di comportamento;
+- bump di versione o di dipendenza senza cambio d'API;
+- spostamento di file a contenuto identico.
+
+Fuori da questi quattro casi i `validation.criteria` sono **obbligatori**.
+
+Decide **chi crea la issue**, e lo motiva con una riga nella description: `Verifica leggera:
+<motivo>`. Senza quella riga la issue si tratta come una normale, con criteri richiesti.
+
+**Al worker è vietato declassare a posteriori** una issue che ha già dei criteri: cancellare i
+criteri che rendono il proprio lavoro giudicabile è self-validation travestita da
+semplificazione.
+
+La verifica **non** si salta. Con `criteria` null il gate resta il comando `verify` più il
+controllo del diff contro la classe dichiarata, e la chiusura scrive comunque `validation` come
+oggetto, con `state` e l'evidenza: vedi
+[references/verification.md](references/verification.md).
+
 ## Verifica indipendente
 
 A fine lavoro il worker porta la issue a `status = in_review` con
