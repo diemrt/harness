@@ -385,6 +385,83 @@ test("--force cannot smuggle an empty enabled docsGate past validation", () => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// execution: how the work of an issue is dispatched
+// ---------------------------------------------------------------------------
+
+test("an omitted execution block is written with its default mode", () => {
+  const dir = tempProject();
+  try {
+    const written = assertOk(run(dir, ["--init", "--config-data", MINIMAL]));
+    assert.deepEqual(written.config.execution, { mode: "auto" });
+    assert.deepEqual(assertOk(run(dir, ["--get"])).config.execution, { mode: "auto" });
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("every execution mode is accepted and read back", () => {
+  for (const mode of ["auto", "inline", "subagent"]) {
+    const dir = tempProject();
+    try {
+      const payload = JSON.stringify({ verify: "npm test", execution: { mode } });
+      assertOk(run(dir, ["--init", "--config-data", payload]));
+      assert.equal(assertOk(run(dir, ["--get"])).config.execution.mode, mode);
+    } finally {
+      cleanup(dir);
+    }
+  }
+});
+
+test("an out-of-enum execution mode is rejected, not written", () => {
+  const dir = tempProject();
+  try {
+    const payload = JSON.stringify({ verify: "npm test", execution: { mode: "parallel" } });
+    assertFail(run(dir, ["--init", "--config-data", payload]), "INVALID_INPUT");
+    assert.equal(existsSync(path.join(dir, ".harness")), false, "a rejected config must write nothing");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("an unknown field inside execution is rejected rather than written and ignored", () => {
+  // A key nobody reads looks, in config.json, exactly like one that works.
+  const dir = tempProject();
+  try {
+    const payload = JSON.stringify({
+      verify: "npm test",
+      execution: { mode: "inline", verification: "inline" },
+    });
+    assertFail(run(dir, ["--init", "--config-data", payload]), "INVALID_INPUT");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("execution must be an object, not a bare mode string", () => {
+  const dir = tempProject();
+  try {
+    const payload = JSON.stringify({ verify: "npm test", execution: "inline" });
+    assertFail(run(dir, ["--init", "--config-data", payload]), "INVALID_INPUT");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--detect proposes no execution block: there is nothing in a project that implies one", () => {
+  const dir = tempProject({ "package.json": JSON.stringify({ scripts: { test: "node --test" } }) });
+  try {
+    const data = assertOk(run(dir, ["--detect"]));
+    assert.equal(
+      JSON.stringify(data).includes("execution"),
+      false,
+      "--detect must not guess a dispatch mode"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("an enabled external worker must carry the {promptFile} placeholder", () => {
   const dir = tempProject();
   try {

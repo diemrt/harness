@@ -3,7 +3,8 @@
 //
 // Harness puts no configuration file in the shared repository. What a session needs — the setup
 // command, the verification command that acts as the gate, the external worker, the docs gate
-// globs — lives in `.harness/` at the root of the project, a directory that ignores itself:
+// globs, the dispatch mode — lives in `.harness/` at the root of the project, a directory that
+// ignores itself:
 // alongside config.json the script writes a `.gitignore` containing `*`, so git never sees the
 // directory and the project's own .gitignore is never touched.
 //
@@ -65,6 +66,14 @@ const DEFAULT_DOCS_GATE = {
   ],
   exclude: ["docs/**", "test/**", "tests/**", "**/*.md", "issues.json"],
 };
+
+// How the orchestrator dispatches the work of an issue. Spawning a subagent per issue is not always
+// worth it: on small, well-bounded work its only real benefit is keeping the orchestrator's context
+// clean, and that does not always pay for the cost. `auto` leaves the choice to the heuristic in the
+// skill; `inline` and `subagent` pin it for projects that want it decided once.
+// This never applies to verification: that stays a separate agent, whatever the mode says.
+const EXECUTION_MODES = ["auto", "inline", "subagent"];
+const DEFAULT_EXECUTION = { mode: "auto" };
 
 class ConfigError extends Error {
   constructor(message, code = "ERROR") {
@@ -218,7 +227,7 @@ function validateConfigInput(config) {
   if (config === null || typeof config !== "object" || Array.isArray(config)) {
     fail("Configuration must be a JSON object.", "INVALID_INPUT");
   }
-  const allowed = ["setup", "verify", "externalWorker", "docsGate"];
+  const allowed = ["setup", "verify", "externalWorker", "docsGate", "execution"];
   const unknown = Object.keys(config).filter((k) => !allowed.includes(k));
   if (unknown.length > 0) {
     fail(
@@ -233,6 +242,28 @@ function validateConfigInput(config) {
   }
   if (config.setup !== undefined && config.setup !== null && typeof config.setup !== "string") {
     fail("'setup' must be a command string or null.", "INVALID_INPUT");
+  }
+  // `execution` is merged field-by-field like the blocks below, so an unknown key inside it would be
+  // written and then ignored downstream: a mode nobody reads looks, in config.json, exactly like one
+  // that works. Rejecting it here is the only place that stays true as the block grows.
+  if (config.execution !== undefined && config.execution !== null) {
+    const execution = config.execution;
+    if (typeof execution !== "object" || Array.isArray(execution)) {
+      fail("'execution' must be an object or null.", "INVALID_INPUT");
+    }
+    const unknownExecution = Object.keys(execution).filter((k) => k !== "mode");
+    if (unknownExecution.length > 0) {
+      fail(
+        `Unknown field(s) in 'execution': ${unknownExecution.join(", ")}. Allowed: mode.`,
+        "INVALID_INPUT"
+      );
+    }
+    if (execution.mode !== undefined && !EXECUTION_MODES.includes(execution.mode)) {
+      fail(
+        `'execution.mode' must be one of: ${EXECUTION_MODES.join(", ")}.`,
+        "INVALID_INPUT"
+      );
+    }
   }
   if (config.externalWorker !== undefined && config.externalWorker !== null) {
     const worker = config.externalWorker;
@@ -322,6 +353,7 @@ function initConfig(dir, config, force) {
     verify: config.verify,
     externalWorker: { enabled: false, command: null, ...(config.externalWorker ?? {}) },
     docsGate: { ...DEFAULT_DOCS_GATE, ...(config.docsGate ?? {}) },
+    execution: { ...DEFAULT_EXECUTION, ...(config.execution ?? {}) },
   };
   writeFileSync(configPath, JSON.stringify(stored, null, 2) + "\n", "utf8");
 
@@ -353,7 +385,9 @@ function showHelp() {
     "         show the proposal to the user and let them confirm before calling --init.",
     "",
     "Fields: setup (string|null), verify (string, required — the verification gate),",
-    "        externalWorker ({enabled, command with {promptFile}}), docsGate ({enabled, include, exclude}).",
+    "        externalWorker ({enabled, command with {promptFile}}), docsGate ({enabled, include, exclude}),",
+    `        execution ({mode: ${EXECUTION_MODES.join("|")}}, default ${DEFAULT_EXECUTION.mode} — how the work of an`,
+    "        issue is dispatched; it never applies to verification, which stays a separate agent).",
     "",
     "Output contract (stdout is always one line of JSON, except for this help text):",
     '  success : {"ok":true,"data":<payload>}                       exit code 0',

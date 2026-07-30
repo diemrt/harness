@@ -39,7 +39,8 @@ progetti diversi senza confonderli.
     "enabled": true,
     "include": ["**/*.mjs", "**/*.ts", "**/*.py", "**/*.go", "**/*.cs"],
     "exclude": ["docs/**", "test/**", "tests/**", "**/*.md", "issues.json"]
-  }
+  },
+  "execution": { "mode": "auto" }
 }
 ```
 
@@ -51,6 +52,10 @@ progetti diversi senza confonderli.
 - **`externalWorker`** — vedi [external-worker.md](external-worker.md).
 - **`docsGate`** — glob che stabiliscono quali file contano come "codice" per il gate
   documentale dopo il commit.
+- **`execution.mode`** — come viene dispatchato il lavoro di una issue: `auto` (default,
+  decide l'euristica della skill), `inline` (lo svolge l'orchestratore), `subagent` (sempre un
+  subagent). **Non riguarda la verifica**, che resta un agente distinto qualunque sia il mode:
+  `inline` non si legge mai come "verifica inline".
 
 L'esempio sopra è **abbreviato**. Quello che `--init` scrive davvero per i campi che ometti:
 
@@ -61,13 +66,19 @@ L'esempio sopra è **abbreviato**. Quello che `--init` scrive davvero per i camp
 | `docsGate.include` | `**/*.mjs`, `**/*.js`, `**/*.cjs`, `**/*.ts`, `**/*.tsx`, `**/*.jsx`, `**/*.py`, `**/*.go`, `**/*.cs`, `**/*.java`, `**/*.rb`, `**/*.rs`, `**/*.php` |
 | `docsGate.exclude` | `docs/**`, `test/**`, `tests/**`, `**/*.md`, `issues.json` |
 | `docsGate.enabled` | `true` |
+| `execution` | `{ "mode": "auto" }` |
 
 Tredici linguaggi nell'`include` di default, non i cinque dell'esempio: se restringi i glob
 copiando l'esempio, stai anche decidendo che gli altri otto non contano come codice per il
 gate documentale. `verify` non ha default: è obbligatorio.
 
+`--detect` non propone `execution`: nel progetto non c'è niente da ispezionare che suggerisca
+come dispatchare il lavoro, e un mode indovinato sarebbe una decisione presa senza dati. Il
+default `auto` lascia la scelta all'euristica della skill, issue per issue.
+
 Il merge è **per campo**, non per oggetto: la tabella sopra vale non solo quando ometti
-`docsGate` o `externalWorker` del tutto, ma anche quando ne ometti solo alcuni campi. Passare
+`docsGate`, `externalWorker` o `execution` del tutto, ma anche quando ne ometti solo alcuni
+campi. Passare
 `{"docsGate":{"enabled":true}}` scrive `enabled: true` **insieme** a `include`/`exclude`
 riempiti coi default sopra, mai un `docsGate` con `enabled: true` e `include` assente — quel
 caso produrrebbe un gate che sembra attivo e non segnala mai niente, perché niente
@@ -122,7 +133,7 @@ niente**.
 |---|---|
 | `CONFIG_NOT_FOUND` | `.harness/config.json` non esiste |
 | `CONFIG_EXISTS` | configurazione già presente e nessun `--force` |
-| `INVALID_INPUT` | campo sconosciuto, `verify` mancante o vuoto, `setup` non stringa/`null`, worker abilitato senza `{promptFile}`, `docsGate`/`externalWorker` non un oggetto, `docsGate.enabled` non booleano, `docsGate.include`/`exclude` non un array di stringhe, `docsGate.include` vuoto a gate acceso |
+| `INVALID_INPUT` | campo sconosciuto, `verify` mancante o vuoto, `setup` non stringa/`null`, worker abilitato senza `{promptFile}`, `docsGate`/`externalWorker`/`execution` non un oggetto, `docsGate.enabled` non booleano, `docsGate.include`/`exclude` non un array di stringhe, `docsGate.include` vuoto a gate acceso, `execution.mode` fuori enum, campo sconosciuto dentro `execution` |
 | `INVALID_JSON` | payload non JSON valido |
 | `FILE_NOT_FOUND` | `--config-file` o `--project-dir` inesistente |
 | `MISSING_ARGS` | payload assente, o `--config-data` e `--config-file` insieme |
