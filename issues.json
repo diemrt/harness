@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-29T15:29:50Z",
+  "last_updated": "2026-07-30T08:53:03Z",
   "rules": {
     "single_active_issue": false
   },
@@ -550,13 +550,13 @@
       "id": "c79b8bc8-449e-4ca2-8742-266857a8101a",
       "title": "Portare il runner del worker esterno nel plugin",
       "description": "Emersa lavorando la issue delle references: `init.mjs` non e' solo un task runner, implementa anche `worker on|off|check|run`. Eliminando `init.mjs` quella logica va ricreata come script del plugin, altrimenti la delega a worker esterno resta senza implementazione.\n\nDa portare in `scripts/`:\n- risoluzione del command template con il placeholder obbligatorio `{promptFile}`, letto da `externalWorker` in `.harness/config.json`;\n- spawn del processo figlio con `HARNESS_ROLE=worker` nell'environment (guard tecnico contro la self-validation lato issue-manager);\n- log del run in `.harness/runs/<issueId>-<timestamp>.log` con in testa la riga di comando risolta, e propagazione dell'exit code;\n- preflight CLI-agnostico equivalente a `worker check` (prompt di smoke test su file, verifica exit 0 / output atteso).\n\nNota: il guard `pre-commit` che bloccava i commit del worker non esiste piu' nel modello plugin. Il divieto di commit per il worker resta scritto nel prompt del worker e nelle regole della skill.\n\nIl prompt del worker deve continuare a essere passato SEMPRE su file, mai inline, e su Windows con path assoluto completo (i path 8.3 tipo DIEGO_~1 non funzionano).",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "Uno script del plugin lancia un worker esterno leggendo il comando da .harness/config.json, con HARNESS_ROLE=worker impostato nel processo figlio (verificabile perche' un update a status=done dal worker fallisce con FORBIDDEN_ROLE), scrive il log del run sotto .harness/runs/ con la riga di comando risolta in testa, propaga l'exit code del figlio, e offre un preflight che valida il comando configurato senza dipendere dalla CLI specifica.",
-        "state": "unknown"
+        "criteria": "VERIFICATO (verifier indipendente, nessun file modificato).\n\nGATE: npm run test (da .harness/config.json) -> tests 203, pass 203, fail 0, duration 6526ms. Include i 20 test nuovi di test/plugin-worker.test.mjs.\n\n1) Script del plugin che legge il comando da .harness/config.json: scripts/harness-worker.mjs:115-156 (readExternalWorkerCommand) legge externalWorker.enabled/command e richiede il placeholder {promptFile}. Prova manuale: --check su config con enabled:false -> WORKER_DISABLED; command senza placeholder -> INVALID_COMMAND; config assente -> CONFIG_NOT_FOUND; config malformata -> INVALID_JSON (riprodotto realmente su un progetto temporaneo).\n\n2) HARNESS_ROLE=worker nel processo figlio + FORBIDDEN_ROLE: run manuale end-to-end con CLI stand-in che stampa la propria env e tenta di chiudersi la issue. Output del figlio: \"ROLE_SEEN=worker\" e SELFCLOSE_OUT={\"ok\":false,\"error\":\"Role 'worker' cannot set status to 'done' (self-validation is forbidden)...\",\"code\":\"FORBIDDEN_ROLE\"}, SELFCLOSE_EXIT=1. Rilettura della issue dopo il run: status ancora \"in_progress\" (il guard ha tenuto davvero, non solo riportato un rifiuto). Codice: harness-worker.mjs:248 (env HARNESS_ROLE) + issue-manager.mjs:235-252 (guard).\n\n3) Log sotto .harness/runs/ con la riga di comando risolta in testa: file creato .harness/runs/f6431089-1ca1-45d5-a2c0-aebf6a4d7aeb-1785401343969.log, prima riga \"Command: \"C:Program Files\nodejs\node.exe\" ... <promptFile risolto> ...\", poi output combinato stdout+stderr del figlio, poi \"Exit code: 42\". Il command line viene scritto PRIMA dello spawn (harness-worker.mjs:242), quindi resta anche se il figlio non parte.\n\n4) Propagazione exit code: la CLI stand-in esce con 42; il runner esce con 42 (RUNNER_EXIT=42) e l envelope resta {\"ok\":true,...,\"exitCode\":42}. Confermato anche dal test con exit 7 e da quello con exit 2.\n\n5) Preflight CLI-agnostico: --check provato contro TRE comandi stand-in diversi, nessun adapter per-CLI. (a) exit 0 senza mai stampare READY -> ok:true; (b) exit 5 ma stampa READY -> ok:true; (c) exit 9 senza READY -> ok:false code CHECK_FAILED con l output diagnostico nel messaggio. Prompt di smoke test passato su file temporaneo e rimosso a fine check; dopo i --check la cartella di progetto e identica a prima (nessun residuo).\n\nExtra verificato: il prompt e sempre passato su file (mai inline) e il path viene espanso a forma lunga con realpathSync.native (nel run manuale il figlio ha ricevuto C:Usersdiego_martignoni... e non la forma 8.3 DIEGO_~1).\n\nDanni collaterali: nessuno. git status --short mostra solo issues.json, i 3 reference .md e i 2 file nuovi attesi; .harness/runs/ e gitignored (.harness/.gitignore = *). node src/cli.mjs update . --dry-run --json -> {\"ok\":true,...,\"updated\":[],\"conflicts\":[]}. Nessun segreto nel diff.\n\nFuori scope (non bloccante): skills/harness/references/board.md e config.md risultano modificati nel working tree ma appartengono ad altre issue docs, non a questa.",
+        "state": "pass"
       },
       "created_at": "2026-07-29T13:42:16Z",
-      "updated_at": "2026-07-29T13:42:16Z"
+      "updated_at": "2026-07-30T08:50:43Z"
     },
     {
       "id": "6e090e8d-98c4-42c0-84a9-b501a8bb2c93",
@@ -634,25 +634,25 @@
       "id": "fa9e838f-890d-43bd-82b6-18b1da88ccca",
       "title": "docs: verifica documentazione per commit 420ecf6",
       "description": "Contesto commit 420ecf6: fix: show the project name on the board, not the folder name\n\nValuta se servono aggiornamenti a docs/, AGENTS.md o README.md e descrivi cosa cambiare per ciascun file.\nSe non serve aggiornare nulla, chiudi la issue motivando la decisione.\n\nFile di codice modificati:\n- scripts/board-server.mjs",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "Verificare la documentazione per il commit 420ecf6 (fix: show the project name on the board, not the folder name). Controllare che tutti i file siano stati aggiornati, che sia stato usato meno testo possibile, che non siano state introdotte delle ripetizioni in documenti diversi",
-        "state": "unknown"
+        "criteria": "PASS. Gate `npm run test` (da .harness/config.json): 203 pass / 0 fail, duration_ms 6756. (1) Tutti i file rilevanti aggiornati: il commit 420ecf6 tocca scripts/board-server.mjs (readIssues propaga `project` sui 3 rami) e scripts/board.html; l'unico documento che descrive il board e' skills/harness/references/board.md, aggiornato con la nuova sezione '## Payload di api/issues' (righe 70-81). Grep case-insensitive di 'board' su README.md, AGENTS.md, CONTRIBUTING.md e docs/*.md: zero match, quindi nessun altro file andava toccato; grep 'scripts/|plugin' su README.md e docs/ARCHITECTURE.md: zero match. (2) Meno testo possibile: `git diff --stat` su board.md = 13 righe aggiunte, 0 rimosse; nessuna riscrittura del testo esistente. (3) Nessuna ripetizione fra documenti: grep 'api/issues|projectDir|projectNameFrom|board-server|lastUpdated' su **/*.md restituisce match solo in board.md; il campo `project` di issues.json non e' documentato in issues.md ne' altrove, quindi nessun duplicato. Accuratezza verificata contro il codice: board-server.mjs:53,64,69 (project null sui rami file-assente/letto/illeggibile, `error` solo sul ramo illeggibile) e board.html projectNameFrom(project, projectDir) corrispondono a quanto scritto; il seed scritto dal plugin e' `{last_updated, issues}` (issue-manager.mjs:278), senza campo `project`, come afferma il doc. Danni collaterali: `git diff --stat` mostra solo issues.json, board.md, config.md, external-worker.md; config.md/external-worker.md e i file untracked (scripts/harness-worker.mjs, test/plugin-worker.test.mjs) appartengono ad altro lavoro e non contengono riferimenti al board. Nessun segreto nel diff.",
+        "state": "pass"
       },
       "created_at": "2026-07-29T15:29:29Z",
-      "updated_at": "2026-07-29T15:29:29Z"
+      "updated_at": "2026-07-30T08:50:34Z"
     },
     {
       "id": "3532ee92-7342-42de-8270-fbb3c462d64c",
       "title": "docs: verifica documentazione per commit d74de8f",
       "description": "Contesto commit d74de8f: fix: merge configuration defaults per field, not per object\n\nValuta se servono aggiornamenti a docs/, AGENTS.md o README.md e descrivi cosa cambiare per ciascun file.\nSe non serve aggiornare nulla, chiudi la issue motivando la decisione.\n\nFile di codice modificati:\n- scripts/harness-config.mjs",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "Verificare la documentazione per il commit d74de8f (fix: merge configuration defaults per field, not per object). Controllare che tutti i file siano stati aggiornati, che sia stato usato meno testo possibile, che non siano state introdotte delle ripetizioni in documenti diversi",
-        "state": "unknown"
+        "criteria": "PASS. Gate `npm run test` (da .harness/config.json): tests 203, pass 203, fail 0, duration 6442ms. `npm run dev:check`: updated=[] conflicts=[] added=[] (radice e template/ in sincronia; skills/ e scripts/ non fanno parte del set gestito). (1) Tutti i file aggiornati: l'unico documento che descrive la semantica di `.harness/config.json` e' skills/harness/references/config.md; il merge per-campo e i type-check erano gia' documentati dal commit stesso (config.md L69-79 merge per campo con l'esempio {\"docsGate\":{\"enabled\":true}}, L81-84 tipizzazione, L121 riga INVALID_INPUT), la modifica non committata aggiunge a L121 la sola clausola `setup` non stringa/`null`. Riga L121 confrontata 1:1 con validateConfigInput in scripts/harness-config.mjs: campo sconosciuto L221-228, verify L231, setup L234, worker senza {promptFile} L242, docsGate/externalWorker non oggetto L239+L256, docsGate.enabled non booleano L259, include/exclude non array di stringhe L267 - tutte presenti. Nessun altro documento richiedeva aggiornamento: `grep -rn 'docsGate|externalWorker|.harness/config' --include=*.md` su README.md, AGENTS.md, docs/, template/docs/, agents/, skills/ restituisce solo riferimenti a `init.config.json` (docs/AGENTS-RULES.md L36/L111, docs/EXTERNAL-WORKER.md L5-145) o menzioni strutturali di match.mjs (README.md L130, docs/ARCHITECTURE.md L67), tutte estranee a scripts/harness-config.mjs. (2) Meno testo possibile: `git diff skills/harness/references/config.md` = 1 riga modificata, 1 aggiunta, 1 rimossa, nessun paragrafo nuovo. (3) Nessuna ripetizione fra documenti: la descrizione di default, merge per campo, tipizzazione e codici di errore compare solo in config.md (unica copia del file: `find . -name config.md` -> ./skills/harness/references/config.md; template/ non contiene skills/). Osservazioni fuori scope, non bloccanti: (a) la tabella INVALID_INPUT non elenca ancora la condizione di harness-config.mjs L218-219 (payload JSON valido ma non oggetto, es. array) - lacuna preesistente e non introdotta da d74de8f; (b) la clausola `setup` aggiunta documenta una validazione introdotta in b311c38, non in d74de8f: accurata e minimale, ma formalmente oltre il perimetro del commit. Danni collaterali: `git status --short` mostra anche board.md, external-worker.md, scripts/harness-worker.mjs, test/plugin-worker.test.mjs e issues.json, appartenenti alle issue parallele fa9e838f e c79b8bc8 (entrambe in_review in issues.json), non a questa. Nessun segreto nel diff. Nessun file modificato dal verificatore oltre alla chiusura di questa issue.",
+        "state": "pass"
       },
       "created_at": "2026-07-29T15:29:32Z",
-      "updated_at": "2026-07-29T15:29:32Z"
+      "updated_at": "2026-07-30T08:51:30Z"
     },
     {
       "id": "654cbb05-94e5-4d0a-a0e2-a786a10c6c84",
@@ -665,6 +665,30 @@
       },
       "created_at": "2026-07-29T15:29:50Z",
       "updated_at": "2026-07-29T15:29:50Z"
+    },
+    {
+      "id": "ad0a59f7-53c8-4b8b-a3c8-a279087a5f27",
+      "title": "docs: verifica documentazione per commit 2b57c43",
+      "description": "Contesto commit 2b57c43: @ feat: bring the external worker runner into the plugin\n\nValuta se servono aggiornamenti a docs/, AGENTS.md o README.md e descrivi cosa cambiare per ciascun file.\nSe non serve aggiornare nulla, chiudi la issue motivando la decisione.\n\nFile di codice modificati:\n- scripts/harness-worker.mjs",
+      "status": "backlog",
+      "validation": {
+        "criteria": "Verificare la documentazione per il commit 2b57c43 (@ feat: bring the external worker runner into the plugin). Controllare che tutti i file siano stati aggiornati, che sia stato usato meno testo possibile, che non siano state introdotte delle ripetizioni in documenti diversi",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-30T08:52:38Z",
+      "updated_at": "2026-07-30T08:52:38Z"
+    },
+    {
+      "id": "dae2472c-16f0-48ac-9ac7-2bb5fae6aa43",
+      "title": "docs: verifica documentazione per commit ce9272f",
+      "description": "Contesto commit ce9272f: feat: bring the external worker runner into the plugin\n\nValuta se servono aggiornamenti a docs/, AGENTS.md o README.md e descrivi cosa cambiare per ciascun file.\nSe non serve aggiornare nulla, chiudi la issue motivando la decisione.\n\nFile di codice modificati:\n- scripts/harness-worker.mjs",
+      "status": "backlog",
+      "validation": {
+        "criteria": "Verificare la documentazione per il commit ce9272f (feat: bring the external worker runner into the plugin). Controllare che tutti i file siano stati aggiornati, che sia stato usato meno testo possibile, che non siano state introdotte delle ripetizioni in documenti diversi",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-30T08:53:03Z",
+      "updated_at": "2026-07-30T08:53:03Z"
     }
   ]
 }

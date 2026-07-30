@@ -118,7 +118,7 @@ niente**.
 |---|---|
 | `CONFIG_NOT_FOUND` | `.harness/config.json` non esiste |
 | `CONFIG_EXISTS` | configurazione già presente e nessun `--force` |
-| `INVALID_INPUT` | campo sconosciuto, `verify` mancante o vuoto, worker abilitato senza `{promptFile}`, `docsGate`/`externalWorker` non un oggetto, `docsGate.enabled` non booleano, `docsGate.include`/`exclude` non un array di stringhe |
+| `INVALID_INPUT` | campo sconosciuto, `verify` mancante o vuoto, `setup` non stringa/`null`, worker abilitato senza `{promptFile}`, `docsGate`/`externalWorker` non un oggetto, `docsGate.enabled` non booleano, `docsGate.include`/`exclude` non un array di stringhe |
 | `INVALID_JSON` | payload non JSON valido |
 | `FILE_NOT_FOUND` | `--config-file` o `--project-dir` inesistente |
 | `MISSING_ARGS` | payload assente, o `--config-data` e `--config-file` insieme |
