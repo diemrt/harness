@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T12:18:14Z",
+  "last_updated": "2026-07-30T12:23:26Z",
   "rules": {
     "single_active_issue": false
   },
@@ -791,13 +791,14 @@
       "id": "a14f5543-f53a-4398-9cae-7d7773a8930e",
       "title": "Board: badge del tier sulla card della issue",
       "description": "Il tier serve a chi guarda il board per decidere il dispatch: va visto senza aprire il JSON. Badge sulla card, accanto agli altri metadati, nascosto quando il campo e' null cosi' le 59 issue esistenti non mostrano un badge vuoto.\n\nIn scripts/board.html, sulla stessa card dove stanno oggi status e validazione.\n\nDipende dalla issue che introduce il campo tier nella CLI.\n\nSpec: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione C.",
-      "status": "backlog",
+      "status": "done",
+      "tier": "economy",
       "validation": {
-        "criteria": "- una issue con tier valorizzato mostra un badge con quel valore sulla card\n- una issue con tier null o assente non mostra alcun badge di tier\n- il valore del badge e' escapato come gli altri campi resi dal board\n- test/plugin-board.test.mjs copre il caso con tier e quello senza\n- npm test verde",
-        "state": "unknown"
+        "criteria": "PASS - tutti i 5 criteri verificati sugli artefatti.\n\n1) Tier valorizzato -> badge sulla card: renderTierBadge estratta da scripts/board.html (righe 305-309) e invocata, output per \"economy\": <span class=\"badge badge-sm badge-outline gap-1 shrink-0\" title=\"Costo di sviluppo atteso\"><i data-lucide=\"gauge\" class=\"w-3 h-3\"></i>economy</span>. La chiamata sta nell'header della card (board.html:356, dentro il div flex accanto al badge di status). End-to-end: board-server con issues.json temporaneo consegna il campo al client non toccato -> payload API: {\"title\":\"with tier\",...,\"tier\":\"reasoning\"}.\n\n2) Tier null/assente -> nessun badge: renderTierBadge(null)=\"\", (undefined)=\"\", (\"\")=\"\", (\"  \")=\"\", e anche i non-stringa (42, {}) danno \"\" per la guard typeof. Nel payload API l'issue senza chiave tier arriva senza il campo -> it.tier undefined -> stringa vuota.\n\n3) Escaping sul contenuto reso, stesso escapeHtml di title/description (board.html:161-169): input '\"><script>alert(1)</script>' -> ...</i>&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;</span>; input \"' onmouseover='x\" -> &#39; onmouseover=&#39;x; input \"a&b<c>\" -> a&amp;b&lt;c&gt;. Il valore siede come testo dentro uno span che porta class e title: nessun output puo' chiudere il tag ne' iniettare un attributo.\n\n4) test/plugin-board.test.mjs: nuovo test \"the tier is badged when set, and absent otherwise\" (righe 359-389) copre il caso con tier (\"reasoning\") e quelli senza (null, undefined, \"  \"), piu' l'injection. node --test test/plugin-board.test.mjs -> pass 15, fail 0, incluso il nuovo test.\n\n5) Gate dichiarato in .harness/config.json (npm run test): tests 156, pass 156, fail 0, duration_ms 6567.\n\nDanni collaterali: nessuno. git status --short mostra solo issues.json, scripts/board.html, test/plugin-board.test.mjs; nessun file untracked. git diff issues.json contiene solo la transizione di questa issue (backlog -> in_review, tier economy) e last_updated.",
+        "state": "pass"
       },
       "created_at": "2026-07-30T10:37:08Z",
-      "updated_at": "2026-07-30T10:37:08Z"
+      "updated_at": "2026-07-30T12:23:26Z"
     },
     {
       "id": "8f6ddbe0-6dbe-4f80-9177-43cd110454f9",

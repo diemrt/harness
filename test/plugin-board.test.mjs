@@ -356,6 +356,38 @@ test("every criterion is escaped, whichever shape it arrives in", async () => {
   }
 });
 
+test("the tier is badged when set, and absent otherwise", async () => {
+  const dir = tempProject(seed());
+  const { child, url } = await startServer(dir);
+  try {
+    const html = await (await fetch(url)).text();
+    const { renderTierBadge } = extractFunctions(html, ["renderTierBadge", "escapeHtml"]);
+
+    const badge = renderTierBadge("reasoning");
+    assert.match(badge, /^<span/);
+    assert.match(badge, /badge/);
+    assert.match(badge, /reasoning/);
+
+    // Most issues have no tier: no badge is the normal case, not an error to render.
+    assert.equal(renderTierBadge(null), "");
+    assert.equal(renderTierBadge(undefined), "");
+    assert.equal(renderTierBadge("  "), "");
+
+    // The value reaches an attribute-bearing element: it must not be able to close the tag.
+    const injected = renderTierBadge('"><script>alert(1)</script>');
+    assert.equal(injected.includes("<script>"), false);
+    assert.equal(
+      injected.includes('"><script'),
+      false,
+      "the value must not be able to close the tag it sits in"
+    );
+    assert.match(injected, /&quot;&gt;/, "quote and angle bracket must arrive escaped");
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("the API hands the array shape to the page untouched", async () => {
   const criteria = ["first criterion", "second criterion"];
   const dir = tempProject(
