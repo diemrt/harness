@@ -1089,3 +1089,241 @@ test("FILE_NOT_FOUND: --project-dir points at a directory that does not exist", 
     cleanup(dir);
   }
 });
+
+// ---------------------------------------------------------------------------
+// depends_on
+//
+// The seeded issues deliberately carry no depends_on key: they stand in for every issue written
+// before the field existed, and the merge has to keep working on them without a migration.
+// ---------------------------------------------------------------------------
+
+// Rewrites the seed so an issue declares dependencies, including shapes the CLI itself would
+// refuse — the point is to prove the script survives a hand-edited issues.json.
+function seedWithEdges(edges) {
+  const seed = baseSeed();
+  for (const issue of seed.issues) {
+    if (edges[issue.id]) {
+      issue.depends_on = edges[issue.id];
+    }
+  }
+  return seed;
+}
+
+function storedIssues(dir) {
+  return JSON.parse(readFileSync(path.join(dir, "issues.json"), "utf8")).issues;
+}
+
+test("--insert without depends_on stores an empty array, not a missing key", () => {
+  const { dir } = setupTempProject();
+  try {
+    const payload = JSON.stringify({ title: "T", description: "D", status: "backlog" });
+    const created = assertOk(run(dir, ["--insert", "--issue-data", payload]));
+    assert.deepEqual(created.depends_on, []);
+    const stored = storedIssues(dir).find((i) => i.id === created.id);
+    assert.ok("depends_on" in stored, "the key must be materialised on disk");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--insert stores the declared dependencies", () => {
+  const { dir } = setupTempProject();
+  try {
+    const payload = JSON.stringify({
+      title: "T",
+      description: "D",
+      status: "backlog",
+      depends_on: [ID_ONE, ID_TWO],
+    });
+    const created = assertOk(run(dir, ["--insert", "--issue-data", payload]));
+    assert.deepEqual(created.depends_on, [ID_ONE, ID_TWO]);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--update adds depends_on to an issue written before the field", () => {
+  const { dir } = setupTempProject();
+  try {
+    const updated = assertOk(
+      run(dir, ["--update", "--issue-id", ID_THREE, "--issue-data", JSON.stringify({ depends_on: [ID_ONE] })])
+    );
+    assert.deepEqual(updated.depends_on, [ID_ONE]);
+    assert.equal(updated.title, "Issue Three", "the other fields must survive the merge");
+    assert.equal(updated.status, "in_progress");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--update that omits depends_on leaves it untouched, and materialises [] on legacy issues", () => {
+  const { dir } = setupTempProject(seedWithEdges({ [ID_THREE]: [ID_ONE] }));
+  try {
+    const kept = assertOk(
+      run(dir, ["--update", "--issue-id", ID_THREE, "--issue-data", JSON.stringify({ status: "blocked" })])
+    );
+    assert.deepEqual(kept.depends_on, [ID_ONE], "an omitted field keeps its value");
+
+    const legacy = assertOk(
+      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "blocked" })])
+    );
+    assert.deepEqual(legacy.depends_on, [], "an issue with no key gets the empty array, not undefined");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--update with [] clears the dependencies", () => {
+  const { dir } = setupTempProject(seedWithEdges({ [ID_THREE]: [ID_ONE, ID_TWO] }));
+  try {
+    const cleared = assertOk(
+      run(dir, ["--update", "--issue-id", ID_THREE, "--issue-data", JSON.stringify({ depends_on: [] })])
+    );
+    assert.deepEqual(cleared.depends_on, []);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("INVALID_DEPENDENCY: depends_on is not an array", () => {
+  const { dir } = setupTempProject();
+  try {
+    for (const value of [null, ID_ONE, 3, {}]) {
+      assertFail(
+        run(dir, ["--update", "--issue-id", ID_THREE, "--issue-data", JSON.stringify({ depends_on: value })]),
+        "INVALID_DEPENDENCY"
+      );
+    }
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("INVALID_DEPENDENCY: an entry that is not a GUID, or listed twice", () => {
+  const { dir } = setupTempProject();
+  try {
+    assertFail(
+      run(dir, ["--update", "--issue-id", ID_THREE, "--issue-data", JSON.stringify({ depends_on: ["nope"] })]),
+      "INVALID_DEPENDENCY"
+    );
+    assertFail(
+      run(dir, ["--update", "--issue-id", ID_THREE, "--issue-data", JSON.stringify({ depends_on: [ID_ONE, ID_ONE] })]),
+      "INVALID_DEPENDENCY"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("INVALID_DEPENDENCY: an id that does not exist in this tracker", () => {
+  const { dir } = setupTempProject();
+  try {
+    const failed = assertFail(
+      run(dir, ["--update", "--issue-id", ID_THREE, "--issue-data", JSON.stringify({ depends_on: [UNKNOWN_GUID] })]),
+      "INVALID_DEPENDENCY"
+    );
+    assert.match(failed.error, new RegExp(UNKNOWN_GUID), "the message must name the missing id");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("INVALID_DEPENDENCY: an issue cannot depend on itself", () => {
+  const { dir } = setupTempProject();
+  try {
+    assertFail(
+      run(dir, ["--update", "--issue-id", ID_THREE, "--issue-data", JSON.stringify({ depends_on: [ID_THREE] })]),
+      "INVALID_DEPENDENCY"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("INVALID_DEPENDENCY: a direct cycle is refused", () => {
+  const { dir } = setupTempProject(seedWithEdges({ [ID_ONE]: [ID_TWO] }));
+  try {
+    assertFail(
+      run(dir, ["--update", "--issue-id", ID_TWO, "--issue-data", JSON.stringify({ depends_on: [ID_ONE] })]),
+      "INVALID_DEPENDENCY"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("INVALID_DEPENDENCY: an indirect cycle is refused and nothing is written", () => {
+  const { dir } = setupTempProject(seedWithEdges({ [ID_ONE]: [ID_TWO], [ID_TWO]: [ID_THREE] }));
+  try {
+    const before = readFileSync(path.join(dir, "issues.json"), "utf8");
+    const failed = assertFail(
+      run(dir, ["--update", "--issue-id", ID_THREE, "--issue-data", JSON.stringify({ depends_on: [ID_ONE] })]),
+      "INVALID_DEPENDENCY"
+    );
+    assert.match(failed.error, /cycle/i);
+    assert.equal(readFileSync(path.join(dir, "issues.json"), "utf8"), before, "a refused update writes nothing");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("a cycle already present in a hand-edited issues.json does not hang the walk", () => {
+  // The CLI cannot produce this state, a text editor can. Without the visited set the traversal
+  // would never terminate and this test would time out instead of failing.
+  const { dir } = setupTempProject(seedWithEdges({ [ID_ONE]: [ID_TWO], [ID_TWO]: [ID_ONE] }));
+  try {
+    const updated = assertOk(
+      run(dir, ["--update", "--issue-id", ID_THREE, "--issue-data", JSON.stringify({ depends_on: [ID_ONE] })])
+    );
+    assert.deepEqual(updated.depends_on, [ID_ONE]);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("INVALID_DEPENDENCY: --delete is refused while other issues depend on the target", () => {
+  const { dir } = setupTempProject(seedWithEdges({ [ID_TWO]: [ID_ONE], [ID_THREE]: [ID_ONE] }));
+  try {
+    const failed = assertFail(run(dir, ["--delete", "--issue-id", ID_ONE]), "INVALID_DEPENDENCY");
+    assert.match(failed.error, new RegExp(ID_TWO));
+    assert.match(failed.error, new RegExp(ID_THREE));
+    assert.equal(storedIssues(dir).length, 3, "the refused delete must leave the tracker alone");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--delete succeeds once the dependents stop pointing at the issue", () => {
+  const { dir } = setupTempProject(seedWithEdges({ [ID_TWO]: [ID_ONE] }));
+  try {
+    assertOk(run(dir, ["--update", "--issue-id", ID_TWO, "--issue-data", JSON.stringify({ depends_on: [] })]));
+    assertOk(run(dir, ["--delete", "--issue-id", ID_ONE]));
+    assert.equal(storedIssues(dir).length, 2);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("depends_on does not gate the work: an issue with open dependencies can go in_progress", () => {
+  const { dir } = setupTempProject(seedWithEdges({ [ID_TWO]: [ID_ONE] }));
+  try {
+    const updated = assertOk(
+      run(dir, ["--update", "--issue-id", ID_TWO, "--issue-data", JSON.stringify({ status: "in_progress" })])
+    );
+    assert.equal(updated.status, "in_progress");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--help documents depends_on and INVALID_DEPENDENCY", () => {
+  const { dir } = setupTempProject();
+  try {
+    const result = run(dir, ["--help"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /depends_on/);
+    assert.match(result.stdout, /INVALID_DEPENDENCY/);
+  } finally {
+    cleanup(dir);
+  }
+});

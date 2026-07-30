@@ -23,9 +23,9 @@
 // outcomes.
 // Exception: --help prints plain text.
 //
-// Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_TIER, INVALID_INPUT,
-//              INVALID_JSON, LIMIT_EXCEEDED, NOT_FOUND, FILE_NOT_FOUND, MISSING_ARGS,
-//              UNKNOWN_COMMAND, FORBIDDEN_ROLE.
+// Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_TIER, INVALID_DEPENDENCY,
+//              INVALID_INPUT, INVALID_JSON, LIMIT_EXCEEDED, NOT_FOUND, FILE_NOT_FOUND,
+//              MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE.
 //
 // Length limits: title and description are capped (see LIMITS) so an issue stays readable by a
 // human instead of turning into an untitled document. Over the cap the payload is rejected with
@@ -45,6 +45,7 @@
 //     "description": "<string>",
 //     "status": "<backlog|in_progress|in_review|blocked|done>",
 //     "tier": "<economy|standard|reasoning>"|null,
+//     "depends_on": ["<guid>"],
 //     "validation": { "criteria": ["<string>"], "state": "<unknown|pass|fail>" }|null,
 //     "created_at": "<datetime>",
 //     "updated_at": "<datetime>"
@@ -55,6 +56,15 @@
 // verification evidence (state="pass"|"fail"), where a plain string is accepted too and no length
 // cap applies, because evidence is the output of the commands that were run.
 // validation can be null if no criteria are defined.
+//
+// depends_on: the issues that must close before this one — the edge runs from the dependency to the
+// issue that declares it. Always stored as an array ([] when absent), so the tracker is a directed
+// graph that readers can walk without special-casing a missing key. Ids must exist, an issue cannot
+// depend on itself, and a payload that would close a cycle is rejected: the graph stays acyclic
+// here, which is what lets every reader assume it. Deleting an issue others depend on is refused
+// for the same reason. Declaring a dependency does NOT block the work: nothing stops an issue with
+// open dependencies from going in_progress, because that is a workflow rule and it lives in the
+// skill, not in this script.
 //
 // --insert requires the full payload. --update merges: omitted fields keep their current value,
 // while an explicit "validation": null clears the validation object.
@@ -221,6 +231,75 @@ function validateCriteria(criteria, state) {
   });
 }
 
+// Helper: validate the shape of depends_on — everything that can be judged from the payload alone.
+// An array and nothing else: null is rejected on purpose, because "no dependencies" already has a
+// spelling ([]) and a second one would only make callers guess which is stored.
+// No cap on the number of entries: a dependency is a fact about the graph, not free text, and a
+// limit would push a caller to drop a real edge to make the payload fit.
+function validateDependsOnShape(dependsOn) {
+  if (!Array.isArray(dependsOn)) {
+    fail("'depends_on' must be an array of issue ids. Pass [] to clear it.", "INVALID_DEPENDENCY");
+  }
+  const seen = new Set();
+  dependsOn.forEach((entry, index) => {
+    if (typeof entry !== "string" || !GUID_RE.test(entry)) {
+      fail(`'depends_on[${index}]' is not a valid issue id (GUID).`, "INVALID_DEPENDENCY");
+    }
+    if (seen.has(entry)) {
+      fail(`'depends_on' lists '${entry}' more than once.`, "INVALID_DEPENDENCY");
+    }
+    seen.add(entry);
+  });
+}
+
+// Helper: the part of depends_on that the payload cannot answer for — every id must exist, an issue
+// cannot depend on itself, and the tracker must stay a DAG.
+//
+// Runs against the stored issues with the edges of `selfId` replaced by the proposed ones. The
+// stored graph is acyclic by construction, so a new cycle can only pass through the node being
+// written: walking forward from the proposed dependencies and looking for selfId is enough, and
+// there is no need to rebuild the whole graph.
+function validateDependencyGraph(dependsOn, issues, selfId) {
+  const byId = new Map(issues.map((issue) => [issue.id, issue]));
+
+  for (const id of dependsOn) {
+    if (id === selfId) {
+      fail("'depends_on' cannot contain the issue's own id: an issue cannot depend on itself.", "INVALID_DEPENDENCY");
+    }
+    if (!byId.has(id)) {
+      fail(`'depends_on' references issue '${id}', which does not exist in this tracker.`, "INVALID_DEPENDENCY");
+    }
+  }
+
+  // A brand new issue has an id nobody can already be pointing at, so no edge of its can close a
+  // cycle. The existence check above is the whole job.
+  if (selfId === null) {
+    return;
+  }
+
+  // The visited set is not an optimisation: issues.json is a file, and a cycle hand-edited into it
+  // before this call would otherwise keep the walk going forever.
+  const visited = new Set();
+  const stack = [...dependsOn];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (current === selfId) {
+      fail(
+        `'depends_on' closes a dependency cycle through issue '${selfId}'.`,
+        "INVALID_DEPENDENCY"
+      );
+    }
+    if (visited.has(current)) {
+      continue;
+    }
+    visited.add(current);
+    const issue = byId.get(current);
+    if (issue && Array.isArray(issue.depends_on)) {
+      stack.push(...issue.depends_on);
+    }
+  }
+}
+
 // Helper: validate the provided status value
 function validateStatus(status) {
   const validStatuses = ["backlog", "in_progress", "in_review", "blocked", "done"];
@@ -265,7 +344,7 @@ function validateIssueInput(issue, partial = false) {
     fail("Issue data must be a JSON object.", "INVALID_INPUT");
   }
 
-  const allowedFields = ["title", "description", "status", "validation", "tier"];
+  const allowedFields = ["title", "description", "status", "validation", "tier", "depends_on"];
   const providedFields = Object.keys(issue);
   const unknownFields = providedFields.filter((f) => !allowedFields.includes(f));
   if (unknownFields.length > 0) {
@@ -313,6 +392,13 @@ function validateIssueInput(issue, partial = false) {
   // tier after a change of scope is not a defect, so it must stay removable.
   if (hasProp(issue, "tier") && issue.tier !== null) {
     validateTier(issue.tier);
+  }
+
+  // depends_on: optional everywhere, absent reads as []. Only the shape is checked here — existence,
+  // self-reference and cycles need the stored tracker, so they run in insert/update once the file
+  // has been read.
+  if (hasProp(issue, "depends_on")) {
+    validateDependsOnShape(issue.depends_on);
   }
 
   // validation: must be null or a well-formed object { criteria, state (valid) }
@@ -444,9 +530,9 @@ function showHelp() {
     '  failure : {"ok":false,"error":"<msg>","code":"<CODE>"}  exit code 1',
     "Nothing is written to stderr: pipe stdout to JSON.parse in both cases.",
     "",
-    "Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_TIER, INVALID_INPUT,",
-    "             INVALID_JSON, LIMIT_EXCEEDED, NOT_FOUND, FILE_NOT_FOUND, MISSING_ARGS,",
-    "             UNKNOWN_COMMAND, FORBIDDEN_ROLE",
+    "Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_TIER, INVALID_DEPENDENCY,",
+    "             INVALID_INPUT, INVALID_JSON, LIMIT_EXCEEDED, NOT_FOUND, FILE_NOT_FOUND,",
+    "             MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE",
     "",
     "Role guard: when env var HARNESS_ROLE=worker, --insert/--update requests that set",
     "status=done or validation.state=pass are rejected with FORBIDDEN_ROLE (no self-validation).",
@@ -463,11 +549,15 @@ function showHelp() {
     "  --issue-data-file <path>  reads the JSON from a file — no shell quoting/escaping",
     "  --issue-data '<json>'     inline JSON; mutually exclusive with --issue-data-file",
     "",
-    "Allowed input fields for --insert/--update: title, description, status, tier, validation",
+    "Allowed input fields for --insert/--update: title, description, status, tier, depends_on, validation",
     `  title        : non-empty string, at most ${LIMITS.title} characters`,
     `  description  : non-empty string, at most ${LIMITS.description} characters`,
     "  status       : backlog | in_progress | in_review | blocked | done",
     `  tier         : ${TIERS.join(" | ")} | null — expected cost of the work; absent reads as standard`,
+    "  depends_on   : array of ids of the issues that must close first; absent reads as [], [] clears it",
+    "                 ids must exist, no self-reference, no cycles — rejected with INVALID_DEPENDENCY",
+    "                 an issue other issues depend on cannot be deleted until they stop pointing at it",
+    "                 it does not gate the work: an issue with open dependencies can still go in_progress",
     "  validation   : null OR { criteria, state: unknown|pass|fail }",
     `                 state=unknown : criteria is an array of at most ${LIMITS.criteriaCount} strings of ${LIMITS.criterion} characters`,
     "                 state=pass|fail : criteria carries the verification evidence — string or array, uncapped",
@@ -542,6 +632,10 @@ function insertIssue(issueData) {
   enforceRolePolicy(newIssue);
 
   const data = readIssuesFile();
+  const existingIssues = Array.isArray(data.issues) ? data.issues : [];
+  const dependsOn = hasProp(newIssue, "depends_on") ? newIssue.depends_on : [];
+  validateDependencyGraph(dependsOn, existingIssues, null);
+
   const now = nowTimestamp();
 
   // Build the stored object with auto-managed fields; never trust caller-supplied id/timestamps
@@ -551,6 +645,9 @@ function insertIssue(issueData) {
     description: newIssue.description,
     status: newIssue.status,
     tier: hasProp(newIssue, "tier") ? newIssue.tier : null,
+    // Always an array, never absent: the field is read on every render of the graph, and a missing
+    // key would push that check onto every reader instead of settling it here.
+    depends_on: dependsOn,
     validation: hasProp(newIssue, "validation") ? newIssue.validation : null,
     created_at: now,
     updated_at: now,
@@ -580,6 +677,15 @@ function updateIssue(issueId, issueData) {
 
   const existing = issues[issueIndex];
 
+  // The graph checks need the tracker as stored, and only the edges of THIS issue are being
+  // replaced — an update that omits depends_on cannot introduce a cycle, so it is not re-validated.
+  const dependsOn = hasProp(updatedIssue, "depends_on")
+    ? updatedIssue.depends_on
+    : Array.isArray(existing.depends_on) ? existing.depends_on : [];
+  if (hasProp(updatedIssue, "depends_on")) {
+    validateDependencyGraph(dependsOn, issues, issueId);
+  }
+
   // Rebuild the stored object: preserve id + created_at; set new updated_at
   const storedIssue = {
     id: issueId,
@@ -589,6 +695,9 @@ function updateIssue(issueId, issueData) {
     // ?? null, not the bare value: the issues written before this field have no `tier` key at all,
     // and carrying an undefined through would silently drop the key from the stored object.
     tier: hasProp(updatedIssue, "tier") ? updatedIssue.tier : existing.tier ?? null,
+    // Same reason as tier: an issue written before this field has no key at all, and the merge must
+    // materialise the empty array rather than carry an undefined into the stored object.
+    depends_on: dependsOn,
     validation: hasProp(updatedIssue, "validation") ? updatedIssue.validation : existing.validation,
     created_at: existing.created_at,
     updated_at: nowTimestamp(),
@@ -610,6 +719,20 @@ function deleteIssue(issueId) {
   const exists = issues.some((i) => i.id === issueId);
   if (!exists) {
     fail(`Issue with ID '${issueId}' not found.`, "NOT_FOUND");
+  }
+
+  // Deleting an issue others depend on would leave dangling ids behind. The alternative — stripping
+  // the id from every dependent — would rewrite issues the caller never named, silently. Refusing
+  // costs one extra command and keeps the change where the caller can see it.
+  const dependents = issues.filter(
+    (i) => Array.isArray(i.depends_on) && i.depends_on.includes(issueId)
+  );
+  if (dependents.length > 0) {
+    fail(
+      `Issue '${issueId}' cannot be deleted: ${dependents.length} issue(s) depend on it ` +
+        `(${dependents.map((i) => i.id).join(", ")}). Remove it from their 'depends_on' first.`,
+      "INVALID_DEPENDENCY"
+    );
   }
 
   // Remove the issue from the list

@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T15:38:42Z",
+  "last_updated": "2026-07-30T15:54:17Z",
   "rules": {
     "single_active_issue": false
   },
@@ -954,22 +954,15 @@
       "id": "2e2e7220-b660-4ad9-ae49-c765ca416a4a",
       "title": "CLI: campo depends_on con validazione del grafo",
       "description": "Aggiunge il campo depends_on (array di GUID) allo schema di scripts/issue-manager.mjs: elenca le issue che devono chiudersi prima. Spec: docs/superpowers/specs/2026-07-30-board-workflow-design.md, sezioni 1 e 2.\n\nForma memorizzata sempre array: --insert scrive [] quando il campo e' assente, --update fa merge con existing.depends_on ?? []. Nessuna migrazione delle issue gia' scritte, nessun cap sul numero di dipendenze: una dipendenza e' un fatto del grafo, non testo libero da comprimere.\n\nCodice di errore nuovo INVALID_DEPENDENCY, uno per campo come INVALID_TIER: copre non-array, elemento non GUID, duplicati, self-reference, id inesistente nel tracker e ciclo diretto o indiretto (DFS sul grafo memorizzato piu' gli archi proposti dal payload). Anche --delete di una issue puntata da altre viene rifiutata con lo stesso codice, elencando gli id dipendenti: sfilare l'id dagli altri record muterebbe issue che il chiamante non ha nominato.\n\nNessun guard sul lavoro: la CLI non impedisce in_progress con dipendenze aperte, quella regola vive nella skill. --get-all non cambia.\n\nCatena: apre la catena del dato; sblocca la issue su skill e reference e la vista a grafo.",
-      "status": "backlog",
+      "status": "done",
       "tier": "reasoning",
+      "depends_on": [],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "--insert senza depends_on crea una issue con depends_on uguale ad array vuoto.",
-          "--update che omette depends_on lo lascia invariato; su una issue priva della chiave la aggiunge senza toccare gli altri campi.",
-          "Un payload con elemento non GUID, id duplicato, self-reference o id inesistente esce 1 con code INVALID_DEPENDENCY.",
-          "Un ciclo indiretto A->B->C->A viene rifiutato con INVALID_DEPENDENCY e issues.json resta invariato.",
-          "--delete di una issue puntata da altre esce 1 con INVALID_DEPENDENCY e il messaggio contiene gli id dipendenti.",
-          "--help e i commenti di testata elencano depends_on fra i campi accettati e INVALID_DEPENDENCY fra i codici.",
-          "npm run test passa; i casi sopra sono coperti in test/plugin-issue-manager.test.mjs su directory temporanea."
-        ]
+        "state": "pass",
+        "criteria": "Verifica indipendente su copia in directory temporanea (--project-dir su scratchpad, issues.json reale mai usato come banco di prova).\n\n1) --insert senza depends_on -> {\"ok\":true,\"data\":{...\"depends_on\":[],...}}: array vuoto materializzato su disco (scripts/issue-manager.mjs:648).\n2) --update che omette depends_on: su issue con [B] resta [\"a6d5f6aa-...\"] dopo un update di solo title; su record legacy privo della chiave (hand-written, senza depends_on) l'update {\"status\":\"in_progress\"} restituisce depends_on:[] lasciando title/description/created_at invariati (merge a scripts/issue-manager.mjs:680-686,698).\n3) Payload invalidi, tutti exit=1 con code INVALID_DEPENDENCY: non-array stringa e null (\"'depends_on' must be an array of issue ids\"), elemento non GUID (\"'depends_on[0]' is not a valid issue id (GUID)\"), duplicato (\"lists '<id>' more than once\"), self-reference (\"cannot contain the issue's own id\"), id inesistente (\"references issue '9999...', which does not exist in this tracker\"); l'ultimo verificato anche su --insert.\n4) Ciclo indiretto A->B->C->A (A dep [B], B dep [C], update C dep [A]) -> exit=1 {\"code\":\"INVALID_DEPENDENCY\",\"error\":\"'depends_on' closes a dependency cycle through issue 'aa04c19b-...'\"} e `diff before.json issues.json` vuoto: file invariato. Ciclo diretto rifiutato allo stesso modo.\n5) --delete di una issue puntata da altre -> exit=1 INVALID_DEPENDENCY, messaggio \"cannot be deleted: 1 issue(s) depend on it (a6d5f6aa-...). Remove it from their 'depends_on' first.\"; il delete di una foglia non puntata resta ok:true.\n6) --help: riga 19 \"Error codes: ... INVALID_TIER, INVALID_DEPENDENCY,\", riga 38 campi accettati con depends_on, righe 43-46 la voce di campo. Commenti di testata: scripts/issue-manager.mjs:26 (codici), :48 (forma del record), :60-67 (semantica dell'arco, DAG, nessun gate sul lavoro).\n7) Gate `npm run test`: tests 175, pass 175, fail 0. I 17 test nuovi in test/plugin-issue-manager.test.mjs:1093-1329 girano su mkdtempSync(tmpdir()) via setupTempProject (test/plugin-issue-manager.test.mjs:78-84), incluso il caso del ciclo pre-esistente hand-edited che senza il visited set non terminerebbe.\n\nCollaterali: git status --short mostra solo issues.json, scripts/issue-manager.mjs, test/plugin-issue-manager.test.mjs; il diff di issues.json e' limitato a questa issue (status backlog->in_review, depends_on:[], timestamp). Nessun file modificato dal verificatore."
       },
       "created_at": "2026-07-30T15:38:42Z",
-      "updated_at": "2026-07-30T15:38:42Z"
+      "updated_at": "2026-07-30T15:54:17Z"
     },
     {
       "id": "10679d39-c6e9-461e-b75d-0d84a9c6175b",
