@@ -29,6 +29,15 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PAGE_PATH = path.join(__dirname, "board.html");
 
+// Static route table for the page's own assets: declared one by one, never built from the
+// request URL, so "no arbitrary file is served" stays true after the split of board.html into
+// three files. Anything not listed here — /board-graph.mjs included, not yet wired to the page —
+// falls through to the catch-all 404, traversal attempts among them.
+const ASSET_ROUTES = [
+  { pathname: "/board.css", filePath: path.join(__dirname, "board.css"), contentType: "text/css" },
+  { pathname: "/board.js", filePath: path.join(__dirname, "board.js"), contentType: "text/javascript" },
+];
+
 // Changes arrive in bursts: issue-manager writes a temp file and renames it over issues.json, so
 // a single update can raise several watch events. One push per burst is enough.
 const DEBOUNCE_MS = 60;
@@ -101,6 +110,11 @@ function main() {
   const projectDir = resolveProjectDir(values["project-dir"]);
   const issuesFilePath = path.join(projectDir, "issues.json");
   const page = readFileSync(PAGE_PATH, "utf8");
+  // Read once at startup, same as the page: these are plugin assets, not project data, so there
+  // is nothing to watch and nothing to re-read per request.
+  const assets = new Map(
+    ASSET_ROUTES.map((route) => [route.pathname, { body: readFileSync(route.filePath, "utf8"), contentType: route.contentType }])
+  );
 
   /** @type {Set<import("node:http").ServerResponse>} */
   const clients = new Set();
@@ -111,6 +125,13 @@ function main() {
     if (url.pathname === "/" || url.pathname === "/index.html") {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
       res.end(page);
+      return;
+    }
+
+    const asset = assets.get(url.pathname);
+    if (asset) {
+      res.writeHead(200, { "content-type": `${asset.contentType}; charset=utf-8`, "cache-control": "no-store" });
+      res.end(asset.body);
       return;
     }
 

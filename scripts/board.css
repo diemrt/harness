@@ -1,0 +1,5 @@
+/* Preserve newlines in issue descriptions */
+.preserve-newlines { white-space: pre-wrap; }
+/* Smooth fade-in for rendered cards */
+.issue-card { animation: fadeIn .18s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }

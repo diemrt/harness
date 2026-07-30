@@ -7,12 +7,18 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
 const SERVER_PATH = path.join(rootDir, "scripts", "board-server.mjs");
 const ISSUE_MANAGER = path.join(rootDir, "scripts", "issue-manager.mjs");
+const BOARD_JS_PATH = path.join(rootDir, "scripts", "board.js");
+
+// A real import, not an extraction: board.js guards its only DOM access (init(), called from a
+// DOMContentLoaded listener) behind `typeof document !== "undefined"`, so it loads cleanly here
+// and every exported function is the function the browser actually runs.
+const { renderCriteria, renderTierBadge, escapeHtml } = await import(pathToFileURL(BOARD_JS_PATH).href);
 
 function seed(issues = []) {
   return JSON.stringify({ last_updated: "2026-01-01T00:00:00Z", issues }, null, 2);
@@ -109,11 +115,17 @@ test("the board serves the page and the project's issues", async () => {
     assert.match(page.headers.get("content-type"), /text\/html/);
     const html = await page.text();
     assert.match(html, /Issue Board/);
+    // The app logic now lives in board.js, loaded as a module; the page itself must carry no
+    // inline CSS or app script, only the tag that loads it.
+    assert.doesNotMatch(html, /<style/);
+    assert.match(html, /<script type="module" src="board\.js">/);
+
+    const js = await (await fetch(`${url}board.js`)).text();
     // The page must read from the server, not from a sibling issues.json the way the copied
     // viewer used to.
-    assert.match(html, /fetch\("api\/issues"/);
-    assert.match(html, /new EventSource\("events"\)/);
-    assert.doesNotMatch(html, /fetch\("issues\.json"/);
+    assert.match(js, /fetch\("api\/issues"/);
+    assert.match(js, /new EventSource\("events"\)/);
+    assert.doesNotMatch(js, /fetch\("issues\.json"/);
 
     const api = await fetch(`${url}api/issues`);
     const data = await api.json();
@@ -140,8 +152,8 @@ test("the board reports the project field from issues.json when present", async 
     const data = await (await fetch(`${url}api/issues`)).json();
     assert.equal(data.project, "MyProject");
 
-    const html = await (await fetch(url)).text();
-    assert.match(html, /projectNameFrom\(data\.project, data\.projectDir\)/);
+    const js = await (await fetch(`${url}board.js`)).text();
+    assert.match(js, /projectNameFrom\(data\.project, data\.projectDir\)/);
   } finally {
     stop(child);
     rmSync(dir, { recursive: true, force: true });
@@ -258,97 +270,39 @@ test("an unreadable issues.json degrades instead of killing the board", async ()
   }
 });
 
-test("the page keeps the features the copied viewer had", async () => {
+test("the page keeps the features the copied viewer had, each marker checked in the artefact that must contain it", async () => {
   const dir = tempProject(seed());
   const { child, url } = await startServer(dir);
   try {
-    const html = await (await fetch(url)).text();
-    // Each of these was lost once already by rewriting the page instead of serving it.
-    for (const marker of [
-      "counters", // per-status counters
-      "statusFilters", // WIP / per-status / all tabs
-      "WIP_PRIORITY", // blocked before in_progress before in_review before backlog
-      "preserve-newlines", // full description, newlines kept
-      "Validazione", // validation criteria block
-      "loadingState",
-      "emptyState",
-      "errorState",
-    ]) {
-      assert.match(html, new RegExp(marker), `the board page lost: ${marker}`);
-    }
-  } finally {
-    stop(child);
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-// Pulls a named function out of the served page and makes it callable here. The alternative — a
-// marker regexp on the HTML — would pass on a renderer that is present and wrong.
-function extractFunctions(html, names) {
-  const sources = names.map((name) => {
-    const start = html.indexOf(`function ${name}(`);
-    assert.notEqual(start, -1, `the page must define ${name}`);
-    let depth = 0;
-    let index = html.indexOf("{", start);
-    while (index < html.length) {
-      if (html[index] === "{") depth += 1;
-      if (html[index] === "}") {
-        depth -= 1;
-        if (depth === 0) break;
+    // A concatenation of the three artefacts would let a marker survive in any one of them and
+    // call it proof for all three: emptying board.css, or renaming the container ids in
+    // board.html, would still leave the marker sitting in board.js and the test green. So each
+    // marker is looked up only in the artefact(s) that must actually carry it. A marker that
+    // legitimately lives in more than one artefact (an id declared in the HTML and driven from
+    // JS, say) lists all of them here and every one is checked, not just the first match.
+    const artefacts = {
+      html: await fetch(url).then((r) => r.text()),
+      css: await fetch(`${url}board.css`).then((r) => r.text()),
+      js: await fetch(`${url}board.js`).then((r) => r.text()),
+    };
+    const markerArtefacts = {
+      counters: ["html", "js"], // per-status counters: id declared in the page, driven from JS
+      statusFilters: ["html", "js"], // WIP / per-status / all tabs
+      WIP_PRIORITY: ["js"], // blocked before in_progress before in_review before backlog
+      "preserve-newlines": ["css", "js"], // full description, newlines kept: the rule and the class that applies it
+      Validazione: ["js"], // validation criteria block label
+      loadingState: ["html", "js"],
+      emptyState: ["html", "js"],
+      errorState: ["html", "js"],
+    };
+    for (const [marker, artefactNames] of Object.entries(markerArtefacts)) {
+      for (const name of artefactNames) {
+        assert.match(
+          artefacts[name],
+          new RegExp(marker),
+          `the board lost: ${marker} (expected in board.${name})`
+        );
       }
-      index += 1;
-    }
-    assert.ok(index < html.length, `${name} must have a balanced body`);
-    return html.slice(start, index + 1);
-  });
-  return new Function(`${sources.join("\n")}\nreturn { ${names.join(", ")} };`)();
-}
-
-test("criteria are rendered as a list when they are an array, as a paragraph when a string", async () => {
-  const dir = tempProject(seed());
-  const { child, url } = await startServer(dir);
-  try {
-    const html = await (await fetch(url)).text();
-    const { renderCriteria } = extractFunctions(html, ["renderCriteria", "escapeHtml"]);
-
-    // The shape written at creation: one item per criterion, in order.
-    const list = renderCriteria(["the command exits 0", "the file is not created"]);
-    assert.match(list, /^<ul/);
-    assert.deepEqual(list.match(/<li/g).length, 2);
-    assert.ok(
-      list.indexOf("the command exits 0") < list.indexOf("the file is not created"),
-      "the order of the criteria must be preserved"
-    );
-
-    // The legacy shape, and the shape of the evidence written at closure.
-    const paragraph = renderCriteria("criteria written before the array rule");
-    assert.match(paragraph, /^<p/);
-    assert.match(paragraph, /criteria written before the array rule/);
-
-    // An empty array is truthy: rendering it would leave an empty list on the card.
-    assert.equal(renderCriteria([]), "");
-    assert.equal(renderCriteria([" ", ""]), "");
-    assert.equal(renderCriteria(null), "");
-    assert.equal(renderCriteria("   "), "");
-  } finally {
-    stop(child);
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test("every criterion is escaped, whichever shape it arrives in", async () => {
-  const dir = tempProject(seed());
-  const { child, url } = await startServer(dir);
-  try {
-    const html = await (await fetch(url)).text();
-    const { renderCriteria } = extractFunctions(html, ["renderCriteria", "escapeHtml"]);
-
-    for (const rendered of [
-      renderCriteria(["<script>alert(1)</script>"]),
-      renderCriteria("<script>alert(1)</script>"),
-    ]) {
-      assert.equal(rendered.includes("<script>"), false, "criteria must never render as markup");
-      assert.match(rendered, /&lt;script&gt;/);
     }
   } finally {
     stop(child);
@@ -356,36 +310,64 @@ test("every criterion is escaped, whichever shape it arrives in", async () => {
   }
 });
 
-test("the tier is badged when set, and absent otherwise", async () => {
-  const dir = tempProject(seed());
-  const { child, url } = await startServer(dir);
-  try {
-    const html = await (await fetch(url)).text();
-    const { renderTierBadge } = extractFunctions(html, ["renderTierBadge", "escapeHtml"]);
+test("criteria are rendered as a list when they are an array, as a paragraph when a string", () => {
+  // The shape written at creation: one item per criterion, in order.
+  const list = renderCriteria(["the command exits 0", "the file is not created"]);
+  assert.match(list, /^<ul/);
+  assert.deepEqual(list.match(/<li/g).length, 2);
+  assert.ok(
+    list.indexOf("the command exits 0") < list.indexOf("the file is not created"),
+    "the order of the criteria must be preserved"
+  );
 
-    const badge = renderTierBadge("reasoning");
-    assert.match(badge, /^<span/);
-    assert.match(badge, /badge/);
-    assert.match(badge, /reasoning/);
+  // The legacy shape, and the shape of the evidence written at closure.
+  const paragraph = renderCriteria("criteria written before the array rule");
+  assert.match(paragraph, /^<p/);
+  assert.match(paragraph, /criteria written before the array rule/);
 
-    // Most issues have no tier: no badge is the normal case, not an error to render.
-    assert.equal(renderTierBadge(null), "");
-    assert.equal(renderTierBadge(undefined), "");
-    assert.equal(renderTierBadge("  "), "");
+  // An empty array is truthy: rendering it would leave an empty list on the card.
+  assert.equal(renderCriteria([]), "");
+  assert.equal(renderCriteria([" ", ""]), "");
+  assert.equal(renderCriteria(null), "");
+  assert.equal(renderCriteria("   "), "");
+});
 
-    // The value reaches an attribute-bearing element: it must not be able to close the tag.
-    const injected = renderTierBadge('"><script>alert(1)</script>');
-    assert.equal(injected.includes("<script>"), false);
-    assert.equal(
-      injected.includes('"><script'),
-      false,
-      "the value must not be able to close the tag it sits in"
-    );
-    assert.match(injected, /&quot;&gt;/, "quote and angle bracket must arrive escaped");
-  } finally {
-    stop(child);
-    rmSync(dir, { recursive: true, force: true });
+test("every criterion is escaped, whichever shape it arrives in", () => {
+  for (const rendered of [
+    renderCriteria(["<script>alert(1)</script>"]),
+    renderCriteria("<script>alert(1)</script>"),
+  ]) {
+    assert.equal(rendered.includes("<script>"), false, "criteria must never render as markup");
+    assert.match(rendered, /&lt;script&gt;/);
   }
+});
+
+test("the tier is badged when set, and absent otherwise", () => {
+  const badge = renderTierBadge("reasoning");
+  assert.match(badge, /^<span/);
+  assert.match(badge, /badge/);
+  assert.match(badge, /reasoning/);
+
+  // Most issues have no tier: no badge is the normal case, not an error to render.
+  assert.equal(renderTierBadge(null), "");
+  assert.equal(renderTierBadge(undefined), "");
+  assert.equal(renderTierBadge("  "), "");
+
+  // The value reaches an attribute-bearing element: it must not be able to close the tag.
+  const injected = renderTierBadge('"><script>alert(1)</script>');
+  assert.equal(injected.includes("<script>"), false);
+  assert.equal(
+    injected.includes('"><script'),
+    false,
+    "the value must not be able to close the tag it sits in"
+  );
+  assert.match(injected, /&quot;&gt;/, "quote and angle bracket must arrive escaped");
+});
+
+test("board.js loads under node --test without a document, and only exposes escapeHtml through the render helpers", () => {
+  // escapeHtml is what makes both renderCriteria and renderTierBadge safe; importing it directly
+  // is the check that the module itself, not just two call sites, survived the split intact.
+  assert.equal(escapeHtml("<b>"), "&lt;b&gt;");
 });
 
 test("the API hands the array shape to the page untouched", async () => {
@@ -407,11 +389,41 @@ test("the API hands the array shape to the page untouched", async () => {
   }
 });
 
+test("the board serves board.css and board.js as declared routes", async () => {
+  const dir = tempProject(seed());
+  const { child, url } = await startServer(dir);
+  try {
+    const css = await fetch(`${url}board.css`);
+    assert.equal(css.status, 200);
+    assert.match(css.headers.get("content-type"), /text\/css/);
+    assert.match(await css.text(), /preserve-newlines/);
+
+    const js = await fetch(`${url}board.js`);
+    assert.equal(js.status, 200);
+    assert.match(js.headers.get("content-type"), /text\/javascript/);
+    assert.match(await js.text(), /export function renderCriteria/);
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("unknown paths 404 rather than leaking files", async () => {
   const dir = tempProject(seed());
   const { child, url } = await startServer(dir);
   try {
-    for (const suffix of ["nope", "../board-server.mjs", "issues.json", "../../proposals/board-minimal.html"]) {
+    for (const suffix of [
+      "nope",
+      "../board-server.mjs",
+      "issues.json",
+      "../../proposals/board-minimal.html",
+      // board-graph.mjs exists on disk (see scripts/board-graph.mjs) but is deliberately not one
+      // of the declared routes yet: wiring it to the page is separate work, and until then it
+      // must 404 like anything else undeclared.
+      "board-graph.mjs",
+      "../package.json",
+      "../issues.json",
+    ]) {
       const response = await fetch(`${url}${suffix}`);
       assert.equal(response.status, 404, `${suffix} must not be served`);
     }
