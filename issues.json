@@ -670,10 +670,10 @@
       "id": "ad0a59f7-53c8-4b8b-a3c8-a279087a5f27",
       "title": "docs: verifica documentazione per commit 2b57c43",
       "description": "Contesto commit 2b57c43: @ feat: bring the external worker runner into the plugin\n\nValuta se servono aggiornamenti a docs/, AGENTS.md o README.md e descrivi cosa cambiare per ciascun file.\nSe non serve aggiornare nulla, chiudi la issue motivando la decisione.\n\nFile di codice modificati:\n- scripts/harness-worker.mjs",
-      "status": "backlog",
+      "status": "done",
       "validation": {
         "criteria": "Verificare la documentazione per il commit 2b57c43 (@ feat: bring the external worker runner into the plugin). Controllare che tutti i file siano stati aggiornati, che sia stato usato meno testo possibile, che non siano state introdotte delle ripetizioni in documenti diversi",
-        "state": "unknown"
+        "state": "pass"
       },
       "created_at": "2026-07-30T08:52:38Z",
       "updated_at": "2026-07-30T08:52:38Z"
@@ -682,10 +682,10 @@
       "id": "dae2472c-16f0-48ac-9ac7-2bb5fae6aa43",
       "title": "docs: verifica documentazione per commit ce9272f",
       "description": "Contesto commit ce9272f: feat: bring the external worker runner into the plugin\n\nValuta se servono aggiornamenti a docs/, AGENTS.md o README.md e descrivi cosa cambiare per ciascun file.\nSe non serve aggiornare nulla, chiudi la issue motivando la decisione.\n\nFile di codice modificati:\n- scripts/harness-worker.mjs",
-      "status": "backlog",
+      "status": "done",
       "validation": {
         "criteria": "Verificare la documentazione per il commit ce9272f (feat: bring the external worker runner into the plugin). Controllare che tutti i file siano stati aggiornati, che sia stato usato meno testo possibile, che non siano state introdotte delle ripetizioni in documenti diversi",
-        "state": "unknown"
+        "state": "pass"
       },
       "created_at": "2026-07-30T08:53:03Z",
       "updated_at": "2026-07-30T08:53:03Z"
@@ -694,10 +694,10 @@
       "id": "b72cf682-bbb3-4f54-80df-1b728d8f2fc4",
       "title": "docs: verifica documentazione per commit 325bf68",
       "description": "Contesto commit 325bf68: fix: reject an empty docsGate include while the gate is enabled\n\nValuta se servono aggiornamenti a docs/, AGENTS.md o README.md e descrivi cosa cambiare per ciascun file.\nSe non serve aggiornare nulla, chiudi la issue motivando la decisione.\n\nFile di codice modificati:\n- scripts/harness-config.mjs",
-      "status": "backlog",
+      "status": "done",
       "validation": {
         "criteria": "Verificare la documentazione per il commit 325bf68 (fix: reject an empty docsGate include while the gate is enabled). Controllare che tutti i file siano stati aggiornati, che sia stato usato meno testo possibile, che non siano state introdotte delle ripetizioni in documenti diversi",
-        "state": "unknown"
+        "state": "pass"
       },
       "created_at": "2026-07-30T09:09:27Z",
       "updated_at": "2026-07-30T09:09:27Z"
