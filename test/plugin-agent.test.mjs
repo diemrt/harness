@@ -78,9 +78,12 @@ test("harness-verifier knows what to do with an issue that has no criteria", () 
     /Verifica leggera/,
     "the agent must know where the contract of such an issue is written"
   );
+  // Anchored to the sentence, not to the bare word: the closure payload shown further down the
+  // prompt already contains "state":"fail", so a /\bfail\b/ here would pass with the whole
+  // paragraph deleted.
   assert.match(
     body,
-    /\bfail\b/,
+    /codice\s+eseguibile\s+è\s+un\s+\*{0,2}fail\*{0,2},\s*non\s+un['’]osservazione/i,
     "leaving the declared class of work must be stated as a failure, not a note"
   );
   // Tolerant of the line wrapping the markdown applies: what matters is the instruction, not where

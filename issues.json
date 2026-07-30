@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T12:35:37Z",
+  "last_updated": "2026-07-30T12:49:09Z",
   "rules": {
     "single_active_issue": false
   },
@@ -874,18 +874,14 @@
       "id": "0fd97d81-aeb1-4e6b-928a-0587d45405f1",
       "title": "Test: assert vacuo sul fail fuori classe in plugin-agent",
       "description": "Il verificatore della issue 55b06dcb ha segnalato un difetto reale nel test che quella issue ha aggiunto: l'assert /\\bfail\\b/ in test/plugin-agent.test.mjs matcha il \"state\":\"fail\" gia' presente nel payload di chiusura dentro il prompt dell'agent. Passerebbe anche se il paragrafo sul diff fuori classe venisse cancellato.\n\nRisultato: l'istruzione piu' importante di quel paragrafo (uscire dalla classe di lavoro dichiarata e' un fail, non un'osservazione) non e' vincolata da nessun test.\n\nVa reso specifico, ancorandolo al contesto della frase e non alla parola isolata, e va provato che il test diventi rosso rimettendo il prompt di prima. Nessun cambio ad agents/harness-verifier.md: il testo e' verificato, qui si irrobustisce solo il test.",
-      "status": "backlog",
+      "status": "done",
+      "tier": null,
       "validation": {
-        "criteria": [
-          "l'assert non passa piu' se dal prompt si rimuove il paragrafo sul diff fuori classe, provato rimettendo la versione precedente in una copia temporanea",
-          "l'assert non e' soddisfatto dal solo \"state\":\"fail\" del payload di chiusura mostrato nel prompt",
-          "agents/harness-verifier.md non viene modificato da questa issue",
-          "npm test verde"
-        ],
-        "state": "unknown"
+        "criteria": "Verifica indipendente (probe mio in temp, non quello del worker). 1) Mutazione chirurgica: rimossa dal prompt copiato la sola frase 'In quel caso il confronto diventa: ... i criteri servivano.' -> node --test test/plugin-agent.test.mjs fallisce esattamente su 'harness-verifier knows what to do with an issue that has no criteria' con AssertionError 'leaving the declared class of work must be stated as a failure, not a note'; ripristinato il prompt, il test torna verde (6/6). Anche la versione precedente del prompt (git show 44e27d5^:agents/harness-verifier.md) rende rosso lo stesso test. 2) Vacuita' del vecchio assert dimostrata: sul corpo con il paragrafo rimosso /\bfail\b/ = true mentre il nuovo regex = false, e il corpo mutato contiene ancora \"state\":\"fail\" del payload di chiusura (verificato /\"state\":\"fail\"/ = true). 3) agents/harness-verifier.md non modificato: git diff --exit-code -- agents/harness-verifier.md esce 0, git status --short elenca solo 'M issues.json' e 'M test/plugin-agent.test.mjs'. 4) Gate .harness/config.json verify = 'npm run test': tests 156, pass 156, fail 0. Diff nel repo limitato a test/plugin-agent.test.mjs:81-88 (nuovo regex + commento) piu' il record di questa issue in issues.json; nessun segreto, nessun file fuori scope.",
+        "state": "pass"
       },
       "created_at": "2026-07-30T11:07:37Z",
-      "updated_at": "2026-07-30T11:07:37Z"
+      "updated_at": "2026-07-30T12:49:09Z"
     },
     {
       "id": "4f7c19f1-ad0c-474e-9832-8992df5430c1",
