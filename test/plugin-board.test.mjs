@@ -282,6 +282,99 @@ test("the page keeps the features the copied viewer had", async () => {
   }
 });
 
+// Pulls a named function out of the served page and makes it callable here. The alternative — a
+// marker regexp on the HTML — would pass on a renderer that is present and wrong.
+function extractFunctions(html, names) {
+  const sources = names.map((name) => {
+    const start = html.indexOf(`function ${name}(`);
+    assert.notEqual(start, -1, `the page must define ${name}`);
+    let depth = 0;
+    let index = html.indexOf("{", start);
+    while (index < html.length) {
+      if (html[index] === "{") depth += 1;
+      if (html[index] === "}") {
+        depth -= 1;
+        if (depth === 0) break;
+      }
+      index += 1;
+    }
+    assert.ok(index < html.length, `${name} must have a balanced body`);
+    return html.slice(start, index + 1);
+  });
+  return new Function(`${sources.join("\n")}\nreturn { ${names.join(", ")} };`)();
+}
+
+test("criteria are rendered as a list when they are an array, as a paragraph when a string", async () => {
+  const dir = tempProject(seed());
+  const { child, url } = await startServer(dir);
+  try {
+    const html = await (await fetch(url)).text();
+    const { renderCriteria } = extractFunctions(html, ["renderCriteria", "escapeHtml"]);
+
+    // The shape written at creation: one item per criterion, in order.
+    const list = renderCriteria(["the command exits 0", "the file is not created"]);
+    assert.match(list, /^<ul/);
+    assert.deepEqual(list.match(/<li/g).length, 2);
+    assert.ok(
+      list.indexOf("the command exits 0") < list.indexOf("the file is not created"),
+      "the order of the criteria must be preserved"
+    );
+
+    // The legacy shape, and the shape of the evidence written at closure.
+    const paragraph = renderCriteria("criteria written before the array rule");
+    assert.match(paragraph, /^<p/);
+    assert.match(paragraph, /criteria written before the array rule/);
+
+    // An empty array is truthy: rendering it would leave an empty list on the card.
+    assert.equal(renderCriteria([]), "");
+    assert.equal(renderCriteria([" ", ""]), "");
+    assert.equal(renderCriteria(null), "");
+    assert.equal(renderCriteria("   "), "");
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("every criterion is escaped, whichever shape it arrives in", async () => {
+  const dir = tempProject(seed());
+  const { child, url } = await startServer(dir);
+  try {
+    const html = await (await fetch(url)).text();
+    const { renderCriteria } = extractFunctions(html, ["renderCriteria", "escapeHtml"]);
+
+    for (const rendered of [
+      renderCriteria(["<script>alert(1)</script>"]),
+      renderCriteria("<script>alert(1)</script>"),
+    ]) {
+      assert.equal(rendered.includes("<script>"), false, "criteria must never render as markup");
+      assert.match(rendered, /&lt;script&gt;/);
+    }
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the API hands the array shape to the page untouched", async () => {
+  const criteria = ["first criterion", "second criterion"];
+  const dir = tempProject(
+    seed([
+      issue("11111111-1111-1111-1111-111111111111", {
+        validation: { criteria, state: "unknown" },
+      }),
+    ])
+  );
+  const { child, url } = await startServer(dir);
+  try {
+    const payload = await (await fetch(`${url}api/issues`)).json();
+    assert.deepEqual(payload.issues[0].validation.criteria, criteria);
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("unknown paths 404 rather than leaking files", async () => {
   const dir = tempProject(seed());
   const { child, url } = await startServer(dir);

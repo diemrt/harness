@@ -299,12 +299,34 @@
       refreshIcons();
     }
 
+    // validation.criteria reaches the page in two shapes, and neither is normalized in issues.json:
+    // an array — the bullet list written at creation, one item per criterion — or a plain string,
+    // which is both how the evidence is written at closure and how every issue predating the array
+    // stored its criteria. Rendering only one of them would blank out half the tracker.
+    // An array is always truthy, empty included, so the emptiness check lives here rather than in
+    // the caller's conditional.
+    function renderCriteria(criteria) {
+      if (Array.isArray(criteria)) {
+        const items = criteria.filter((entry) => typeof entry === "string" && entry.trim() !== "");
+        if (items.length === 0) return "";
+        return `<ul class="text-sm opacity-80 list-disc pl-5 space-y-1">${items
+          .map((entry) => `<li class="preserve-newlines">${escapeHtml(entry)}</li>`)
+          .join("")}</ul>`;
+      }
+      if (typeof criteria === "string" && criteria.trim() !== "") {
+        return `<p class="text-sm opacity-80 preserve-newlines">${escapeHtml(criteria)}</p>`;
+      }
+      return "";
+    }
+
     function issueCard(it) {
       const meta = statusMeta(it.status);
       const validation = it.validation || {};
       const vMeta = VALIDATION_META[validation.state] || VALIDATION_META.unknown;
 
-      const validationBlock = (validation.criteria || validation.state) ? `
+      const criteriaMarkup = renderCriteria(validation.criteria);
+
+      const validationBlock = (criteriaMarkup || validation.state) ? `
         <div class="mt-3 rounded-lg bg-base-200/60 p-3">
           <div class="flex items-center gap-2 mb-1">
             <i data-lucide="clipboard-check" class="w-4 h-4 opacity-70"></i>
@@ -313,7 +335,7 @@
               <i data-lucide="${vMeta.icon}" class="w-3 h-3"></i>${escapeHtml(vMeta.label)}
             </span>
           </div>
-          ${validation.criteria ? `<p class="text-sm opacity-80 preserve-newlines">${escapeHtml(validation.criteria)}</p>` : ""}
+          ${criteriaMarkup}
         </div>` : "";
 
       return `

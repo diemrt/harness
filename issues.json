@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T11:01:44Z",
+  "last_updated": "2026-07-30T11:02:49Z",
   "rules": {
     "single_active_issue": false
   },
@@ -754,25 +754,25 @@
       "id": "74cb0bdd-4de8-49cd-8564-55c6c8f743a0",
       "title": "Board: render di criteria come lista, con fallback sulla forma stringa",
       "description": "Il board rende oggi validation.criteria come un solo paragrafo preserve-newlines (scripts/board.html, intorno alla riga 316). Con criteria diventato array serve una lista, e la forma stringa deve continuare a funzionare per le 59 issue esistenti, che non vengono migrate.\n\nIn scripts/board.html: array reso come ul con un li per criterio, stringa resa come oggi. Ogni criterio passa da escapeHtml come il resto dei campi: il board e' servito su loopback ma il contenuto arriva da issues.json, non e' fidato.\n\nDipende dalla issue che introduce criteria array nella CLI.\n\nSpec: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione A.",
-      "status": "in_review",
+      "status": "done",
       "validation": {
-        "criteria": "- una issue con criteria array viene resa come ul, un li per criterio, nell'ordine dell'array\n- una issue con criteria stringa continua a rendersi come paragrafo preserve-newlines\n- una issue con validation null non rende alcun blocco di validazione, come oggi\n- ogni criterio e' escapato: un criterio contenente <script> compare come testo, non come markup\n- test/plugin-board.test.mjs copre entrambe le forme di criteria\n- npm test verde",
-        "state": "unknown"
+        "state": "pass",
+        "criteria": "Verifica indipendente. renderCriteria estratta da scripts/board.html (righe 308-320) ed eseguita in un probe mio, non tramite i test del worker.\n\n1) array -> ul, un li per criterio, ordine preservato: renderCriteria([\"a\",\"b\",\"c\"]) => '<ul class=\"text-sm opacity-80 list-disc pl-5 space-y-1\"><li class=\"preserve-newlines\">a</li><li class=\"preserve-newlines\">b</li><li class=\"preserve-newlines\">c</li></ul>' (3 li, ordine a,b,c).\n\n2) stringa -> paragrafo preserve-newlines: renderCriteria(\"plain\nstring\") => '<p class=\"text-sm opacity-80 preserve-newlines\">...</p>', identico al markup pre-modifica (git diff riga 335-338: il vecchio <p> e' lo stesso, ora prodotto dalla funzione).\n\n3) validation null -> nessun blocco: il gate e' '(criteriaMarkup || validation.state)' (board.html riga 329) con 'const validation = it.validation || {}'. Simulazione: null -> false, {} -> false, {criteria:[]} -> false, {criteria:[],state:\"pass\"} -> true (solo badge, come prima), {criteria:[\"x\"]} -> true. L'array vuoto, truthy, non produce piu' un blocco vuoto.\n\n4) escaping giudicato sul contenuto reso: renderCriteria([\"<script>alert(1)</script>\"]) => '<li class=\"preserve-newlines\">&lt;script&gt;alert(1)&lt;/script&gt;</li>'; nessun '<script>' letterale nell'output, ne' nella forma array ne' nella stringa. Anche & \" ' escapati ('ok &amp; &lt;b&gt;bold&lt;/b&gt;', 'he said &quot;hi&quot; and it&#39;s'). Le entry non stringa di un array sono filtrate ([{a:1},\"kept\"] rende solo 'kept'), quindi nessuna via di iniezione via oggetti.\n\n5) test/plugin-board.test.mjs copre entrambe le forme: node --test test/plugin-board.test.mjs => tests 14, pass 14, fail 0, con 'criteria are rendered as a list when they are an array, as a paragraph when a string', 'every criterion is escaped, whichever shape it arrives in', 'the API hands the array shape to the page untouched'. Controllo di non-vacuita': gli stessi test eseguiti su un export di HEAD (git archive HEAD, board.html pre-modifica, solo il test file sovrascritto, in scratchpad) => pass 12, fail 2, con i due test sul render/escaping in rosso. Non sono marker regexp: estraggono renderCriteria/escapeHtml dalla pagina servita e le invocano.\n\n6) Gate .harness/config.json (verify = npm run test): npm run test => tests 148, suites 0, pass 148, fail 0, duration_ms 6257 (una run precedente: 147/147 verde prima che il worker parallelo aggiungesse un test).\n\nDanni collaterali: git diff --stat sui file in scope => scripts/board.html 26 righe, test/plugin-board.test.mjs 93 righe, nessun'altra modifica a board.html oltre a renderCriteria e al gate del blocco. Nessun file untracked (git status --untracked-files=all). Nessun segreto nel diff. Non ho modificato alcun file: l'unica scrittura e' questa chiusura.\n\nOsservazioni fuori scope (non bloccanti): (a) il working tree contiene anche scripts/issue-manager.mjs + test/plugin-issue-manager.test.mjs (issue 903cd6e8) e agents/harness-verifier.md, skills/harness/SKILL.md, skills/harness/references/verification.md, test/plugin-agent.test.mjs (issue 55b06dcb, passata a in_progress durante questa verifica); (b) una run intermedia di npm run test e' fallita su plugin-agent.test.mjs (regex /da null a oggetto/i contro 'da null a\noggetto popolato', a capo in mezzo) mentre il worker parallelo stava scrivendo agents/harness-verifier.md; alla run successiva quel file era coerente e la suite e' tornata verde. Nulla di cio' riguarda board.html."
       },
       "created_at": "2026-07-30T10:37:08Z",
-      "updated_at": "2026-07-30T10:58:44Z"
+      "updated_at": "2026-07-30T11:02:49Z"
     },
     {
       "id": "fdc1e6d9-d93a-497c-9efd-009da2ce9cda",
       "title": "Docs: limiti di formato delle issue in issues.md e issue.md",
       "description": "I limiti imposti dalla CLI vanno documentati dove gli agenti li leggono, insieme alle regole che il codice non puo' misurare: paragrafi nella description, e rimando a un documento del progetto quando il testo sfora invece di comprimerlo.\n\nIn skills/harness/references/issues.md: limiti, forma di criteria condizionata a validation.state, LIMIT_EXCEEDED nella tabella dei codici, schema aggiornato. In commands/issue.md: come si compone un criteria array e cosa fare quando la CLI risponde LIMIT_EXCEEDED.\n\nLe skill di spec eventualmente installate (superpowers:brainstorming, core-dev-toolkit:spec) vanno menzionate come opzione per produrre quel documento, con nota esplicita che harness non le invoca e non crea file: continua a valere che harness non semina file nel progetto.\n\nDipende dalla issue che introduce criteria array nella CLI. Spec: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione A.",
-      "status": "backlog",
+      "status": "in_progress",
       "validation": {
         "criteria": "- issues.md riporta i quattro limiti con i valori 80, 1200, 200 e 7, e la misura sulla stringa trimmata\n- issues.md documenta che criteria e' array con state unknown, stringa o array con pass o fail\n- LIMIT_EXCEEDED compare nella tabella dei codici d'errore di issues.md\n- commands/issue.md spiega come comporre criteria come array e come reagire a LIMIT_EXCEEDED\n- documentata la regola dei paragrafi e il rimando a un documento del progetto sopra il limite\n- le skill di spec sono citate come opzionali, con la nota che harness non crea file\n- npm test verde, plugin-skill e plugin-commands compresi",
         "state": "unknown"
       },
       "created_at": "2026-07-30T10:37:08Z",
-      "updated_at": "2026-07-30T10:37:08Z"
+      "updated_at": "2026-07-30T11:02:31Z"
     },
     {
       "id": "497230cc-342f-4841-9fa8-9f9e083b5710",
