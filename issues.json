@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T15:54:17Z",
+  "last_updated": "2026-07-30T15:58:22Z",
   "rules": {
     "single_active_issue": false
   },
@@ -970,6 +970,9 @@
       "description": "Porta depends_on nella documentazione normativa del plugin. Spec: docs/superpowers/specs/2026-07-30-board-workflow-design.md, sezione 3.\n\nIn skills/harness/references/issues.md: il campo nello schema della issue, la riga nella tabella dei campi accettati in input, INVALID_DEPENDENCY nella tabella dei codici di errore, il rifiuto di --delete su una issue con dipendenti, e la semantica del campo (l'arco va dalla dipendenza alla issue che la dichiara).\n\nIn skills/harness/SKILL.md due cambi. La regola 1-WIP resta identica nella sostanza ma dice che la catena ora e' calcolabile: e' la componente connessa del grafo di depends_on, non piu' una deduzione dell'orchestratore. E un invariante nuovo, gemello di quello sui criteri: al worker e' vietato togliere una dipendenza per sbloccarsi, perche' cancellare l'arco che rende la propria issue non ancora lavorabile e' la stessa mossa del cancellare i criteri che la rendono giudicabile.\n\nSolo documentazione: nessuno script cambia. Catena: dipende dalla issue che introduce il campo nella CLI, altrimenti documenta qualcosa che non esiste.",
       "status": "backlog",
       "tier": "standard",
+      "depends_on": [
+        "2e2e7220-b660-4ad9-ae49-c765ca416a4a"
+      ],
       "validation": {
         "state": "unknown",
         "criteria": [
@@ -982,7 +985,7 @@
         ]
       },
       "created_at": "2026-07-30T15:38:42Z",
-      "updated_at": "2026-07-30T15:38:42Z"
+      "updated_at": "2026-07-30T15:58:06Z"
     },
     {
       "id": "1d944e82-eb9e-4257-ab06-918df471320f",
@@ -990,6 +993,7 @@
       "description": "Spezza scripts/board.html in tre file e li serve da route dichiarate. Spec: docs/superpowers/specs/2026-07-30-board-workflow-design.md, sezione 4.\n\nSplit meccanico, nessun restyle e nessuna feature nuova: lo <style> inline diventa scripts/board.css, lo <script> inline diventa scripts/board.js caricato come modulo. Il restyle e' un'altra issue e questa non deve anticiparlo.\n\nIn scripts/board-server.mjs una tabella statica di route (/board.css -> text/css, /board.js -> text/javascript), letta in memoria all'avvio come gia' accade per la pagina. Nessun path costruito a partire dall'URL: le route restano dichiarate una per una e tutto il resto continua a rispondere 404.\n\nboard.js esporta le funzioni pure (renderCriteria, renderTierBadge e simili) e chiama init() solo quando esiste document, cosi' i test lo importano davvero invece di ritagliarlo dall'HTML contando le graffe. extractFunctions in test/plugin-board.test.mjs sparisce, e il marker test cerca i marker nell'artefatto che ora li contiene.\n\nCatena: apre la catena del board, sblocca il restyle.",
       "status": "backlog",
       "tier": "standard",
+      "depends_on": [],
       "validation": {
         "state": "unknown",
         "criteria": [
@@ -1003,7 +1007,7 @@
         ]
       },
       "created_at": "2026-07-30T15:38:42Z",
-      "updated_at": "2026-07-30T15:38:42Z"
+      "updated_at": "2026-07-30T15:58:22Z"
     },
     {
       "id": "10067a5b-c270-45ac-a51d-0c9ec2f09b32",
@@ -1011,6 +1015,9 @@
       "description": "Riscrive la presentazione del board senza rete e nello stile di Claude Code. Spec: docs/superpowers/specs/2026-07-30-board-workflow-design.md, sezione 5.\n\nVia Tailwind, daisyUI e Lucide: CSS scritto a mano su custom properties in scripts/board.css, icone SVG inline, font di sistema, nessun build step. Il board e' servito da un socket di loopback e deve presentarsi anche senza rete.\n\nToken (light / dark): --bg F0EEE6 / 1B1A18, --surface FAF9F5 / 232220, --ink 1F1E1C / EDEAE2, --muted 6C6A62 / 9A968B, --line DEDBD0 / 34322E, --accent D97757 / E08262. Stati: backlog 8A877D, in_progress accent, in_review 7A6BB5, blocked C0473E, done 5B8C51.\n\nTipografia, una regola sola: la macchina parla mono, l'umano parla sans. Id, tier, stati, contatori ed evidenze in stack mono di sistema; titoli e description in stack sans, perche' sono prosa lunga. Spacing su base 4px, densita' alta, radius 6px, bordi hairline 1px. Via il contenitore centrato: barra di stato, toolbar, canvas a tutta larghezza.\n\nParita' funzionale: nessuna feature nuova, il grafo arriva dopo.",
       "status": "backlog",
       "tier": "standard",
+      "depends_on": [
+        "1d944e82-eb9e-4257-ab06-918df471320f"
+      ],
       "validation": {
         "state": "unknown",
         "criteria": [
@@ -1024,7 +1031,7 @@
         ]
       },
       "created_at": "2026-07-30T15:38:42Z",
-      "updated_at": "2026-07-30T15:38:42Z"
+      "updated_at": "2026-07-30T15:58:06Z"
     },
     {
       "id": "4829cd1d-2e9a-43b5-9bad-a93126afb29c",
@@ -1032,6 +1039,7 @@
       "description": "Isola in scripts/board-graph.mjs la matematica del grafo, senza alcun accesso al DOM. Spec: docs/superpowers/specs/2026-07-30-board-workflow-design.md, sezione 6.\n\nCosa calcola: quali issue sono nodi (status diverso da done), quali dipendenze entrano come nodi fantasma (una dipendenza gia' done di un nodo visibile, oppure un id che non esiste piu'), il livello di ogni nodo con longest-path (0 se non ha dipendenze visibili, altrimenti max(livello dipendenza)+1), l'ordine dentro il livello con due passate di baricentro e tie-break sull'indice originale, il gruppo delle issue senza catena (ne' dipendenze ne' dipendenti), e la catena di un nodo (antenati piu' discendenti) che serve al chain lens.\n\nGuardia sui cicli: issues.json e' un file e qualcuno puo' editarlo a mano nonostante il divieto della CLI. Il layering tiene un visited-set, termina sempre e segnala gli id coinvolti invece di entrare in loop.\n\nModulo non ancora collegato alla pagina: qui si scrive solo la logica e i suoi test. Catena indipendente, puo' partire subito in parallelo.",
       "status": "backlog",
       "tier": "reasoning",
+      "depends_on": [],
       "validation": {
         "state": "unknown",
         "criteria": [
@@ -1045,7 +1053,7 @@
         ]
       },
       "created_at": "2026-07-30T15:38:42Z",
-      "updated_at": "2026-07-30T15:38:42Z"
+      "updated_at": "2026-07-30T15:58:22Z"
     },
     {
       "id": "1f4c689e-6087-4536-a995-2c31b856e171",
@@ -1053,6 +1061,11 @@
       "description": "Collega board-graph.mjs alla pagina e disegna il grafo. Spec: docs/superpowers/specs/2026-07-30-board-workflow-design.md, sezione 6.\n\nRoute nuova /board-graph.mjs con content-type text/javascript nella tabella statica del server, e board.js che lo importa come modulo.\n\nRender: colonne per livello, card per nodo, nodi fantasma in forma compatta con bordo tratteggiato e solo titolo troncato piu' stato. Archi come polilinee SVG a gomito da 1px con la punta sul target; un arco che salta piu' livelli passa nel corridoio fra le colonne. Le issue senza catena non fanno colonna: griglia a wrap etichettata, a sinistra del livello 0, altrimenti su questo tracker il grafo e' una colonna verticale che contiene tutto.\n\nToggle fra grafo e lista. La lista resta e mostra tutte le issue, done incluse: e' la vista di riferimento quando il grafo non ha niente da dire.\n\nCon un ciclo nei dati la pagina mostra un banner con gli id coinvolti e ripiega sulla lista.\n\nCatena: e' il punto di giunzione, richiede il campo nella CLI, il restyle e board-graph.mjs. E' il lavoro piu' grande: se va spezzato, si spezza qui.",
       "status": "backlog",
       "tier": "reasoning",
+      "depends_on": [
+        "2e2e7220-b660-4ad9-ae49-c765ca416a4a",
+        "10067a5b-c270-45ac-a51d-0c9ec2f09b32",
+        "4829cd1d-2e9a-43b5-9bad-a93126afb29c"
+      ],
       "validation": {
         "state": "unknown",
         "criteria": [
@@ -1066,7 +1079,7 @@
         ]
       },
       "created_at": "2026-07-30T15:38:42Z",
-      "updated_at": "2026-07-30T15:38:42Z"
+      "updated_at": "2026-07-30T15:58:06Z"
     },
     {
       "id": "315ec0d9-8a2d-4782-9729-6e78bf5ec2cd",
@@ -1074,6 +1087,9 @@
       "description": "L'elemento distintivo della pagina e la navigazione della canvas. Spec: docs/superpowers/specs/2026-07-30-board-workflow-design.md, sezioni 5 e 7.\n\nChain lens: al focus su una card, tutto cio' che non appartiene alla sua catena sbiadisce e gli archi della catena restano pieni. E' la regola 1-WIP resa visibile, ed e' l'unico punto in cui la pagina alza la voce. Si attiva su hover e su focus da tastiera: se vivesse solo nel mouse, meta' delle persone non lo vedrebbe mai. La catena la calcola board-graph.mjs, non una seconda implementazione dentro la pagina.\n\nNavigazione: drag sullo sfondo per il pan, rotella per lo scroll, ctrl piu' rotella per lo zoom fra 0.5x e 1.5x, bottoni fit-to-screen e reset.\n\nprefers-reduced-motion rispettato: niente transizioni sul lens e sullo zoom quando e' attivo.\n\nCatena: dipende dalla vista a grafo.",
       "status": "backlog",
       "tier": "standard",
+      "depends_on": [
+        "1f4c689e-6087-4536-a995-2c31b856e171"
+      ],
       "validation": {
         "state": "unknown",
         "criteria": [
@@ -1087,7 +1103,7 @@
         ]
       },
       "created_at": "2026-07-30T15:38:42Z",
-      "updated_at": "2026-07-30T15:38:42Z"
+      "updated_at": "2026-07-30T15:58:07Z"
     },
     {
       "id": "1787de25-b3c4-418d-b7d0-ae5468407824",
@@ -1095,6 +1111,9 @@
       "description": "Rende leggibile una issue intera e rende condivisibile cio' che si sta guardando. Spec: docs/superpowers/specs/2026-07-30-board-workflow-design.md, sezione 7.\n\nDrawer: click o Enter su una card apre un pannello a destra con description intera, criteri, tier e dipendenze come link cliccabili che selezionano e centrano la issue puntata. Esc chiude, il focus resta in trappola finche' e' aperto e torna alla card di partenza alla chiusura. Un bottone copia l'id con navigator.clipboard, che su 127.0.0.1 e' secure context: nessun fallback da scrivere.\n\nStato nell'URL: view, status, q, tier e issue viaggiano nella querystring. replaceState sui filtri, pushState sull'apertura di una issue, cosi' il tasto indietro chiude il drawer invece di uscire dalla pagina. Al boot l'URL vince sui default e un link incollato riapre la stessa vista.\n\nCatena: dipende dalla vista a grafo.",
       "status": "backlog",
       "tier": "standard",
+      "depends_on": [
+        "1f4c689e-6087-4536-a995-2c31b856e171"
+      ],
       "validation": {
         "state": "unknown",
         "criteria": [
@@ -1108,7 +1127,7 @@
         ]
       },
       "created_at": "2026-07-30T15:38:42Z",
-      "updated_at": "2026-07-30T15:38:42Z"
+      "updated_at": "2026-07-30T15:58:07Z"
     },
     {
       "id": "730ba7d8-f912-4ee3-91bf-59aa01e4ee50",
@@ -1116,6 +1135,9 @@
       "description": "Le aspettative standard rimaste, in un blocco solo. Spec: docs/superpowers/specs/2026-07-30-board-workflow-design.md, sezione 7.\n\nFiltri: chip per tier accanto a quelli per stato, dove standard include anche le issue con tier assente, che e' quanto references/issues.md gia' dichiara. Chip dei filtri attivi con un comando per azzerarli.\n\nScorciatoie: / porta il focus sulla ricerca, Esc chiude o pulisce, g e l cambiano vista, le frecce muovono il focus fra le card, Enter apre il drawer, ? mostra l'elenco delle scorciatoie.\n\nTema: data-theme sull'elemento html, default system da prefers-color-scheme, toggle system verso light verso dark persistito in localStorage. Densita': modalita' compatta che riduce il padding e nasconde la description nelle card, anch'essa persistita.\n\nBaseline di accessibilita', non un extra: focus visibile su ogni controllo, aria sui controlli e sugli stati, contrasto AA sui testi.\n\nCatena: dipende dalla vista a grafo.",
       "status": "backlog",
       "tier": "standard",
+      "depends_on": [
+        "1f4c689e-6087-4536-a995-2c31b856e171"
+      ],
       "validation": {
         "state": "unknown",
         "criteria": [
@@ -1129,7 +1151,7 @@
         ]
       },
       "created_at": "2026-07-30T15:38:42Z",
-      "updated_at": "2026-07-30T15:38:42Z"
+      "updated_at": "2026-07-30T15:58:07Z"
     },
     {
       "id": "65e77ea4-3523-47ef-93f4-db3e2ecd356f",
@@ -1137,6 +1159,11 @@
       "description": "Allinea la documentazione del board alla pagina che esiste davvero. Spec: docs/superpowers/specs/2026-07-30-board-workflow-design.md, sezioni 3 e 4.\n\nIn skills/harness/references/board.md la sezione Dipendenze della pagina documenta le CDN come trade-off scelto consapevolmente: e' diventata falsa e va sostituita, non corretta ai margini. Al suo posto i file serviti e le quattro route dichiarate dal server. Si aggiungono la vista a grafo, il toggle sulla lista, le scorciatoie e lo stato nella querystring.\n\nproposals/board-minimal.html era congelato in attesa di decidere se vendorizzare le librerie o cambiare interfaccia: la decisione e' presa e la sua impostazione senza dipendenze e' entrata in board.css. Il file si rimuove e proposals/README.md smette di citarlo come questione aperta.\n\nCatena: ultima, dipende dal server, dal restyle e dalla vista a grafo.",
       "status": "backlog",
       "tier": "economy",
+      "depends_on": [
+        "315ec0d9-8a2d-4782-9729-6e78bf5ec2cd",
+        "1787de25-b3c4-418d-b7d0-ae5468407824",
+        "730ba7d8-f912-4ee3-91bf-59aa01e4ee50"
+      ],
       "validation": {
         "state": "unknown",
         "criteria": [
@@ -1149,7 +1176,7 @@
         ]
       },
       "created_at": "2026-07-30T15:38:42Z",
-      "updated_at": "2026-07-30T15:38:42Z"
+      "updated_at": "2026-07-30T15:58:07Z"
     }
   ]
 }
