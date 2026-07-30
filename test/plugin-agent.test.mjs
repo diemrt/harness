@@ -67,6 +67,31 @@ test("harness-verifier closes issues through the plugin's tracker", () => {
   }
 });
 
+test("harness-verifier knows what to do with an issue that has no criteria", () => {
+  // A null validation is the one case where the contract is not in the criteria. Without
+  // instructions the agent either stalls or passes everything by default, and both are worse than
+  // no verification at all: they look like a gate.
+  const body = readAgent();
+  assert.match(body, /validation.{0,20}null/is, "the prompt must cover the null validation case");
+  assert.match(
+    body,
+    /Verifica leggera/,
+    "the agent must know where the contract of such an issue is written"
+  );
+  assert.match(
+    body,
+    /\bfail\b/,
+    "leaving the declared class of work must be stated as a failure, not a note"
+  );
+  // Tolerant of the line wrapping the markdown applies: what matters is the instruction, not where
+  // the paragraph happens to break.
+  assert.match(
+    body,
+    /da\s+null\s+a\s+\*{0,2}oggetto/i,
+    "closure must be documented as populating the validation object"
+  );
+});
+
 test("the skill names an agent that exists", () => {
   const referenced = [
     path.join(skillDir, "SKILL.md"),

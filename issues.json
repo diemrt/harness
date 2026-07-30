@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T11:04:39Z",
+  "last_updated": "2026-07-30T11:05:58Z",
   "rules": {
     "single_active_issue": false
   },
@@ -826,13 +826,13 @@
       "id": "55b06dcb-8530-4059-bc19-5210d136be2c",
       "title": "Agent harness-verifier: gate su una issue senza criteri",
       "description": "Il verificatore oggi confronta validation.criteria con gli artefatti reali. Su una issue a verifica leggera quei criteri non esistono, e senza istruzioni l'agente o si blocca o passa tutto per default: entrambi gli esiti sono peggiori di nessuna verifica, perche' danno l'illusione del gate.\n\nIn agents/harness-verifier.md: con criteria null il gate e' il comando verify di configurazione piu' il confronto del diff con la classe di lavoro dichiarata nella description. Un typo in un commento che tocca codice eseguibile e' un fail. La chiusura scrive validation come oggetto, con state e l'evidenza dei comandi eseguiti.\n\nDipende dalla issue che definisce la whitelist in SKILL.md e verification.md.\n\nSpec: docs/superpowers/specs/2026-07-30-harness-issue-quality-design.md, sezione B.",
-      "status": "in_review",
+      "status": "done",
       "validation": {
-        "criteria": "- harness-verifier.md istruisce cosa fare quando validation e' null: verify piu' controllo del diff\n- e' scritto che un diff fuori dalla classe dichiarata e' un fail, non una nota\n- e' scritto che la chiusura passa validation da null a oggetto con state ed evidenza\n- resta scritto che il verificatore non corregge il lavoro\n- test/plugin-agent.test.mjs copre le nuove istruzioni\n- npm test verde",
-        "state": "unknown"
+        "criteria": "PASS. (1) agents/harness-verifier.md:39-45 istruisce il caso validation null: contratto = classe di lavoro dichiarata dalla riga `Verifica leggera: <motivo>`, confronto sul diff; il gate verify resta il passo 3 non condizionato (righe 47-50). (2) riga 42-43: 'Un \"typo in un commento\" che tocca codice eseguibile e' un **fail**, non un'osservazione'; riga 44-45: riga assente => fatta fallire. (3) righe 65-67: la chiusura porta il campo 'da null a oggetto popolato', con state ed evidenza. (4) sezione 'Non correggere niente' righe 15-22 intatta (diff su quel blocco: vuoto). (5) test/plugin-agent.test.mjs:70-93 nuovo test 'harness-verifier knows what to do with an issue that has no criteria'; mutation check con la versione HEAD del prompt in dir temporanea => 'not ok ... AssertionError: the prompt must cover the null validation case', quindi il test e' effettivamente legato al testo nuovo. (6) gate `npm run test` (.harness/config.json): 'tests 148 / pass 148 / fail 0', eseguito due volte (prima e dopo la deriva concorrente del working tree), verde entrambe. Coerenza con la dipendenza: il formato riga combacia con skills/harness/SKILL.md:143 e references/verification.md:52. Collaterali: hash dei file in scope git hash-object b2a4cde (agent) e 39d45e8 (test), coincidenti con gli index dei diff esaminati; nessun file fuori scope attribuibile a questa issue. Osservazioni fuori scope (non bloccanti): l'assert /\bfail\b/ del nuovo test e' vacuo (matcha il preesistente \"state\":\"fail\" a riga 63) e non vincola l'istruzione fail; il paragrafo null non ribadisce esplicitamente 'il gate resta il comando verify'; il payload di chiusura mostrato a riga 62-63 usa criteria come stringa mentre commands/issue.md nel working tree introduce criteria come array (lavoro di un'altra issue, in volo).",
+        "state": "pass"
       },
       "created_at": "2026-07-30T10:37:08Z",
-      "updated_at": "2026-07-30T11:01:44Z"
+      "updated_at": "2026-07-30T11:05:32Z"
     },
     {
       "id": "8c89bdd3-f8d8-4489-830a-4e7422bae125",
@@ -857,6 +857,15 @@
       },
       "created_at": "2026-07-30T10:37:09Z",
       "updated_at": "2026-07-30T11:04:39Z"
+    },
+    {
+      "id": "25ab3cae-4bf6-400e-92c5-a65bae9d9495",
+      "title": "Docs: due frasi rimaste indietro sulle regole riscritte",
+      "description": "Verifica leggera: riformulazione di due frasi di documentazione ormai false, nessun codice eseguibile toccato.\n\nDue punti sono rimasti indietro rispetto alle regole cambiate, segnalati dai verificatori come osservazioni fuori scope:\n\n1. skills/harness/references/external-worker.md parla del \"subagent per issue richiesto dalla regola 1-WIP\": quella formula non esiste piu', il subagent e' una scelta e non un obbligo.\n2. scripts/issue-manager.mjs, commento di testata che abbozza la struttura della issue memorizzata, documenta ancora validation.criteria come stringa. Il blocco successivo dello stesso commento e' invece corretto.\n\nSolo riformulazione: nessuna riga di codice eseguibile, nessun test da cambiare.",
+      "status": "backlog",
+      "validation": null,
+      "created_at": "2026-07-30T11:05:58Z",
+      "updated_at": "2026-07-30T11:05:58Z"
     }
   ]
 }

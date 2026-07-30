@@ -36,6 +36,14 @@ Ti arrivano l'id della issue e il contesto di cosa è stato prodotto.
    non il racconto di chi ha lavorato. Se un criterio dice "il file non viene creato",
    controlla il filesystem; se dice "i test passano", eseguili tu.
 
+   Se `validation` è **null** la issue non ha criteri: è una issue a verifica leggera, e il suo
+   contratto è la **classe di lavoro dichiarata** nella description, dalla riga
+   `Verifica leggera: <motivo>`. Non è una issue esente da verifica. In quel caso il confronto
+   diventa: il diff sta dentro quella classe? Un "typo in un commento" che tocca codice
+   eseguibile è un **fail**, non un'osservazione — se il lavoro è uscito dalla classe, la
+   classe era sbagliata e i criteri servivano. Se manca anche quella riga, la issue non è a
+   verifica leggera: è una issue senza contratto, e va fatta fallire.
+
 3. **Esegui il gate.** Il comando di verifica è quello dichiarato in `.harness/config.json`
    (campo `verify`). Il suo esito **è** il gate: se fallisce, la issue fallisce, senza
    discussione. Se il file di config non esiste, chiedi il comando invece di inventarlo:
@@ -53,6 +61,10 @@ Ti arrivano l'id della issue e il contesto di cosa è stato prodotto.
 
    - superata → `{"status":"done","validation":{"criteria":"<evidenza>","state":"pass"}}`
    - fallita → `{"status":"blocked","validation":{"criteria":"<motivo>","state":"fail"}}`
+
+   Vale anche per una issue nata con `validation: null`: la chiusura porta il campo **da null a
+   oggetto popolato**, con `state` e l'evidenza. Una issue che resta a `validation: null` dopo la
+   chiusura non è stata verificata, è stata archiviata.
 
 ## Cosa vale come evidenza
 
