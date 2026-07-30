@@ -67,6 +67,19 @@ vendorizzare le librerie o cambiare interfaccia.
 
 I dati invece non passano mai da fuori: `api/issues` legge il file locale e basta.
 
+## Payload di `api/issues`
+
+```json
+{"projectDir": "...", "issues": [...], "lastUpdated": "...", "project": null}
+```
+
+`issues` e `lastUpdated` rispecchiano `issues.json` (schema in [issues.md](issues.md)).
+`project` è il campo `project` di `issues.json` quando presente e non vuoto, altrimenti
+`null` — è il caso del seed minimo scritto oggi dal plugin. La pagina lo usa per il titolo e
+ripiega sul nome della cartella (`projectDir`) solo quando è `null`. Se il file esiste ma non
+è leggibile (lettura a metà di una scrittura), il payload aggiunge `error` e gli altri campi
+tornano vuoti (`issues: []`, `lastUpdated: null`, `project: null`).
+
 ## Se un progetto non ha `issues.json`
 
 Il board mostra un tracker vuoto e non crea niente. Quando il file compare — al primo
