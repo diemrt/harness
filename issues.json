@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T09:08:42Z",
+  "last_updated": "2026-07-30T09:21:34Z",
   "rules": {
     "single_active_issue": false
   },
@@ -502,13 +502,13 @@
       "id": "5280cf02-bf3a-41e2-9a48-683bb0b46d9d",
       "title": "Slash command del plugin: board, issue, verify",
       "description": "Esporre le azioni ripetitive come comandi espliciti del plugin, oltre all'auto-invocazione della skill.\n\n- Comando per avviare/fermare il board server e stamparne l'URL.\n- Comando per le operazioni sulle issue (elenco per stato, creazione, aggiornamento) che si appoggia allo script del plugin.\n- Comando per lanciare la verifica indipendente su una issue tramite l'agent harness-verifier.\n- I nomi dei comandi vanno decisi in questa issue e usati in modo coerente nella documentazione.",
-      "status": "backlog",
+      "status": "done",
       "validation": {
-        "criteria": "I comandi compaiono in Claude Code dopo l'installazione del plugin e ognuno esegue l'azione dichiarata su un progetto di prova; i nomi usati coincidono con quelli documentati nel README.",
-        "state": "unknown"
+        "criteria": "PASS. Gate `npm run test` (da .harness/config.json): 217 pass / 0 fail, incluse le 9 asserzioni di test/plugin-commands.test.mjs. File nel posto giusto: commands/board.md, commands/issue.md, commands/verify.md alla radice del plugin (.claude-plugin/marketplace.json source ./, plugin.json name harness) -> nomi /harness:board|issue|verify. Frontmatter valido per tutti e tre: description presente (contiene il comportamento 'Senza argomenti'), argument-hint presente, nessun campo name, allowed-tools coerenti (verify ha Task). Nomi = README: grep '/harness:[a-z-]+' trova solo board/issue/verify in README.md righe 187-193, nessun nome non spedito e nessun comando non documentato. Azioni eseguite davvero su progetto di prova fuori dal repo (scratchpad/proj), con CLAUDE_PLUGIN_ROOT impostato: (a) /harness:issue senza argomenti -> tre --get-all --status in_progress|in_review|backlog, tutti {\"ok\":true,...totalCount:0} e nessun file creato nella dir di prova; (b) --insert --issue-data-file -> issue e8891db8-7978-439a-82af-45faeecff06d creata; --get la rilegge; --update la porta a in_review; (c) tentativo di chiusura come worker: HARNESS_ROLE=worker --update con {status:done,state:pass} -> {\"ok\":false,...\"code\":\"FORBIDDEN_ROLE\"}, exit 1, issue rimasta in_review: nessun bypass dell'agent harness-verifier; commands/issue.md non contiene payload done/pass e rimanda a /harness:verify (riga 63); commands/verify.md delega sempre al subagent (agents/harness-verifier.md esiste, name: harness-verifier) e vieta i controlli in linea. (d) /harness:board senza argomenti -> board-server.mjs in background, riga JSON {\"ok\":true,\"data\":{\"url\":\"http://127.0.0.1:58680/\",\"port\":58680,\"pid\":9320,\"projectDir\":<scratch>}}, /api/issues serve le issue del progetto giusto; percorsi d'errore come documentati: --port occupata -> PORT_IN_USE, --project-dir inesistente -> FILE_NOT_FOUND; stop via taskkill /PID 9320 /F -> server giu'. (e) /harness:verify senza argomenti -> --get-all --status in_review restituisce la sola issue in review. Path: nessun path assoluto in commands/ (grep per [A-Za-z]:\\, /Users/, /home/, ../ -> nessuno); tutte le invocazioni usano ${CLAUDE_PLUGIN_ROOT}/scripts/... e ogni ${CLAUDE_PLUGIN_ROOT}/<path> citato esiste su disco. Rimozione di commands/.gitkeep giudicata corretta: il testo era un placeholder che rimandava a questa issue e la cartella ora contiene i tre comandi. Danni collaterali: git diff --stat tocca solo README.md (+16), commands/.gitkeep (-1) e issues.json (dati del tracker); nessun segreto nei nuovi file; npm run dev:check pulito (updated: [], conflicts: []). NON VERIFICABILE IN QUESTA SESSIONE: la comparsa effettiva dei comandi nella lista di Claude Code richiede il riavvio della sessione (limite noto dei plugin appena scritti); resta da confermare al primo riavvio. Osservazioni fuori scope (non bloccanti): agents/.gitkeep esiste ancora con testo obsoleto ('the harness-verifier agent lands here') benche' agents/harness-verifier.md ci sia gia' - appartiene all'issue dell'agent; commands/issue.md nella sezione 'new' non nomina il flag --insert (il primo tentativo con --create esce UNKNOWN_COMMAND), recuperabile via --help o skills/harness/references/issues.md:30 che il comando stesso indica; skills/harness/SKILL.md non menziona i nuovi comandi.",
+        "state": "pass"
       },
       "created_at": "2026-07-29T13:20:46Z",
-      "updated_at": "2026-07-29T13:20:46Z"
+      "updated_at": "2026-07-30T09:21:34Z"
     },
     {
       "id": "f11914ba-b522-4fcb-88e7-eff4915780da",
@@ -689,6 +689,18 @@
       },
       "created_at": "2026-07-30T08:53:03Z",
       "updated_at": "2026-07-30T08:53:03Z"
+    },
+    {
+      "id": "b72cf682-bbb3-4f54-80df-1b728d8f2fc4",
+      "title": "docs: verifica documentazione per commit 325bf68",
+      "description": "Contesto commit 325bf68: fix: reject an empty docsGate include while the gate is enabled\n\nValuta se servono aggiornamenti a docs/, AGENTS.md o README.md e descrivi cosa cambiare per ciascun file.\nSe non serve aggiornare nulla, chiudi la issue motivando la decisione.\n\nFile di codice modificati:\n- scripts/harness-config.mjs",
+      "status": "backlog",
+      "validation": {
+        "criteria": "Verificare la documentazione per il commit 325bf68 (fix: reject an empty docsGate include while the gate is enabled). Controllare che tutti i file siano stati aggiornati, che sia stato usato meno testo possibile, che non siano state introdotte delle ripetizioni in documenti diversi",
+        "state": "unknown"
+      },
+      "created_at": "2026-07-30T09:09:27Z",
+      "updated_at": "2026-07-30T09:09:27Z"
     }
   ]
 }

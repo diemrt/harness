@@ -176,6 +176,22 @@ Exit codes:
 | `2`  | Completed, but one or more files are in conflict and need manual resolution. |
 | `1`  | Fatal error (bad arguments, unreadable template, etc.). |
 
+## Plugin slash commands
+
+Installed as a Claude Code plugin, the harness also exposes its three repetitive actions as
+explicit commands. They are shortcuts, not a second source of truth: the workflow itself
+lives in the `harness` skill, and each command points back at it.
+
+| Command | What it does | Without arguments |
+|---|---|---|
+| `/harness:board` | Starts the live issue board and prints its URL once; `stop` shuts it down | Starts the board for the current project |
+| `/harness:issue` | Lists issues by status, creates one, updates one | Shows the tracker: `in_progress`, `in_review`, `backlog` |
+| `/harness:verify` | Hands a finished issue to the independent `harness-verifier` agent | Picks among the issues sitting in `in_review` |
+
+`/harness:verify` never verifies inline: it always delegates to the `harness-verifier`
+subagent, so the agent that did the work is never the one that closes the issue. Closing an
+issue (`done` / `pass`) is the verifier's job alone — `/harness:issue` will not do it.
+
 ## `init.config.json` is yours to fill in
 
 The example commands `init.config.json` ships with (`npm install`, `npm test`, ...) are
