@@ -1,9 +1,5 @@
 # Worker esterno
 
-> **Stato:** contratto definito, runner in corso di migrazione nel plugin (issue "Portare il
-> runner del worker esterno nel plugin"). Il pattern qui sotto è quello che il runner deve
-> rispettare.
-
 Delega **opt-in** di una issue a una sessione AI esterna (una CLI in un processo separato)
 invece che a un subagent interno. Se `externalWorker.enabled` è `false` in
 `.harness/config.json` — il default — questa reference non serve: non leggerla, non costa
@@ -19,15 +15,54 @@ vincoli in un prompt supera il risparmio.
 
 1. L'orchestratore scrive il prompt del worker **in un file**. Sempre su file, mai inline:
    elimina ogni problema di quoting. Su Windows usa il **path assoluto completo**, non la
-   forma abbreviata 8.3 (`DIEGO_~1`), che alcune CLI non risolvono.
-2. Lancia il runner del plugin passando issue e prompt file. Il runner, non l'orchestratore:
-   - risolve il template `command` sostituendo il placeholder `{promptFile}`;
+   forma abbreviata 8.3 (`DIEGO_~1`), che alcune CLI non risolvono. `scripts/harness-worker.mjs`
+   risolve comunque il path ricevuto alla propria forma lunga (`fs.realpathSync.native`) prima di
+   sostituirlo nel comando, ma partire già da un path lungo evita l'unica dipendenza extra: che il
+   file esista quando lo script lo risolve.
+2. Lancia il runner del plugin:
+
+   ```text
+   node scripts/harness-worker.mjs --run --issue-id <issueId> --prompt-file <promptFile> [--project-dir <path>]
+   ```
+
+   Il runner, non l'orchestratore:
+   - legge `externalWorker` da `.harness/config.json` del `--project-dir` (default: cwd);
+   - risolve il template `command` sostituendo il placeholder `{promptFile}` con il path lungo
+     assoluto del prompt file;
    - imposta `HARNESS_ROLE=worker` nell'environment del processo figlio;
    - scrive il log in `.harness/runs/<issueId>-<timestamp>.log`, con la riga di comando
-     risolta in testa;
-   - propaga l'exit code del figlio.
+     risolta in testa, l'output combinato stdout+stderr del figlio, e l'exit code in coda;
+   - propaga l'exit code del figlio come proprio exit code (unica eccezione al contratto
+     standard "exit 0 su ok:true": qui l'exit code segnala l'esito del worker, non del runner —
+     vedi sotto).
 3. Gli aggiornamenti della issue da parte del worker usano `--issue-data-file`, mai
    `--issue-data` inline.
+
+### Output e contratto
+
+Come gli altri script del plugin, stdout è sempre una riga di JSON
+(`{"ok":true,"data":...}` / `{"ok":false,"error":"...","code":"..."}`), stderr resta vuoto,
+`--help` è testo semplice. `--run` è l'unica eccezione all'exit code 0/1 standard: una volta che
+il processo figlio è stato lanciato, l'exit code dello script diventa quello del figlio (0-255),
+non un fisso 0/1 — `data.exitCode` porta lo stesso valore anche per chi legge solo stdout.
+`ok:false` resta riservato ai casi in cui il run non è nemmeno partito (config assente/invalida,
+argomenti mancanti, prompt file inesistente, o l'avvio del processo che solleva un'eccezione).
+
+Comandi disponibili:
+
+```text
+node scripts/harness-worker.mjs --check [--project-dir <path>]
+node scripts/harness-worker.mjs --run --issue-id <id> --prompt-file <path> [--project-dir <path>]
+node scripts/harness-worker.mjs --help
+```
+
+Codici di errore: `CONFIG_NOT_FOUND` (nessun `.harness/config.json`), `INVALID_JSON` (config non
+parsabile), `WORKER_DISABLED` (`externalWorker` assente o `enabled` non `true`),
+`INVALID_COMMAND` (`command` assente o privo del placeholder `{promptFile}`), `MISSING_ARGS`
+(`--run` senza `--issue-id`/`--prompt-file`), `FILE_NOT_FOUND` (project dir o prompt file
+inesistenti), `SPAWN_ERROR` (il processo figlio non è nemmeno partito), `CHECK_FAILED` (il
+preflight ha eseguito il comando ma l'esito non è quello atteso), `UNKNOWN_COMMAND` (nessuna
+flag riconosciuta).
 
 ## Configurazione
 
@@ -47,8 +82,17 @@ codex exec --file {promptFile}
 ollama launch claude --model <model> -- -p {promptFile} --dangerously-skip-permissions
 ```
 
-Il preflight è **CLI-agnostico**: scrive un prompt di smoke test su file, sostituisce il
-placeholder, esegue il comando e valida l'esito. Nessun codice per-adapter.
+Il preflight è **CLI-agnostico**:
+
+```text
+node scripts/harness-worker.mjs --check [--project-dir <path>]
+```
+
+Scrive un prompt di smoke test (`Reply exactly READY. Use no tools.`) su un file temporaneo,
+sostituisce il placeholder, esegue il comando e valida l'esito senza dipendere dalla CLI
+specifica: passa se il comando esce con `0` oppure se `READY` compare nell'output combinato
+stdout+stderr. Nessun codice per-adapter. Il file temporaneo viene rimosso a fine check, che
+riesca o fallisca.
 
 ## Guard e permessi
 
