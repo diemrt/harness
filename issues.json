@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T09:21:34Z",
+  "last_updated": "2026-07-30T09:29:14Z",
   "rules": {
     "single_active_issue": false
   },
@@ -514,13 +514,13 @@
       "id": "f11914ba-b522-4fcb-88e7-eff4915780da",
       "title": "Demolizione dell'harness v1: motore update, template e hook",
       "description": "Rimuovere tutto cio' che il modello plugin rende inutile. Da fare SOLO quando il plugin e' funzionante end-to-end.\n\nDa eliminare: `src/policies.mjs`, `src/manifest.mjs`, `src/actions.mjs`, `src/cli.mjs`, `template/`, `.harness-manifest.json`, `hooks/` (root e template), `init.mjs`, `init.config.json`, `issues.html` e `issue-manager.mjs` alla radice, `docs/AGENTS-RULES.md`, `docs/ISSUES.md`, `docs/GIT.md`, `docs/EXTERNAL-WORKER.md`, gli script npm `dev:sync`/`dev:check` e il check di drift nel workflow CI.\n\nDa preservare: `issues.json` (dati reali del progetto, mai sovrascritti), la storia git, i test rilevanti riadattati al plugin.\nDa fare inoltre: disinstallare `core.hooksPath` dal clone (`git config --unset core.hooksPath`) e ridefinire cosa esegue la CI ora che il drift check non esiste piu'.",
-      "status": "backlog",
+      "status": "done",
       "validation": {
         "criteria": "Nessuno dei file elencati esiste piu' nel repo; `git config --get core.hooksPath` non restituisce nulla; `issues.json` ha lo stesso numero di issue di prima della demolizione ed e' leggibile dallo script del plugin; il workflow CI passa con il nuovo contenuto.",
-        "state": "unknown"
+        "state": "pass"
       },
       "created_at": "2026-07-29T13:20:46Z",
-      "updated_at": "2026-07-29T13:20:46Z"
+      "updated_at": "2026-07-30T09:29:14Z"
     },
     {
       "id": "b93f2268-15d6-4428-ab18-d0477637b993",

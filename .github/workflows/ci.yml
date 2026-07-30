@@ -22,5 +22,8 @@ jobs:
       - name: Run test suite
         run: npm test
 
-      - name: Check for drift between template/ and the materialized root
-        run: npm run dev:check
+      # The repository dogfoods its own plugin: issues.json here is real tracking data, not a
+      # fixture. Reading it back through the shipped tracker is the cheapest guarantee that a
+      # change to the plugin has not broken the one file every consumer project keeps.
+      - name: Read this project's tracker through the plugin
+        run: node scripts/issue-manager.mjs --get-all --page-size 1

@@ -22,22 +22,15 @@
     "npx",
     "boilerplate"
   ],
-  "bin": {
-    "harness": "src/cli.mjs"
-  },
   "engines": {
     "node": ">=18"
   },
   "files": [
-    "src/",
-    "template/",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "test": "node --test",
-    "dev:sync": "node src/cli.mjs update .",
-    "dev:check": "node src/cli.mjs update . --dry-run --json"
+    "test": "node --test"
   },
   "publishConfig": {
     "access": "public"
