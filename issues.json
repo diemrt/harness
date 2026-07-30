@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T12:49:09Z",
+  "last_updated": "2026-07-30T12:55:01Z",
   "rules": {
     "single_active_issue": false
   },
@@ -887,20 +887,14 @@
       "id": "4f7c19f1-ad0c-474e-9832-8992df5430c1",
       "title": "Agent verifier: vietare gli insert di prova sul tracker reale",
       "description": "Durante questa sessione un verificatore ha inserito due fixture nel issues.json reale del progetto (title \"no tier\" e \"reasoning\", description \"desc\", criteria [\"c1\"]): probe di prova lanciati con la cwd sul repository invece che su una copia temporanea. CLAUDE.md lo vieta esplicitamente, e i due record sono finiti nei commit della sessione.\n\nOggi la regola vive solo nel prompt che l'orchestratore scrive a mano, quindi vale se e quando se lo ricorda. Va nella definizione dell'agent, che e' il posto dove regge sempre.\n\nagents/harness-verifier.md deve dire che l'unica scrittura ammessa sul tracker del progetto e' la chiusura della issue in verifica, e che qualunque prova della CLI va fatta su una copia in directory temporanea con --project-dir.",
-      "status": "backlog",
+      "status": "done",
       "tier": "economy",
       "validation": {
-        "criteria": [
-          "harness-verifier.md dichiara che l'unica scrittura sul tracker del progetto e' la chiusura della issue in verifica",
-          "harness-verifier.md impone --project-dir su una copia temporanea per qualunque prova di insert o update",
-          "e' scritto che un probe sul tracker reale e' un errore del verificatore, non un dettaglio",
-          "test/plugin-agent.test.mjs copre le due istruzioni e diventa rosso se vengono rimosse",
-          "npm test verde"
-        ],
-        "state": "unknown"
+        "criteria": "1) agents/harness-verifier.md:26-27 dichiara in grassetto 'L'unica scrittura ammessa sul tracker del progetto e' la chiusura della issue che stai verificando', con il divieto esplicito di --insert/--update di prova (riga 27-29). 2) righe 31-37: qualunque prova della CLI va su una copia in directory temporanea con --project-dir esplicito, con esempio bash e spiegazione (39-40) del perche' senza --project-dir il record finisce nel tracker reale. 3) righe 42-44: 'Un probe sul tracker reale e' un errore del verificatore, non un dettaglio da segnalare a margine'. 4) test/plugin-agent.test.mjs:98-119 test 'harness-verifier may not probe the project's own tracker', 3 assert ancorati alla frase. Prova di copertura rifatta dal verificatore su copia in scratchpad (agents+test+skills+package.json copiati, tracker del progetto mai toccato): baseline pass 1/fail 0; rimozione dell'intera sezione -> fail 1 (assert 1); mutazione singola s1 -> fail solo assert 1; s2 (sostituito 'copia in directory temporanea, passando --project-dir') -> fail solo assert 2; s3 (sostituito 'un errore del verificatore') -> fail solo assert 3. Diagonale pulita: ogni istruzione ha il suo assert. 5) Gate .harness/config.json verify='npm run test': tests 157, pass 157, fail 0. git status --short: solo agents/harness-verifier.md, test/plugin-agent.test.mjs e issues.json (transizione di stato della issue). Nessun file modificato dal verificatore.",
+        "state": "pass"
       },
       "created_at": "2026-07-30T12:32:24Z",
-      "updated_at": "2026-07-30T12:32:24Z"
+      "updated_at": "2026-07-30T12:55:01Z"
     }
   ]
 }

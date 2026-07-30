@@ -95,6 +95,29 @@ test("harness-verifier knows what to do with an issue that has no criteria", () 
   );
 });
 
+test("harness-verifier may not probe the project's own tracker", () => {
+  // A verifier that runs a trial --insert with the cwd on the repository writes a fixture into
+  // the project's real issues.json, and it ships in the commit of the very issue it was judging.
+  // The rule only holds if it lives here, not in whatever prompt the orchestrator improvises.
+  // Asserts are anchored to the sentence: the words alone appear elsewhere in the prompt.
+  const body = readAgent();
+  assert.match(
+    body,
+    /unica\s+scrittura\s+ammessa\s+sul\s+tracker\s+del\s+progetto\s+è\s+la\s+chiusura\s+della\s+issue/i,
+    "the only write on the project tracker must be stated to be the closure of the issue"
+  );
+  assert.match(
+    body,
+    /copia\s+in\s+directory\s+temporanea\*{0,2},\s*passando\s+`--project-dir`/i,
+    "trying the CLI out must be pinned to a temp copy through an explicit --project-dir"
+  );
+  assert.match(
+    body,
+    /probe\s+sul\s+tracker\s+reale\s+è\s+\*{0,2}un\s+errore\s+del\s+verificatore/i,
+    "a probe on the real tracker must be named a mistake, not a footnote"
+  );
+});
+
 test("the skill names an agent that exists", () => {
   const referenced = [
     path.join(skillDir, "SKILL.md"),
