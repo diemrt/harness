@@ -33,7 +33,7 @@ node "$SCRIPTS/issue-manager.mjs" --insert --issue-data '{"title":"...","descrip
 # aggiornare (merge: i campi omessi restano invariati)
 node "$SCRIPTS/issue-manager.mjs" --update --issue-id <id> --issue-data '{"status":"done","validation":{"criteria":"<evidenza>","state":"pass"}}'
 
-# eliminare
+# eliminare (rifiutato finché altre issue la dichiarano in depends_on)
 node "$SCRIPTS/issue-manager.mjs" --delete --issue-id <id>
 
 # operare su un altro progetto
@@ -98,6 +98,7 @@ eccezione: testo semplice). Su stderr non viene scritto nulla.
   "description": "<string>",
   "status": "backlog|in_progress|in_review|blocked|done",
   "tier": "economy|standard|reasoning",
+  "depends_on": ["<guid>"],
   "validation": { "criteria": ["<string>"], "state": "unknown|pass|fail" },
   "created_at": "<datetime>",
   "updated_at": "<datetime>"
@@ -112,6 +113,30 @@ di ridedurlo dalla description: `economy`, `standard`, `reasoning`. È opzionale
 `null` — assente vale `standard`. Un `null` esplicito in `--update` lo azzera: è un **hint**, e
 un tier rimasto indietro dopo un cambio di scope va corretto, non conservato. La mappatura su
 modello e reasoning effort sta in [SKILL.md](../SKILL.md), non nei dati.
+
+**`depends_on`** elenca le issue che devono chiudersi **prima** di questa: l'arco va dalla
+dipendenza alla issue che la dichiara, non il contrario. È sempre un array — assente vale `[]`,
+e `[]` esplicito ripulisce le dipendenze — così chi legge il tracker cammina un grafo diretto
+senza dover distinguere fra chiave mancante e lista vuota. Le issue scritte prima del campo non
+hanno la chiave e restano leggibili e aggiornabili: il primo `--update` la materializza, come è
+già successo con `tier`.
+
+A differenza di `tier` e `validation`, `null` **non** è un valore ammesso: "nessuna dipendenza"
+si scrive già `[]`, e una seconda grafia obbligherebbe a indovinare quale delle due è
+memorizzata. Non c'è nessun tetto al numero di dipendenze: una dipendenza è un fatto del grafo,
+non testo libero, e un limite spingerebbe a cancellare un arco vero per far passare il payload.
+
+Il grafo è **aciclico per costruzione**: la CLI rifiuta con `INVALID_DEPENDENCY` un id
+inesistente, la self-reference, un duplicato nell'array e qualsiasi payload che chiuderebbe un
+ciclo (diretto o indiretto). È l'unico punto in cui il DAG viene difeso, ed è ciò che permette a
+ogni lettore — board compreso — di darlo per acquisito. Per lo stesso motivo `--delete` di una
+issue da cui altre dipendono viene rifiutata, elencando gli id che la puntano: sfilare l'id dai
+loro record muterebbe issue che il chiamante non ha nominato. Chi cancella scollega prima.
+
+**`depends_on` non blocca il lavoro.** La CLI non impedisce di portare `in_progress` una issue
+con dipendenze aperte: l'unico guard di processo resta quello anti-self-validation
+(`FORBIDDEN_ROLE`). Che si rispetti l'ordine della catena è una regola di workflow, e vive in
+[SKILL.md](../SKILL.md) come ci vive il tier.
 
 **Semantica di `validation`:** `criteria` descrive cosa rende la issue accettabile.
 - **alla creazione** — `criteria` con i criteri di accettazione, `state: "unknown"`;
@@ -179,6 +204,7 @@ il verificatore indipendente porta poi la issue a `done`/`pass` oppure `blocked`
 | `description` | string | obbligatorio | opzionale | non vuoto, max 1200 caratteri |
 | `status` | string | obbligatorio | opzionale | `backlog`, `in_progress`, `in_review`, `blocked`, `done` |
 | `tier` | string \| null | opzionale | opzionale | `economy`, `standard`, `reasoning`, oppure `null` |
+| `depends_on` | array | opzionale | opzionale | id di issue esistenti; assente vale `[]`, `[]` ripulisce; niente self-reference, niente duplicati, niente cicli; `null` non è ammesso |
 | `validation` | object \| null | opzionale | opzionale | `null` oppure `{ criteria, state: unknown\|pass\|fail }`; `criteria` array a `state: unknown`, stringa o array alla chiusura |
 
 In `--update` i campi omessi restano invariati, ma un campo **presente** deve essere valido:
@@ -195,6 +221,7 @@ Il `code` è stabile: usalo per la logica, il messaggio è per gli umani.
 | `INVALID_STATUS` | `status` fuori dai valori ammessi |
 | `INVALID_STATE` | `validation.state` fuori da `unknown`, `pass`, `fail` |
 | `INVALID_TIER` | `tier` fuori da `economy`, `standard`, `reasoning` (un `null` esplicito è valido) |
+| `INVALID_DEPENDENCY` | `depends_on` non è un array (`null` incluso), elemento non GUID, id duplicato, self-reference, id inesistente nel tracker, ciclo diretto o indiretto; oppure `--delete` di una issue da cui altre dipendono |
 | `INVALID_INPUT` | campo sconosciuto, obbligatorio mancante o vuoto, payload `{}` in update, `page-size` < 1, `criteria` di forma sbagliata (stringa a `state: unknown`, array vuoto, elemento non stringa o vuoto) |
 | `LIMIT_EXCEEDED` | `title`, `description` o un criterio oltre il limite di caratteri, o più di 7 criteri |
 | `INVALID_JSON` | payload non JSON valido |
