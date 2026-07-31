@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T09:45:04Z",
+  "last_updated": "2026-07-31T10:04:58Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1183,25 +1183,26 @@
       "id": "f5a51fab-e8e7-4954-9020-e4a497de6504",
       "title": "board-cli: comando one-shot con filtri e contratto di errore",
       "description": "Task 4 del piano. Spec sezione 5.\n\nNuovo scripts/board-cli.mjs, unico file con effetti collaterali: parseArgs, lettura del tracker, filtri, decisione sul colore, stampa.\n\nFlag: --project-dir, --view chains|cards, --status, --tier, --search, --all, --width, --no-color. Il progetto assente vale la cwd; issues.json non si risolve mai accanto allo script. Un progetto senza issues.json legge come tracker vuoto, non come errore.\n\nErrori: una riga JSON {ok:false,error,code} su stdout ed exit 1, con FILE_NOT_FOUND, INVALID_ARGUMENT e UNKNOWN_ARGUMENT — gli stessi tre che commands/board.md gia' insegna a leggere. In caso di successo stampa testo: e' una vista, non un'API.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
         "03268e64-df9c-4634-87a4-9aff28337a34"
       ],
       "validation": {
-        "state": "unknown",
+        "state": "pass",
         "criteria": [
-          "Il comando stampa l'albero delle catene del progetto passato con --project-dir.",
-          "Un progetto senza issues.json stampa il tracker vuoto ed esce con codice 0.",
-          "--project-dir inesistente esce 1 con FILE_NOT_FOUND; un flag sconosciuto con UNKNOWN_ARGUMENT; un flag noto senza valore con INVALID_ARGUMENT.",
-          "--view cards stampa le card e --status, --tier e --search le riducono.",
-          "Le issue done restano fuori finche' non si passa --all.",
-          "NO_COLOR valorizzato spegne il colore.",
-          "npm run test passa, test/plugin-board-cli.test.mjs incluso."
+          "1) Albero delle catene con --project-dir: verificato lanciando davvero il comando in 8 forme, non solo tramite i test. Percorso script assoluto; relativo dalla radice del repo (./scripts/board-cli.mjs); relativo da scripts/ (board-cli.mjs); relativo calcolato da una cwd estranea; percorso 8.3 corto (C:/Users/DIEGO_~1/...); da PowerShell; --project-dir con spazi nel path; senza --project-dir con cwd dentro il progetto. Tutte stampano 'proj . 2 aperte . 1 chiuse' + 'catena . aaaaaaaa' + la issue figlia, exit 0. La guardia di entrypoint (board-cli.mjs:315-333, fileURLToPath con fallback realpathSync) regge il caso Windows file:///C:/ contro C: backslash che avrebbe prodotto un comando muto a exit 0.",
+          "2) Progetto senza issues.json: node scripts/board-cli.mjs --project-dir <dir vuota> esce 0 e stampa 'Nessuna issue aperta: il tracker non ha niente da mostrare.'. issues.json non si risolve mai accanto allo script: lanciato da una cwd priva di tracker stampa comunque il tracker vuoto, non quello del plugin.",
+          "3) Contratto d'errore: una sola riga JSON su stdout, exit 1, stderr a 0 byte in tutti i casi provati. --project-dir inesistente -> FILE_NOT_FOUND; un file al posto della directory -> FILE_NOT_FOUND; --inventato e il positional 'start' -> UNKNOWN_ARGUMENT; --project-dir in coda, --search seguito da --all, --project-dir=, --status=, --view grafo, --width abc|80px|-5|10|0, --all=x, --no-color=true -> INVALID_ARGUMENT. Stessa forma di board-server.mjs:52 (writeFail su stdout piu' exit 1) e stessi tre codici che commands/board.md insegna a leggere. issues.json storto, vuoto o directory -> exit 1 con code ERROR, il quarto codice gia' dichiarato da board-server.mjs:21.",
+          "4) --view cards e i filtri: su un progetto di prova con 3 issue, cards apre {A,B}; --status backlog -> {B}; --status backlog --status in_progress (ripetibile, i valori si sommano) -> {A,B}; --tier economy -> {B}; --search alpha e --search ALPHA (case-insensitive) -> {A}; un filtro senza risultati stampa 'Nessuna issue da mostrare con questi filtri' e resta exit 0.",
+          "5) done fuori dalle card: cards mostra {A,B} e non la done cccccccc; --all -> {A,B,C}; --status done senza --all -> vuoto; --status done --all -> {C}. Nella vista chains filtri e --all sono inerti per scelta dichiarata (board-cli.mjs:264-269): giudicata dentro il contratto, perche' e' lo stesso comportamento del board web (board.js:734 costruisce il grafo da tutto il tracker e buildGraph scarta le done mostrandole come ghost) ed e' imposta dall'invariante 'board-graph.mjs intatto'; il criterio 4 scopa esplicitamente i filtri sulla vista cards. Le done restano contate nell'header ('1 chiuse'), non sparite.",
+          "6) NO_COLOR: verificato non a vuoto. Con TTY forzato e main() reale il disegno contiene davvero escape ANSI 256 (ESC[38;5;209m su '. in_progress'), sia in cards sia in chains; NO_COLOR=1 e NO_COLOR=0 lo spengono, NO_COLOR vuota no (convenzione: variabile valorizzata), --no-color vince sul TTY. Senza TTY il colore e' spento comunque.",
+          "7) Gate npm run test: 267 test, 267 pass, 0 fail (238 prima piu' i 29 di test/plugin-board-cli.test.mjs, che eseguito da solo da' 29/29). Nessun danno collaterale: git status --short mostra solo 'M issues.json' piu' i due file nuovi; git diff HEAD su scripts/board-render.mjs, scripts/board-graph.mjs, scripts/board-server.mjs, scripts/board.js, scripts/board.css, scripts/board.html e' vuoto: invariante rispettato.",
+          "Osservazioni fuori scope, non bloccanti: (a) --width maggiore o uguale a 268435456 esce 1 con code ERROR e messaggio \"issues.json in <dir> is not readable: Invalid string length\", che incolpa il tracker di un problema di larghezza e contraddice la definizione di ERROR data nell'intestazione del file; non e' una delle tre mappature del criterio 3. (b) --width non ha limite superiore: --width 10000000 produce un frame da 60 MB in 523 ms. (c) --status/--tier non validati contro il vocabolario del tracker (scelta dichiarata, board-cli.mjs:129-131): un typo da zero risultati con il messaggio di filtro vuoto, il che resta dentro il criterio 4 ('le riducono'); --view, vocabolario dello script stesso, e' invece validato. (d) --all --view chains e' accettato in silenzio senza effetto, mentre la spec sezione 5 riga 187 scrive '--all include le done' senza qualificare la vista: da decidere in un follow-up se avvisare o documentare. Nessun file toccato dal verificatore: tutte le prove in directory temporanee con --project-dir esplicito."
         ]
       },
       "created_at": "2026-07-31T08:50:16Z",
-      "updated_at": "2026-07-31T08:50:16Z"
+      "updated_at": "2026-07-31T10:04:58Z"
     },
     {
       "id": "0dd43c41-d40d-4ad9-afd4-de9a27059046",
