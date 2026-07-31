@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T10:04:58Z",
+  "last_updated": "2026-07-31T10:20:56Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1208,23 +1208,17 @@
       "id": "0dd43c41-d40d-4ad9-afd4-de9a27059046",
       "title": "board-cli: --watch con ridisegno e resistenza al file transitorio",
       "description": "Task 5 del piano. Spec sezione 6.\n\nIl watcher e' quello di board-server.mjs, spostato com'e': osserva la directory e non il file, perche' issue-manager.mjs scrive su un temporaneo e poi renameSync, e un watcher legato al file continuerebbe a puntare a quello sostituito. Il debounce sul burst di eventi e' gia' li'.\n\nIn watch la vista e' albero piu' card delle sole issue in volo — in_progress, in_review, blocked — che per la regola 1-WIP sono una o due: cosi' la schermata sta dentro un terminale e il redraw non combatte con la scrollback.\n\nSu un errore di lettura il watch non muore: stampa una riga e resta in attesa.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
         "f5a51fab-e8e7-4954-9020-e4a497de6504"
       ],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "--watch disegna subito e ridisegna quando issues.json cambia, senza rilanciare il comando.",
-          "Un issues.json illeggibile non fa uscire il processo: stampa l'errore e resta in ascolto.",
-          "In watch compaiono le card delle sole issue in_progress, in_review e blocked.",
-          "Il watcher osserva la directory, non il file, e ha il debounce sul burst di eventi.",
-          "npm run test passa."
-        ]
+        "state": "pass",
+        "criteria": "Verifica indipendente su feat/board-improv. (1) Ridisegno senza rilanciare: probe reale in dir temporanea con `node scripts/board-cli.mjs --project-dir <tmp> --watch --width 80` e scritture atomiche (file .issues.json.<pid>.tmp + renameSync, come issue-manager.mjs:507-509): STEP1 primo disegno 'primo alpha' true, STEP3 'terzo gamma' true, STEP4 'quarto delta' true, exitCode null a ogni passo. (2) File illeggibile: scrittura atomica di '{ questo non e json' -> stampa 'Tracker illeggibile: ...' e resta vivo, e la scrittura valida successiva ridisegna (terzo stato comparso); anche all'avvio con tracker gia' rotto il processo non esce e recupera al primo write valido. (3) Card delle sole in flight: frame live mostra '● in_progress'/'● in_review'/'● blocked' e nessun '● backlog' mentre la issue backlog resta nell'albero (board-cli.mjs:303-313, IN_FLIGHT da board-render.mjs:14, invariato). (4) Directory e non file: fs.watch e' chiamato su options.projectDir (board-cli.mjs:372), test 'il watcher osserva la directory' asserisce spy.watched deepEqual [dir], e il watch reale sopravvive a 3 renameSync consecutivi; debounce provato dal vivo: 2 eventi grezzi per rename, 1 solo frame in piu' per scrittura atomica (delta=1). (5) `npm run test`: tests 277, pass 277, fail 0, duration 13.8s (267 -> 277, i 10 nuovi). Default reali usati davvero, non solo le dipendenze finte: la sequenza end-to-end gira senza iniezione (watch/debounce/stdout reali) e il default clear segue isTTY (isTTY=false -> nessun ESC; isTTY=true -> frame che inizia con ESC[H ESC[J, nessun 2J). Nessun processo board-cli rimasto dopo la suite (conteggio 0). git status --short: solo issues.json, scripts/board-cli.mjs, test/plugin-board-cli.test.mjs; board-render.mjs, board-graph.mjs e board-server.mjs intatti; nessun file non tracciato. Nessun file modificato dal verificatore."
       },
       "created_at": "2026-07-31T08:50:16Z",
-      "updated_at": "2026-07-31T08:50:16Z"
+      "updated_at": "2026-07-31T10:20:56Z"
     },
     {
       "id": "932a5713-6066-4fb4-b6fc-69212babf14e",
@@ -1314,6 +1308,49 @@
       },
       "created_at": "2026-07-31T09:30:01Z",
       "updated_at": "2026-07-31T09:30:01Z"
+    },
+    {
+      "id": "11ad85f1-8107-461f-9793-88d619a18444",
+      "title": "board-cli: --width senza limite superiore e con la diagnosi sbagliata",
+      "description": "Segnalato dal verificatore della issue f5a51fab come osservazione fuori contratto.\n\n--width ha un minimo ma non un massimo. Con --width 268435456 il render supera la lunghezza massima di una stringa JavaScript e l'errore che esce e' {\"ok\":false,\"error\":\"issues.json in '<dir>' is not readable: Invalid string length\",\"code\":\"ERROR\"}: incolpa il tracker di un problema di larghezza, e contraddice la definizione che lo script stesso da' a ERROR, cioe' 'il tracker c'e' ma non si legge'. Con --width 10000000 produce un frame da 60 MB in mezzo secondo senza lamentarsi.\n\nUn errore che punta al file sbagliato manda chi legge a cercare un problema che non esiste. Il massimo va dichiarato come il minimo, e sforarlo e' INVALID_ARGUMENT come ogni altro valore fuori dominio.",
+      "status": "backlog",
+      "tier": "economy",
+      "depends_on": [
+        "f5a51fab-e8e7-4954-9020-e4a497de6504"
+      ],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "--width oltre il massimo dichiarato esce con INVALID_ARGUMENT e non con ERROR.",
+          "Il messaggio di INVALID_ARGUMENT nomina la larghezza e non issues.json.",
+          "Il massimo e' documentato nel messaggio d'aiuto dei flag come lo e' il minimo.",
+          "npm run test passa."
+        ]
+      },
+      "created_at": "2026-07-31T10:06:40Z",
+      "updated_at": "2026-07-31T10:06:40Z"
+    },
+    {
+      "id": "db7f2437-2d12-4d19-9d98-93272985333f",
+      "title": "board-cli: l'intestazione lascia spazi in coda e non dice su che branch sei",
+      "description": "Segnalato dal worker della issue f5a51fab.\n\nrenderChains ha uno slot branch nell'intestazione e board-cli.mjs gli passa la stringa vuota, ma il riempimento e' calcolato comunque: ogni board esce con una fila di spazi in coda alla prima riga. Su un terminale non si vede, in un file o in una pipe si', ed e' il genere di sporcizia che poi qualcuno insegue.\n\nLo slot pero' non e' un errore di progetto: l'esempio dello spec (sezione 3) mostra il branch a destra dell'intestazione, ed e' un dato utile — dice su quale ramo stai guardando quelle issue. Il renderer non puo' leggerlo perche' e' puro; board-cli.mjs si', e' il file con gli effetti collaterali. Si legge da .git/HEAD, che per un branch e' una riga sola 'ref: refs/heads/<nome>'; in detached HEAD si mostra l'hash corto o niente.\n\nDa fare: riempire lo slot da board-cli.mjs, e in ogni caso non lasciare spazi in coda quando lo slot resta vuoto.",
+      "status": "backlog",
+      "tier": "economy",
+      "depends_on": [
+        "f5a51fab-e8e7-4954-9020-e4a497de6504"
+      ],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "Nessuna riga dell'output ha spazi in coda, con o senza branch.",
+          "L'intestazione mostra il branch corrente del progetto guardato.",
+          "Un progetto senza .git, o in detached HEAD, non fa fallire il comando.",
+          "board-render.mjs resta puro: il branch glielo passa il chiamante.",
+          "npm run test passa."
+        ]
+      },
+      "created_at": "2026-07-31T10:06:40Z",
+      "updated_at": "2026-07-31T10:06:40Z"
     }
   ]
 }

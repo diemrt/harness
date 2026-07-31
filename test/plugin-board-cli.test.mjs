@@ -11,7 +11,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -20,7 +20,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CLI = path.join(__dirname, "..", "scripts", "board-cli.mjs");
 
-const { parseArgs, selectIssues, decideColors, readIssues, draw } = await import(
+const { parseArgs, selectIssues, decideColors, readIssues, draw, watchProject } = await import(
   pathToFileURL(CLI).href
 );
 
@@ -59,6 +59,7 @@ function tempProject(issues, raw = null) {
 
 const A = "aaaaaaaa-1111-1111-1111-111111111111";
 const B = "bbbbbbbb-2222-2222-2222-222222222222";
+const C = "cccccccc-3333-3333-3333-333333333333";
 
 function issue(id, extra = {}) {
   return {
@@ -404,6 +405,244 @@ test("--width stringe la vista invece di essere ignorato", () => {
     const piuLunga = (text) => Math.max(...text.split("\n").map((line) => line.length));
     assert.ok(piuLunga(stretta) < piuLunga(larga), "la larghezza chiesta cambia il disegno");
   } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- watch -------------------------------------------------------------------------------
+//
+// Il piano proponeva di verificare il watch con un figlio e tre `setTimeout` in fila, e dichiarava
+// da sé il rischio: su una macchina carica quel test lampeggia, e la reazione tipica — allungare le
+// attese finché smette — non dimostra niente di più. Qui il watcher è pilotato a livello di
+// funzione: `watchProject` riceve chi crea il watcher e chi scrive, così il test *provoca* l'evento
+// invece di aspettarlo, e resta un solo test di processo, quello che verifica che il primo disegno
+// arrivi davvero da una vera invocazione.
+
+// L'unica attesa rimasta, e non è un'attesa sul lavoro altrui: con `debounceMs: 0` il timer del
+// debounce scade prima di questo, perché i timer di node partono in ordine di scadenza e non di
+// registrazione. Non è una scommessa sulla velocità della macchina.
+const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
+
+// Un fs.watch finto: tiene il callback da parte e lo lascia chiamare al test.
+function fakeWatcher() {
+  const watched = [];
+  let listener = null;
+  let closed = 0;
+  return {
+    watched,
+    closed: () => closed,
+    create(dir, callback) {
+      watched.push(dir);
+      listener = callback;
+      return {
+        close() {
+          closed += 1;
+        },
+      };
+    },
+    fire(filename, event = "change") {
+      listener(event, filename);
+    },
+  };
+}
+
+function startWatch(dir, extra = []) {
+  const spy = fakeWatcher();
+  const written = [];
+  const options = { ...parseArgs(["--watch", "--width", "80", ...extra]).value, projectDir: dir };
+  const session = watchProject(options, {
+    write: (text) => written.push(text),
+    createWatcher: spy.create,
+    debounceMs: 0,
+    clear: false,
+  });
+  return { spy, written, session };
+}
+
+test("--watch è un flag booleano e non prende un valore", () => {
+  assert.equal(parseArgs([]).value.watch, false);
+  assert.equal(parseArgs(["--watch"]).value.watch, true);
+  assert.equal(parseArgs(["--watch=1"]).code, "INVALID_ARGUMENT");
+});
+
+test("in watch il disegno è l'albero più le card delle sole issue in volo", () => {
+  const dir = tempProject([
+    issue(A, { status: "in_progress" }),
+    issue(B, { status: "backlog" }),
+    issue(C, { status: "done" }),
+  ]);
+  try {
+    const frame = draw({ ...parseArgs(["--watch", "--width", "80"]).value, projectDir: dir });
+    // L'albero c'è tutto: le catene sono un fatto del grafo e non si filtrano.
+    assert.match(frame, /aperte/, "l'intestazione dell'albero è al suo posto");
+    assert.match(frame, /titolo bbbb/, "le issue non in volo restano nell'albero");
+    // Le card no: solo quelle in volo. `● <stato>` è la riga di testa di una card, l'albero
+    // scrive `○` e non nomina mai lo stato.
+    assert.match(frame, /● in_progress/);
+    assert.equal(frame.includes("● backlog"), false, "una issue ferma non merita una card");
+    assert.equal(frame.includes("● done"), false, "una issue chiusa nemmeno");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("in watch anche in_review e blocked hanno la loro card", () => {
+  const dir = tempProject([
+    issue(A, { status: "in_review" }),
+    issue(B, { status: "blocked" }),
+    issue(C, { status: "backlog" }),
+  ]);
+  try {
+    const frame = draw({ ...parseArgs(["--watch", "--width", "80"]).value, projectDir: dir });
+    assert.match(frame, /● in_review/);
+    assert.match(frame, /● blocked/);
+    assert.equal(frame.includes("● backlog"), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("senza niente in volo il watch lo dice, invece di parlare di filtri", () => {
+  const dir = tempProject([issue(A)]);
+  try {
+    const frame = draw({ ...parseArgs(["--watch"]).value, projectDir: dir });
+    assert.match(frame, /Nessuna issue in volo/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("il watch disegna subito e ridisegna a ogni scrittura su issues.json", async () => {
+  const dir = tempProject([issue(A, { status: "in_progress" })]);
+  const { spy, written, session } = startWatch(dir);
+  try {
+    assert.equal(written.length, 1, "il primo disegno non aspetta un evento");
+    assert.match(written[0], /aaaaaaaa/);
+
+    writeFileSync(
+      path.join(dir, "issues.json"),
+      JSON.stringify({ issues: [issue(A, { status: "in_progress" }), issue(B)] }),
+      "utf8"
+    );
+    spy.fire("issues.json");
+    await tick();
+    assert.equal(written.length, 2, "l'evento ha ridisegnato");
+    assert.match(written[1], /bbbbbbbb/, "la issue nuova compare senza rilanciare il comando");
+  } finally {
+    session.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("il watcher osserva la directory, non il file, e ignora gli altri file", async () => {
+  const dir = tempProject([issue(A)]);
+  const { spy, written, session } = startWatch(dir);
+  try {
+    // La ragione per cui guarda la directory: issue-manager scrive un temporaneo e poi lo rinomina
+    // sopra il tracker, e un watcher legato al file resterebbe attaccato a quello sostituito.
+    assert.deepEqual(spy.watched, [dir]);
+
+    spy.fire("altro.txt");
+    await tick();
+    assert.equal(written.length, 1, "una scrittura su un altro file non ridisegna");
+
+    spy.fire("issues.json.tmp");
+    await tick();
+    assert.equal(written.length, 1, "nemmeno il temporaneo di issue-manager");
+  } finally {
+    session.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("una raffica di eventi produce un solo ridisegno", async () => {
+  const dir = tempProject([issue(A)]);
+  const { spy, written, session } = startWatch(dir);
+  try {
+    spy.fire("issues.json", "rename");
+    spy.fire("issues.json", "change");
+    spy.fire("issues.json", "change");
+    await tick();
+    assert.equal(written.length, 2, "un disegno iniziale più uno solo per la raffica");
+  } finally {
+    session.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("un issues.json illeggibile non uccide il watch: stampa e resta in attesa", async () => {
+  const dir = tempProject([issue(A)]);
+  const { spy, written, session } = startWatch(dir);
+  try {
+    writeFileSync(path.join(dir, "issues.json"), "{ questo non e' json", "utf8");
+    spy.fire("issues.json");
+    await tick();
+    assert.equal(written.length, 2);
+    assert.match(written[1], /illeggibile/i, "l'errore è una riga, non uno stack trace");
+
+    // Il punto vero: il watcher è ancora lì, e la scrittura successiva ridisegna.
+    writeFileSync(path.join(dir, "issues.json"), JSON.stringify({ issues: [issue(B)] }), "utf8");
+    spy.fire("issues.json");
+    await tick();
+    assert.equal(written.length, 3);
+    assert.match(written[2], /bbbbbbbb/, "dopo il file transitorio il watch riprende a disegnare");
+  } finally {
+    session.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("chiudere la sessione chiude il watcher e annulla il ridisegno in coda", async () => {
+  const dir = tempProject([issue(A)]);
+  const { spy, written, session } = startWatch(dir);
+  try {
+    spy.fire("issues.json");
+    session.close();
+    await tick();
+    assert.equal(spy.closed(), 1, "il watcher è chiuso");
+    assert.equal(written.length, 1, "il debounce in coda non disegna dopo la chiusura");
+  } finally {
+    session.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// L'unico test di processo del watch: che una vera invocazione con --watch disegni e resti viva.
+// Attende l'output invece di attendere un tempo, e uccide il figlio comunque vada l'asserzione.
+function firstFrame(child, pattern, ms = 15000) {
+  return new Promise((resolve, reject) => {
+    let seen = "";
+    const timer = setTimeout(() => reject(new Error(`nessun disegno in ${ms}ms. Visto: ${seen}`)), ms);
+    const stop = (error, value) => {
+      clearTimeout(timer);
+      if (error) {
+        reject(error);
+      } else {
+        resolve(value);
+      }
+    };
+    child.stdout.on("data", (chunk) => {
+      seen += chunk.toString();
+      if (pattern.test(seen)) {
+        stop(null, seen);
+      }
+    });
+    child.on("error", (error) => stop(error));
+    child.on("exit", (code) => stop(new Error(`il watch è uscito con ${code}. Visto: ${seen}`)));
+  });
+}
+
+test("--watch disegna e resta vivo, lanciato davvero", async () => {
+  const dir = tempProject([issue(A, { status: "in_progress" })]);
+  const child = spawn("node", [CLI, "--project-dir", dir, "--watch", "--width", "80"], {
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  try {
+    const seen = await firstFrame(child, /aaaaaaaa/);
+    assert.match(seen, /● in_progress/, "il primo disegno ha già le card di chi è in volo");
+    assert.equal(child.exitCode, null, "il comando non è uscito dopo il primo disegno");
+  } finally {
+    child.kill();
     rmSync(dir, { recursive: true, force: true });
   }
 });

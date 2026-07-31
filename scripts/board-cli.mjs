@@ -9,6 +9,10 @@
 // Usage:
 //   node board-cli.mjs [--project-dir <path>] [--view chains|cards] [--status <s>]
 //                      [--tier <t>] [--search <text>] [--all] [--width <n>] [--no-color]
+//                      [--watch]
+//
+// Without --watch it prints one frame and ends. With --watch it stays: it draws immediately and
+// redraws at every write on issues.json, until SIGINT.
 //
 // --project-dir defaults to the process cwd: the board shows the project you are working in.
 // issues.json is never resolved next to this script — one installed copy serves every project,
@@ -23,15 +27,15 @@
 // declares, used wrong), UNKNOWN_ARGUMENT (a flag that does not exist), ERROR (the tracker is
 // there but unreadable). The same set board-server.mjs uses and commands/board.md teaches to read.
 
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync, watch } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { buildGraph } from "./board-graph.mjs";
-import { renderChains, renderCards } from "./board-render.mjs";
+import { IN_FLIGHT, renderChains, renderCards } from "./board-render.mjs";
 
 const VALUE_FLAGS = new Set(["--project-dir", "--view", "--status", "--tier", "--search", "--width"]);
-const BOOL_FLAGS = new Set(["--all", "--no-color"]);
+const BOOL_FLAGS = new Set(["--all", "--no-color", "--watch"]);
 const VIEWS = ["chains", "cards"];
 
 // Below this the tree has no room left for a title, and every line runs long anyway: a width that
@@ -41,8 +45,18 @@ const MIN_WIDTH = 20;
 // renderer already defaults to.
 const DEFAULT_WIDTH = 100;
 
+// One write on the tracker raises more than one event — the temp file, the rename, the mtime — and
+// redrawing on each of them means three frames for one change. Moved over from board-server.mjs
+// together with the watcher, same value, same reason.
+const DEBOUNCE_MS = 60;
+
+// Home, then erase down: the frame that follows overwrites the previous one from the top left,
+// and what the old frame left below it goes. `2J` alone scrolls on some terminals, and erasing
+// before moving would leave the cursor wherever it was.
+const CLEAR = "\u001b[H\u001b[J";
+
 const USAGE_TAIL =
-  "The board takes --project-dir, --view, --status, --tier, --search, --all, --width and --no-color.";
+  "The board takes --project-dir, --view, --status, --tier, --search, --all, --width, --no-color and --watch.";
 
 function fail(error, code) {
   process.stdout.write(`${JSON.stringify({ ok: false, error, code })}\n`);
@@ -75,6 +89,7 @@ export function parseArgs(argv) {
     width: null,
     all: false,
     noColor: false,
+    watch: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -94,6 +109,9 @@ export function parseArgs(argv) {
       }
       if (flag === "--no-color") {
         value.noColor = true;
+      }
+      if (flag === "--watch") {
+        value.watch = true;
       }
       continue;
     }
@@ -245,28 +263,13 @@ export function decideColors({ noColor }, env, isTTY) {
   return isTTY === true;
 }
 
-/**
- * One frame of the board, as a string. Reads the tracker and the terminal; writes nothing.
- *
- * @param {object} options the value returned by `parseArgs`
- * @returns {string}
- */
-export function draw(options) {
-  const issues = readIssues(options.projectDir);
-  const colors = decideColors(options, process.env, process.stdout.isTTY);
-  const width = options.width ?? process.stdout.columns ?? DEFAULT_WIDTH;
-  const shared = { width, colors };
-
-  if (options.view === "cards") {
-    return renderCards(selectIssues(issues, options), shared);
-  }
-
-  // The tree is built from the whole tracker, filters and all: a chain is a fact of the graph, and
-  // hiding half of it would either cut edges or turn the issues left out into ghosts the reader
-  // cannot tell from a closed dependency. The filters narrow the card view, which is the one meant
-  // for looking at issues one by one. `done` needs no filtering here either — buildGraph already
-  // keeps closed issues out of the nodes and shows them as ghosts where something still waits for
-  // them.
+// The tree is built from the whole tracker, filters and all: a chain is a fact of the graph, and
+// hiding half of it would either cut edges or turn the issues left out into ghosts the reader
+// cannot tell from a closed dependency. The filters narrow the card view, which is the one meant
+// for looking at issues one by one. `done` needs no filtering here either — buildGraph already
+// keeps closed issues out of the nodes and shows them as ghosts where something still waits for
+// them.
+function chains(issues, options, shared) {
   const isDone = (issue) => issue && issue.status === "done";
   return renderChains({
     graph: buildGraph(issues),
@@ -278,6 +281,121 @@ export function draw(options) {
     },
     ...shared,
   });
+}
+
+/**
+ * One frame of the board, as a string. Reads the tracker and the terminal; writes nothing.
+ *
+ * Three layouts, and the third is the one --watch asks for. A watch frame is redrawn over itself,
+ * so it has to fit a screen: the tree, plus the cards of the issues somebody is holding — the
+ * `IN_FLIGHT` statuses, which under the one-WIP-per-chain rule are one or two. The whole card view
+ * would scroll past the top on the first redraw and fight the scrollback for the rest of the day.
+ *
+ * @param {object} options the value returned by `parseArgs`
+ * @returns {string}
+ */
+export function draw(options) {
+  const issues = readIssues(options.projectDir);
+  const colors = decideColors(options, process.env, process.stdout.isTTY);
+  const width = options.width ?? process.stdout.columns ?? DEFAULT_WIDTH;
+  const shared = { width, colors };
+
+  if (options.watch) {
+    // The in-flight statuses stand in for --status here — asking a watch to follow the backlog is
+    // asking for a frame taller than the terminal — while --tier and --search still narrow, and
+    // --all has nothing to add since a done issue is by definition not in flight.
+    const flying = selectIssues(issues, { ...options, status: IN_FLIGHT, all: false });
+    const cards =
+      flying.length === 0
+        ? "Nessuna issue in volo: niente di preso in carico da tenere d'occhio."
+        : renderCards(flying, shared);
+    return `${chains(issues, options, shared)}\n${cards}`;
+  }
+
+  if (options.view === "cards") {
+    return renderCards(selectIssues(issues, options), shared);
+  }
+
+  return chains(issues, options, shared);
+}
+
+/**
+ * The watch: draw now, draw again at every write on issues.json, and stay.
+ *
+ * The watcher is the one board-server.mjs was already using, moved over as it was. It watches the
+ * DIRECTORY and not the file, and that is the whole reason it works: issue-manager.mjs writes a
+ * temporary file and then `renameSync`s it over the tracker, so a watcher bound to issues.json
+ * itself would keep pointing at the replaced inode and go silent after the first change.
+ *
+ * Everything this touches outside itself arrives as an argument — who writes, who makes the
+ * watcher, how long the debounce is. Not for the sake of injection: it is what lets the test
+ * *raise* the event instead of sleeping and hoping, which is the difference between a test that
+ * fails when the watch is broken and one that fails when the machine is busy.
+ *
+ * @param {object} options the value returned by `parseArgs`
+ * @param {object} [deps]
+ * @param {(text: string) => void} [deps.write] where a frame goes
+ * @param {(dir: string, listener: Function) => {close: Function}} [deps.createWatcher]
+ * @param {number} [deps.debounceMs]
+ * @param {boolean} [deps.clear] whether to erase the screen before each frame
+ * @returns {{close: () => void}}
+ */
+export function watchProject(options, deps = {}) {
+  const write = deps.write ?? ((text) => process.stdout.write(text));
+  const createWatcher = deps.createWatcher ?? watch;
+  const debounceMs = deps.debounceMs ?? DEBOUNCE_MS;
+  // Only a terminal gets the escapes: a watch piped into a file or into an agent's transcript is
+  // still a legitimate use, and control bytes in there are noise nobody asked for. Same rule the
+  // colour follows, taken separately because `--no-color` in a real terminal still wants the
+  // redraw to land on top of the previous frame instead of below it.
+  const clear = deps.clear ?? process.stdout.isTTY === true;
+
+  let pending = null;
+  let closed = false;
+
+  const render = () => {
+    let frame;
+    try {
+      frame = draw(options);
+    } catch (error) {
+      // A tracker caught mid-write is a transient, not a reason to die: issue-manager.mjs writes
+      // continuously while the agents work, and a watcher that exits on the first unreadable read
+      // is worse than no watcher at all.
+      const detail = error && error.message ? error.message : String(error);
+      frame = `Tracker illeggibile: ${detail}\nIn attesa della prossima scrittura…`;
+    }
+    write(`${clear ? CLEAR : ""}${frame}\n`);
+  };
+
+  render();
+
+  const watcher = createWatcher(options.projectDir, (_event, filename) => {
+    // A rename can arrive with no filename at all on some platforms; that one is worth a redraw,
+    // since the alternative is missing the very event the rename raises. A named file that is not
+    // the tracker is not: the temp file issue-manager writes next to it would otherwise double
+    // every redraw.
+    if (filename !== null && filename !== undefined && String(filename) !== "issues.json") {
+      return;
+    }
+    if (closed) {
+      return;
+    }
+    // One update raises a burst of events. The debounce collapses it into the single redraw the
+    // reader was going to see anyway.
+    clearTimeout(pending);
+    pending = setTimeout(render, debounceMs);
+  });
+
+  return {
+    close() {
+      closed = true;
+      // Not only politeness: a pending timer keeps the process alive, so a watch left half-closed
+      // would hang whoever is waiting for it to end.
+      clearTimeout(pending);
+      pending = null;
+      watcher.close();
+    },
+  };
 }
 
 export function main() {
@@ -292,6 +410,19 @@ export function main() {
   }
   if (!statSync(options.projectDir).isDirectory()) {
     fail(`'${options.projectDir}' is not a directory.`, "FILE_NOT_FOUND");
+  }
+
+  if (options.watch) {
+    // The watch owns the watcher; the process owns the signals. Keeping the two apart is what
+    // lets the watcher be tested without a test leaving signal handlers behind on the runner.
+    const session = watchProject(options);
+    const stop = () => {
+      session.close();
+      process.exit(0);
+    };
+    process.on("SIGINT", stop);
+    process.on("SIGTERM", stop);
+    return;
   }
 
   let frame;
