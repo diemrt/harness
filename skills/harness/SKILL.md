@@ -42,6 +42,24 @@ migliora la risposta.
 **Una sola issue `in_progress` per catena di dipendenza.** Issue scorrelate (catene distinte)
 possono procedere in parallelo. Dentro una stessa catena si va in ordine, una alla volta.
 
+**La catena è un dato, non una deduzione.** Ogni issue dichiara da cosa dipende nel campo
+`depends_on` ([references/issues.md](references/issues.md)), e la catena è la **componente
+connessa** di quel grafo: due issue stanno nella stessa catena se un cammino di dipendenze le
+collega, in un verso o nell'altro. Prima la ricostruiva l'orchestratore a giudizio e nessuno
+poteva controllarla; ora si calcola dal tracker, e il board la disegna. La regola non cambia:
+cambia che ora è verificabile.
+
+La CLI non fa da guard: portare `in_progress` una issue con dipendenze aperte è tecnicamente
+possibile ([references/issues.md](references/issues.md)). È la valvola di sfogo per il caso in
+cui la dipendenza dichiarata non morda davvero — e resta una decisione da motivare, non il modo
+normale di procedere.
+
+**Al worker è vietato togliere una dipendenza per sbloccarsi.** Cancellare l'arco che rende la
+propria issue non ancora lavorabile è la stessa mossa del cancellare i criteri che la rendono
+giudicabile: il lavoro sembra procedere perché è sparito ciò che lo misurava. Le dipendenze le
+mette chi apre la issue; chi le cambia lo motiva nella description, e non è mai chi ne sta
+traendo il permesso di partire.
+
 **Overlap verifica → next:** puoi iniziare la issue successiva mentre la verifica della
 precedente è ancora in corso, purché le catene lo consentano. Evita attese inutili su lavori
 brevi. Se il lavoro successivo modifica gli **script del plugin**, però, aspetta: un
