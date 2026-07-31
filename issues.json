@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-30T15:58:22Z",
+  "last_updated": "2026-07-31T13:31:00Z",
   "rules": {
     "single_active_issue": false
   },
@@ -968,24 +968,17 @@
       "id": "10679d39-c6e9-461e-b75d-0d84a9c6175b",
       "title": "Skill e reference: depends_on e catena calcolabile",
       "description": "Porta depends_on nella documentazione normativa del plugin. Spec: docs/superpowers/specs/2026-07-30-board-workflow-design.md, sezione 3.\n\nIn skills/harness/references/issues.md: il campo nello schema della issue, la riga nella tabella dei campi accettati in input, INVALID_DEPENDENCY nella tabella dei codici di errore, il rifiuto di --delete su una issue con dipendenti, e la semantica del campo (l'arco va dalla dipendenza alla issue che la dichiara).\n\nIn skills/harness/SKILL.md due cambi. La regola 1-WIP resta identica nella sostanza ma dice che la catena ora e' calcolabile: e' la componente connessa del grafo di depends_on, non piu' una deduzione dell'orchestratore. E un invariante nuovo, gemello di quello sui criteri: al worker e' vietato togliere una dipendenza per sbloccarsi, perche' cancellare l'arco che rende la propria issue non ancora lavorabile e' la stessa mossa del cancellare i criteri che la rendono giudicabile.\n\nSolo documentazione: nessuno script cambia. Catena: dipende dalla issue che introduce il campo nella CLI, altrimenti documenta qualcosa che non esiste.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
         "2e2e7220-b660-4ad9-ae49-c765ca416a4a"
       ],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "references/issues.md documenta depends_on nello schema e nella tabella dei campi accettati in input.",
-          "references/issues.md elenca INVALID_DEPENDENCY nella tabella dei codici e descrive il rifiuto di --delete con dipendenti.",
-          "SKILL.md, regola 1-WIP: dichiara che la catena e' la componente connessa del grafo depends_on.",
-          "SKILL.md contiene l'invariante che vieta al worker di togliere una dipendenza per sbloccarsi.",
-          "Nessun file fuori da skills/harness/ e' modificato dal diff della issue.",
-          "npm run test passa, test/plugin-skill.test.mjs incluso."
-        ]
+        "state": "pass",
+        "criteria": "Verifica indipendente sul diff di fd2a5b1 (git show --stat: solo skills/harness/SKILL.md +18, skills/harness/references/issues.md +29/-1). (1) references/issues.md:101 aggiunge \"depends_on\": [\"<guid>\"] allo schema e :207 la riga della tabella 'Campi accettati in input' (array, opzionale/opzionale, assente vale [], [] ripulisce, no self-reference/duplicati/cicli, null non ammesso). (2) :224 riga INVALID_DEPENDENCY nella tabella dei codici, che include \"--delete di una issue da cui altre dipendono\"; :132-135 e :36 descrivono il rifiuto di --delete elencando gli id dipendenti — coerente con scripts/issue-manager.mjs:727-736 che filtra i dependents e fallisce con INVALID_DEPENDENCY elencandoli. (3) SKILL.md:45-50, dentro '## Regola 1-WIP per catena di dipendenza': 'la catena e' la componente connessa di quel grafo' di depends_on. (4) SKILL.md:57-61: 'Al worker e' vietato togliere una dipendenza per sbloccarsi', esplicitamente gemello dell'invariante sui criteri. (5) git show --stat fd2a5b1 tocca solo file sotto skills/harness/; git status --short mostra unicamente ' M issues.json', il cui diff sono solo le transizioni di stato di questa issue (backlog -> in_review) e last_updated. (6) Gate .harness/config.json verify = npm run test: 'tests 175 / pass 175 / fail 0 / duration_ms 7728'; test/plugin-skill.test.mjs incluso nel run (i suoi 6 test compaiono nell'output) e rieseguito da solo: 'tests 6 / pass 6 / fail 0'. Nessun file modificato dal verificatore oltre a questa chiusura."
       },
       "created_at": "2026-07-30T15:38:42Z",
-      "updated_at": "2026-07-30T15:58:06Z"
+      "updated_at": "2026-07-31T13:31:00Z"
     },
     {
       "id": "1d944e82-eb9e-4257-ab06-918df471320f",
