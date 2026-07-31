@@ -12,12 +12,14 @@ import { fileURLToPath } from "node:url";
 import { buildGraph } from "../scripts/board-graph.mjs";
 import {
   components,
+  paint,
   renderCard,
   renderCards,
   renderChains,
   renderCriteria,
   SEP,
   shortId,
+  STATUS_COLOR,
   wrapText,
 } from "../scripts/board-render.mjs";
 
@@ -300,4 +302,171 @@ test("renderCards separa le card e dice quando non ce ne sono", () => {
 
   assert.match(renderCards([], { width: 70 }), /nessuna issue/i);
   assert.match(renderCards(null, { width: 70 }), /nessuna issue/i);
+});
+
+// --- Il colore: decorazione quando è acceso, nessuna traccia quando è spento -------------------
+
+// eslint-disable-next-line no-control-regex
+const ANSI = "\\u001b\\[[0-9;]*m";
+const stripAnsi = (text) => text.replace(new RegExp(ANSI, "g"), "");
+const hasAnsi = (text) => new RegExp(ANSI).test(text);
+
+const STATUSES = ["backlog", "in_progress", "in_review", "blocked", "done"];
+
+// Un grafo che tocca ogni riga che il renderer sa disegnare: intestazione, testata di catena,
+// nodo lavorabile e non, fantasma di una dipendenza chiusa, riga delle attese, sezione senza
+// catena. Se il colore rompe una larghezza, la rompe qui.
+function motleyGraph() {
+  return buildGraph([
+    issue(A, { status: "done" }),
+    issue(B, { depends_on: [A], status: "in_progress", tier: "reasoning" }),
+    issue(C, { depends_on: [A], status: "blocked" }),
+    issue(D, { depends_on: [B, C], status: "in_review", tier: "economy" }),
+    issue(E, { status: "backlog" }),
+  ]);
+}
+
+const chains = (colors) =>
+  renderChains({ graph: motleyGraph(), ...opts, counts: { open: 4, done: 1 }, colors });
+
+test("paint avvolge il testo solo quando il colore è acceso", () => {
+  assert.equal(paint("x", "in_progress", false), "x", "spento non lascia byte di escape");
+
+  const painted = paint("x", "in_progress", true);
+  assert.match(painted, new RegExp(`^\u001b\\[38;5;${STATUS_COLOR.in_progress}m`), "ANSI 256");
+  assert.match(painted, /\u001b\[0m$/, "e richiude");
+  assert.equal(stripAnsi(painted), "x", "in mezzo c'è il testo, invariato");
+
+  assert.equal(paint("x", "chiave-che-non-esiste", true), "x", "una chiave ignota non colora");
+});
+
+test("colors è una decisione booleana: tutto ciò che non è true vale spento", () => {
+  // Emettere escape per sbaglio è il verso che fa danno — una pipe si riempie di sporcizia.
+  for (const value of [undefined, null, 0, 1, "true", "sì", {}]) {
+    assert.equal(paint("x", "in_progress", value), "x", `colors=${JSON.stringify(value)}`);
+  }
+  assert.equal(hasAnsi(renderCard(issue(A), { width: 70, colors: "true" })), false);
+  assert.equal(hasAnsi(chains("true")), false);
+});
+
+test("ogni stato del tracker ha un colore in STATUS_COLOR", () => {
+  for (const status of STATUSES) {
+    assert.equal(typeof STATUS_COLOR[status], "number", `manca il colore di ${status}`);
+    assert.ok(
+      Number.isInteger(STATUS_COLOR[status]) &&
+        STATUS_COLOR[status] >= 0 &&
+        STATUS_COLOR[status] <= 255,
+      `${status} non è un indice della tavolozza a 256`
+    );
+  }
+  assert.equal(
+    new Set(STATUSES.map((s) => STATUS_COLOR[s])).size,
+    STATUSES.length,
+    "due stati con lo stesso colore sarebbero indistinguibili"
+  );
+});
+
+test("con il colore spento non esce un byte di escape, da nessuna vista", () => {
+  assert.equal(hasAnsi(chains(false)), false, "albero");
+  assert.equal(hasAnsi(chains(undefined)), false, "albero, colors omesso");
+  assert.equal(hasAnsi(renderCards([issue(A, { status: "blocked" }), issue(B)], { width: 70 })), false);
+  for (const status of STATUSES) {
+    assert.equal(hasAnsi(renderCard(issue(A, { status }), { width: 70, colors: false })), false, status);
+  }
+});
+
+test("il colore è additivo: spento e acceso-e-ripulito danno lo stesso testo", () => {
+  const plain = chains(false).split("\n");
+  const coloured = chains(true).split("\n");
+  assert.notEqual(coloured.join("\n"), plain.join("\n"), "acceso qualcosa deve pur cambiare");
+  assert.equal(coloured.length, plain.length, "il colore non aggiunge né toglie righe");
+  for (let i = 0; i < plain.length; i += 1) {
+    assert.equal(stripAnsi(coloured[i]), plain[i], `riga ${i} diversa una volta ripulita`);
+  }
+});
+
+// Il difetto che questo task rischia: colorare prima di misurare. `width - left.length` conta
+// anche gli escape, il riempimento si accorcia di una dozzina di caratteri e la colonna di destra
+// si sposta solo quando il colore è acceso — invisibile a un test che cerchi solo gli escape.
+test("le sequenze di escape non entrano nel calcolo delle larghezze", () => {
+  const plain = chains(false).split("\n");
+  const coloured = chains(true).split("\n").map(stripAnsi);
+
+  const withTier = plain
+    .map((line, i) => [line, coloured[i]])
+    .filter(([line]) => line.includes("[reasoning]") || line.includes("[economy]"));
+  assert.ok(withTier.length >= 2, "il grafo di prova ha righe con la colonna di destra");
+  for (const [line, cleaned] of withTier) {
+    assert.equal(cleaned.length, line.length, "la riga colorata è larga uguale");
+    assert.equal(
+      cleaned.indexOf("["),
+      line.indexOf("["),
+      "la colonna del tier cade nella stessa colonna"
+    );
+  }
+
+  // Anche la testata, che ha lo stesso riempimento fra progetto e branch.
+  assert.equal(coloured[0].length, plain[0].length);
+  assert.equal(coloured[0].lastIndexOf("main"), plain[0].lastIndexOf("main"));
+});
+
+test("una riga già al limite della larghezza non si allarga col colore", () => {
+  const title = "un titolo cosí lungo da mangiarsi tutta la riga e anche il riempimento minimo";
+  const graph = buildGraph([issue(A, { title }), issue(B, { depends_on: [A] })]);
+  const args = { graph, ...opts, counts: { open: 2, done: 0 } };
+  const plain = renderChains({ ...args, colors: false }).split("\n");
+  const coloured = renderChains({ ...args, colors: true }).split("\n");
+  const find = (lines) => lines.find((line) => stripAnsi(line).includes(title));
+  assert.equal(stripAnsi(find(coloured)), find(plain));
+  assert.match(find(plain), /  \[standard\]/, "il riempimento è già al minimo di due spazi");
+});
+
+test("la card allinea uguale con e senza colore", () => {
+  const it = issue(A, {
+    status: "in_review",
+    tier: "reasoning",
+    description: "una descrizione\nsu due righe",
+    validation: { state: "unknown", criteria: ["primo criterio", "secondo criterio"] },
+  });
+  const plain = renderCard(it, { width: 70, colors: false }).split("\n");
+  const coloured = renderCard(it, { width: 70, colors: true }).split("\n");
+  assert.equal(coloured.length, plain.length);
+  for (let i = 0; i < plain.length; i += 1) {
+    assert.equal(stripAnsi(coloured[i]), plain[i], `riga ${i}`);
+  }
+  const head = plain.find((line) => line.includes("in_review"));
+  assert.equal(head.length, 70, "la testata riempie la larghezza chiesta");
+
+  // Anche impilate: il righello di confine resta uno solo, e colorarlo non ne fa spuntare un altro.
+  const stack = (colors) => renderCards([issue(A), issue(B)], { width: 70, colors });
+  assert.equal(stripAnsi(stack(true)), stack(false));
+});
+
+test("il colore non porta informazione da solo: ogni stato resta scritto in lettere", () => {
+  for (const status of STATUSES) {
+    const it = issue(A, { status });
+    const coloured = renderCard(it, { width: 70, colors: true });
+    assert.ok(
+      stripAnsi(coloured).includes(`● ${status}`),
+      `${status} deve restare leggibile in lettere`
+    );
+    assert.ok(
+      coloured.includes(`\u001b[38;5;${STATUS_COLOR[status]}m`),
+      `${status} deve usare il colore della tavolozza`
+    );
+    assert.ok(
+      renderCard(it, { width: 70, colors: false }).includes(`● ${status}`),
+      `${status} resta leggibile anche senza colore`
+    );
+  }
+});
+
+test("uno stato fuori tavolozza si stampa lo stesso, semplicemente non colorato", () => {
+  const out = renderCard(issue(A, { status: "wontfix" }), { width: 70, colors: true });
+  const head = out.split("\n").find((line) => line.includes("wontfix"));
+  assert.ok(stripAnsi(head).startsWith("● wontfix"), "lo stato ignoto resta scritto");
+  assert.doesNotMatch(head, /\u001b\[38;5;\d+m● wontfix/, "e non prende un colore inventato");
+
+  // Nemmeno una issue senza stato deve far esplodere il renderer.
+  assert.doesNotThrow(() => renderCard({ id: A, title: "x" }, { width: 70, colors: true }));
 });

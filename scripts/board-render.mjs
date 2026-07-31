@@ -21,6 +21,47 @@ export function shortId(id) {
   return String(id || "").slice(0, 8);
 }
 
+// The palette of the visual spec (§8) translated to ANSI 256, which Windows Terminal and every
+// modern terminal support without negotiation: backlog grey, in_progress coral, in_review violet,
+// blocked red, done green.
+export const STATUS_COLOR = {
+  backlog: 245,
+  in_progress: 209,
+  in_review: 104,
+  blocked: 167,
+  done: 107,
+};
+
+// Not statuses: the shades the layout uses. Ids and section labels step back so the titles stand
+// out, and the workable flag borrows the coral of the issue somebody is holding.
+const EXTRA_COLOR = { id: 245, label: 245, flag: 209 };
+
+/**
+ * Wraps a piece of text in an ANSI 256 sequence, or hands it back untouched.
+ *
+ * Colour is decoration and never a carrier: every status this paints is spelled out in letters
+ * under the escape, so a pipe, a `NO_COLOR` or a terminal from 1985 lose nothing. Which is also
+ * why the decision is not taken here — the caller passes it, and this module stays pure.
+ *
+ * `colors` has to be exactly `true`. Emitting escapes by mistake is the direction that does the
+ * damage — control bytes in a file nobody asked to colour — so anything else counts as off.
+ *
+ * @param {string} text
+ * @param {string} key a status of the tracker, or one of the layout shades
+ * @param {boolean} colors
+ * @returns {string}
+ */
+export function paint(text, key, colors) {
+  if (colors !== true || text === "") {
+    return text;
+  }
+  const code = STATUS_COLOR[key] ?? EXTRA_COLOR[key];
+  if (typeof code !== "number") {
+    return text;
+  }
+  return `\u001b[38;5;${code}m${text}\u001b[0m`;
+}
+
 // Everything reachable from a node when the edges are walked in both directions at once. This is
 // NOT what chainOf() returns: that one climbs dependsOn and descends dependents, so two siblings
 // of one dependency — or anything reachable only by alternating up and down — land in disjoint
@@ -106,22 +147,35 @@ function isWorkable(node, graph) {
 // One issue, one line: marker, short id, title, and on the right what the reader decides with —
 // the tier and whether the issue can be picked up. The gap is padding, never information: with a
 // narrow terminal it collapses to two spaces and the line simply runs long.
-function nodeLine(node, graph, prefix, width) {
+//
+// The status does not appear here, so no colour of the palette does either: painting the marker by
+// status would make the tree say something it does not write down, and a reader without colour
+// would be reading a different board. Here colour only steps the ids and the labels back.
+function nodeLine(node, graph, prefix, width, colors) {
+  const id = shortId(node.id);
   if (node.ghost) {
     const label = node.ghost === GHOST_UNKNOWN ? "id sconosciuto" : node.issue.title;
-    return `${prefix}✓ ${shortId(node.id)}  ${label}`;
+    return `${prefix}✓ ${paint(id, "id", colors)}  ${paint(label, "label", colors)}`;
   }
   const tier = node.issue.tier || "standard";
   const flag = isWorkable(node, graph) ? "► lavorabile" : "";
-  const left = `${prefix}○ ${shortId(node.id)}  ${node.issue.title}`;
+  // Measured plain, painted afterwards. An escape sequence is zero columns wide on screen and a
+  // dozen characters to `.length`: colouring before this subtraction would eat the padding and
+  // move the right-hand column, and only when the colour is on.
+  const left = `${prefix}○ ${id}  ${node.issue.title}`;
   const right = `[${tier}]${flag ? `  ${flag}` : ""}`;
   const gap = Math.max(2, width - left.length - right.length);
-  return `${left}${" ".repeat(gap)}${right}`;
+  const leftOut = `${prefix}○ ${paint(id, "id", colors)}  ${node.issue.title}`;
+  const rightOut = `${paint(`[${tier}]`, "label", colors)}${
+    flag ? `  ${paint(flag, "flag", colors)}` : ""
+  }`;
+  return `${leftOut}${" ".repeat(gap)}${rightOut}`;
 }
 
-function renderComponent(component, graph, width) {
+function renderComponent(component, graph, width, colors) {
   const title = `catena · ${shortId(component.root.id)} `;
-  const lines = [`${title}${SEP(width - title.length)}`];
+  // The rule is measured on the plain title, then title and rule are dimmed as one label.
+  const lines = [paint(`${title}${SEP(width - title.length)}`, "label", colors)];
 
   const children = new Map();
   const roots = [];
@@ -139,7 +193,7 @@ function renderComponent(component, graph, width) {
 
   const walk = (node, depth) => {
     const prefix = depth === 0 ? "  " : `  ${"   ".repeat(depth - 1)}└─ `;
-    lines.push(nodeLine(node, graph, prefix, width));
+    lines.push(nodeLine(node, graph, prefix, width, colors));
     // A DAG is not a tree: a node that waits for more than one issue hangs off the deepest of
     // them and says out loud what else it is waiting for, instead of being drawn once per edge.
     // The line is indented past its own marker, never merely past its parent: at any depth below
@@ -147,7 +201,8 @@ function renderComponent(component, graph, width) {
     // reads as if an ancestor had said it.
     if (node.dependsOn.length > 1) {
       const under = " ".repeat(prefix.length + 2);
-      lines.push(`${under}attende ${node.dependsOn.map(shortId).join(" ")}`);
+      const waits = `attende ${node.dependsOn.map(shortId).join(" ")}`;
+      lines.push(`${under}${paint(waits, "label", colors)}`);
     }
     for (const child of (children.get(node.id) ?? []).sort((a, b) => a.order - b.order)) {
       walk(child, depth + 1);
@@ -169,13 +224,14 @@ function renderComponent(component, graph, width) {
  * @param {string} options.branch the branch shown on the right of the header
  * @param {{open: number, done: number}} options.counts the whole tracker, closed issues included
  * @param {number} [options.width] the columns to lay the text out on
+ * @param {boolean} [options.colors] whether to emit ANSI 256 escapes — the caller decides
  * @returns {string}
  */
-export function renderChains({ graph, project, branch, counts, width = 100 }) {
+export function renderChains({ graph, project, branch, counts, width = 100, colors = false }) {
   const head = `${project} · ${counts.open} aperte · ${counts.done} chiuse`;
   const branchLabel = branch || "";
   const gap = Math.max(2, width - head.length - branchLabel.length);
-  const blocks = [`${head}${" ".repeat(gap)}${branchLabel}`, ""];
+  const blocks = [`${head}${" ".repeat(gap)}${paint(branchLabel, "label", colors)}`, ""];
 
   // A cycle is only reachable by hand-editing issues.json past the CLI's refusal, and with one
   // there is no tree to draw: naming the issues involved and falling back to the flat list says
@@ -186,7 +242,7 @@ export function renderChains({ graph, project, branch, counts, width = 100 }) {
     blocks.push("");
     for (const node of graph.nodes) {
       if (!node.ghost) {
-        blocks.push(nodeLine(node, graph, "  ", width));
+        blocks.push(nodeLine(node, graph, "  ", width, colors));
       }
     }
     return blocks.join("\n");
@@ -194,14 +250,14 @@ export function renderChains({ graph, project, branch, counts, width = 100 }) {
 
   const chains = components(graph);
   for (const component of chains) {
-    blocks.push(renderComponent(component, graph, width), "");
+    blocks.push(renderComponent(component, graph, width, colors), "");
   }
 
   if (graph.unchained.length > 0) {
     const title = "senza catena ";
-    blocks.push(`${title}${SEP(width - title.length)}`);
+    blocks.push(paint(`${title}${SEP(width - title.length)}`, "label", colors));
     for (const node of graph.unchained) {
-      blocks.push(nodeLine(node, graph, "  ", width));
+      blocks.push(nodeLine(node, graph, "  ", width, colors));
     }
     blocks.push("");
   }
@@ -298,15 +354,19 @@ function formatDate(iso) {
  * @param {object} issue the issue as issues.json stores it
  * @param {object} [options]
  * @param {number} [options.width] the columns to lay the text out on
+ * @param {boolean} [options.colors] whether to emit ANSI 256 escapes — the caller decides
  * @returns {string}
  */
-export function renderCard(issue, { width = 100 } = {}) {
-  const lines = [SEP(width)];
+export function renderCard(issue, { width = 100, colors = false } = {}) {
+  const lines = [paint(SEP(width), "label", colors)];
 
   const tier = issue.tier || "standard";
+  // This is the one place the status is written out, so it is the one place it is coloured: the
+  // word stays there whatever the terminal, and a status the palette does not know keeps the word
+  // and loses only the colour.
   const head = `● ${issue.status}`;
   const gap = Math.max(2, width - head.length - tier.length);
-  lines.push(`${head}${" ".repeat(gap)}${tier}`);
+  lines.push(`${paint(head, issue.status, colors)}${" ".repeat(gap)}${paint(tier, "label", colors)}`);
   lines.push(...wrapText(issue.title, width));
 
   const description = typeof issue.description === "string" ? issue.description.trim() : "";
@@ -316,16 +376,21 @@ export function renderCard(issue, { width = 100 } = {}) {
 
   const validation = issue.validation;
   if (validation && (validation.state || validation.criteria)) {
-    lines.push("", `Validazione · ${validation.state || "unknown"}`);
+    const label = `Validazione · ${validation.state || "unknown"}`;
+    lines.push("", paint(label, "label", colors));
     lines.push(...renderCriteria(validation.criteria, width));
   }
 
   lines.push(
     "",
-    issue.id,
-    `creata ${formatDate(issue.created_at)} · aggiornata ${formatDate(issue.updated_at)}`
+    paint(issue.id, "id", colors),
+    paint(
+      `creata ${formatDate(issue.created_at)} · aggiornata ${formatDate(issue.updated_at)}`,
+      "label",
+      colors
+    )
   );
-  lines.push(SEP(width));
+  lines.push(paint(SEP(width), "label", colors));
   return lines.join("\n");
 }
 
@@ -336,15 +401,16 @@ export function renderCard(issue, { width = 100 } = {}) {
  * @param {object[]} issues
  * @param {object} [options]
  * @param {number} [options.width] the columns to lay the text out on
+ * @param {boolean} [options.colors] whether to emit ANSI 256 escapes — the caller decides
  * @returns {string}
  */
-export function renderCards(issues, { width = 100 } = {}) {
+export function renderCards(issues, { width = 100, colors = false } = {}) {
   if (!Array.isArray(issues) || issues.length === 0) {
     return "Nessuna issue da mostrare con questi filtri.";
   }
   return issues
     .map((issue, index) => {
-      const card = renderCard(issue, { width });
+      const card = renderCard(issue, { width, colors });
       return index === 0 ? card : card.slice(card.indexOf("\n") + 1);
     })
     .join("\n");

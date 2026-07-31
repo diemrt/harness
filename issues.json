@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T09:28:26Z",
+  "last_updated": "2026-07-31T09:45:04Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1167,23 +1167,17 @@
       "id": "03268e64-df9c-4634-87a4-9aff28337a34",
       "title": "board-render: colore ANSI 256 opzionale",
       "description": "Task 3 del piano. Spec sezione 8.\n\npaint() e STATUS_COLOR: la palette dello spec visivo tradotta in ANSI 256, che Windows Terminal e i terminali moderni supportano senza negoziazione.\n\nIl colore non porta mai informazione da solo: ogni stato e' scritto anche in lettere, cosi' NO_COLOR, una pipe o un terminale spartano non perdono niente. Con colors falso non deve uscire nemmeno un byte di escape.",
-      "status": "backlog",
+      "status": "done",
       "tier": "economy",
       "depends_on": [
         "aaae9161-4b26-4b85-a7ee-69683656c9fa"
       ],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "paint restituisce il testo invariato quando il colore e' spento e non emette byte di escape.",
-          "Ogni stato ha un colore in STATUS_COLOR e una chiave sconosciuta non colora.",
-          "Lo stesso render con colors falso non contiene sequenze di escape.",
-          "Ogni stato resta leggibile in lettere anche senza colore.",
-          "npm run test passa."
-        ]
+        "state": "pass",
+        "criteria": "Verifica indipendente, tutti e cinque i criteri soddisfatti con prove eseguite dal verificatore (non i test del worker).\n\n1) paint restituisce il testo invariato a colore spento e non emette escape: probe diretta su paint() con colors in [false, undefined, null, 0, 1, \"true\", \"1\", {}, [], \"yes\"] -> sempre \"x\" (colors !== true, board-render.mjs:55). Testo vuoto -> \"\" senza escape. Acceso: paint(\"x\",\"done\",true) === \"\u001b[38;5;107mx\u001b[0m\".\n\n2) Palette completa e chiave ignota inerte: STATUS_COLOR = {backlog:245,in_progress:209,in_review:104,blocked:167,done:107}, esattamente i 5 stati che issue-manager.mjs:306 ammette, 5 codici distinti, nessuna chiave di troppo. Chiavi ignote (\"wontfix\", \"\", \"DONE\", undefined, null, 0) e chiavi di prototipo (\"constructor\",\"toString\",\"__proto__\",\"hasOwnProperty\",\"valueOf\") non colorano: la guardia typeof code !== \"number\" (board-render.mjs:59) regge anche i metodi ereditati. renderCard con status \"wontfix\" a colore acceso stampa \"● wontfix\" senza escape davanti.\n\n3) Nessun byte di escape a colore spento, e identita' col commit precedente: HEAD:scripts/board-render.mjs estratto in scratchpad e confrontato con la versione nuova sulle 94 issue reali di issues.json. renderChains a width 40/60/72/80/100/120/160/200: Buffer.compare === 0 con colors:false, con colors:undefined e con l'opzione omessa (1231..3171 byte). renderCards su tutte e 94 le issue a width 50/80/100/140: stringhe identiche (329530..357302 byte), piu' renderCard issue per issue. Rami non coperti dal tracker reale esercitati a parte: ciclo (graph.cycle.detected) e ghost GHOST_UNKNOWN, base === off a 5 larghezze.\n\n4) Gli escape non entrano nel calcolo delle larghezze: stripAnsi(render(colors:true)) confrontato riga per riga con render(colors:false). Albero su issue reali, 8 larghezze, 17 righe ciascuna: zero divergenze e escape effettivamente presenti. Card reali, 4 larghezze, fino a 7990 righe: zero divergenze. Il difetto e' escluso alla radice nel sorgente: nodeLine misura left/right in chiaro e costruisce leftOut/rightOut dopo (board-render.mjs:165-172), e renderComponent misura SEP sul titolo in chiaro prima di dipingere (board-render.mjs:178).\n\n5) Il colore non porta mai informazione da solo: poiche' stripAnsi(colorato) === spento byte per byte ovunque, il colore non aggiunge ne' toglie un solo carattere di testo. Lo stato e' scritto in lettere in tutte e 94 le card reali (\"● <status>\") sia a colore spento sia sotto l'escape. La scelta di non colorare per stato nell'albero e' corretta e non aggira il criterio 4: l'albero non scrive lo stato da nessuna parte, quindi colorarlo per stato avrebbe messo nel colore l'unica copia di quell'informazione; nell'albero il colore attenua solo id/etichette/tier e accende \"► lavorabile\", tutte stringhe presenti anche a colore spento.\n\nModulo puro riletto nel sorgente, non dedotto dal test: unico import GHOST_UNKNOWN da ./board-graph.mjs, nessun process.env, nessun NO_COLOR letto (compare solo in un commento a riga 43), nessun fs, nessun side effect a livello di modulo; la decisione sul colore arriva dal chiamante.\n\nGate: npm run test -> tests 238, pass 238, fail 0 (228 prima di questo lavoro, +10 test nuovi).\n\nDanni collaterali: git status --short --untracked-files=all elenca solo issues.json, scripts/board-render.mjs, test/plugin-board-render.test.mjs. scripts/board-graph.mjs non toccato (git diff --stat HEAD -- scripts/board-graph.mjs vuoto). Nessun probe sul tracker reale: la CLI e' stata esercitata solo in lettura, i confronti su copie in scratchpad.\n\nNon riprodotta l'osservazione del worker sulla dipendenza chiusa vista come \"id sconosciuto\": sul tracker reale i due fantasmi (85d40484, aaae9161) rendono col proprio titolo."
       },
       "created_at": "2026-07-31T08:50:16Z",
-      "updated_at": "2026-07-31T08:50:16Z"
+      "updated_at": "2026-07-31T09:45:04Z"
     },
     {
       "id": "f5a51fab-e8e7-4954-9020-e4a497de6504",
@@ -1297,6 +1291,28 @@
       },
       "created_at": "2026-07-31T09:00:07Z",
       "updated_at": "2026-07-31T09:00:07Z"
+    },
+    {
+      "id": "36fdaea6-0f36-4310-8dd4-9fd86eee6418",
+      "title": "board-render: la card perde l'indentazione e non regge un elemento non-issue",
+      "description": "Segnalato dal verificatore della issue aaae9161 come osservazione fuori contratto. Tre difetti della card, tutti piccoli, tutti in renderCard.\n\n1. L'indentazione iniziale di una riga di description viene assorbita dal word wrap: '  - primo' esce come '- primo'. La card web la conservava con preserve-newlines, e sul tracker reale sono 8 le issue con righe indentate — sono elenchi, e senza rientro un elenco smette di leggersi come tale. I criteri della issue chiedevano le newline e non l'indentazione, per questo non e' stato un fail.\n\n2. renderCards([issue, null]) solleva TypeError leggendo 'tier' su null. issues.json e' un file e puo' essere editato a mano: board-graph.mjs normalizza via ogni voce che non sia un oggetto usabile proprio per questo, il renderer no. Un board che esplode su un file storto e' peggio di un board che salta una riga.\n\n3. validation: {criteria: []} senza state stampa 'Validazione · unknown' con sotto il vuoto, dove issueCard() in board.js non stampava alcun blocco. Non raggiungibile sul tracker di oggi, dove tutte e 93 le issue hanno state, ma lo schema lo ammette.",
+      "status": "backlog",
+      "tier": "economy",
+      "depends_on": [
+        "aaae9161-4b26-4b85-a7ee-69683656c9fa"
+      ],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "L'indentazione iniziale di una riga di description e' conservata nella card.",
+          "renderCards con un elemento non-oggetto nell'array non solleva: la voce viene saltata.",
+          "validation senza state e con criteria vuoto non stampa il blocco di validazione.",
+          "I test coprono i tre casi e fallirebbero sul codice attuale.",
+          "npm run test passa."
+        ]
+      },
+      "created_at": "2026-07-31T09:30:01Z",
+      "updated_at": "2026-07-31T09:30:01Z"
     }
   ]
 }
