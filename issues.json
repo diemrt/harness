@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T15:51:51Z",
+  "last_updated": "2026-07-31T16:01:46Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1019,43 +1019,35 @@
       "id": "de750e71-51a7-4561-914e-e8ed5422c769",
       "title": "SKILL.md: il tier non viene applicato nel punto in cui si istanzia il subagent",
       "description": "SKILL.md:130 assegna all'orchestratore la mappatura tier -> modello e la tabella a :137-141 la descrive a parole, ma nessun punto della skill dice di applicarla quando il subagent viene creato. La sezione del dispatch (:79-83) decide soltanto fra subagent e inline e chiude con 'harness non prescrive come si istanzia': e' li' che il passo servirebbe, ed e' li' che manca.\n\nIl modo di fallire e' silenzioso: senza una scelta esplicita il subagent eredita il modello della sessione, quasi sempre il piu' capace. Nessun errore, nessun test rosso, e il tier resta un campo che nessuno legge. Osservato sullo sviluppo del board: tre subagent per issue economy e standard girati tutti sul modello di sessione.\n\nHARNESS_ROLE fallisce allo stesso modo, e per quello :91-102 dedica una sottosezione con i comandi da copiare: serve il gemello per il tier. Stesso trattamento per :150, il verificatore con tier >= a quello del worker, regola enunciata e mai applicata dove la verifica si delega.\n\nVincolo: harness non pinna modelli per nome e non si lega all'API di un harness specifico. Il testo impone che il tier sia onorato, non il nome di un parametro.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "La sezione sul dispatch di SKILL.md dice di fissare il modello dal tier nel momento in cui il subagent viene istanziato.",
-          "Il testo dichiara che dimenticarlo non produce nessun errore e che il subagent eredita il modello della sessione.",
-          "La regola del verificatore con tier >= a quello del worker e' applicata dove la verifica viene delegata, non solo enunciata nel capitolo sul tier.",
-          "Il testo non nomina modelli specifici ne' il parametro di un tool particolare: la mappatura resta dell'orchestratore.",
-          "E' detto cosa fare quando si lavora inline, dove il modello non e' scelto da chi dispatcha.",
-          "Nessun file fuori da skills/harness/ e' modificato dal diff della issue.",
-          "npm run test passa, test/plugin-skill.test.mjs incluso."
-        ]
+        "state": "pass",
+        "criteria": "skills/harness/SKILL.md: nuova sottosezione 'Il tier si applica quando il subagent nasce' (righe 91-103) dice esplicitamente di fissare il modello dal tier nell'istante in cui il subagent viene creato, e che dimenticarlo non produce errore ne' test rosso ma fa ereditare al subagent il modello della sessione (righe 93-98). La sezione 'Verifica indipendente' (righe 205-211) applica la regola tier verificatore >= tier worker al punto in cui la verifica viene delegata (istanza di harness-verifier), non solo enunciata nel capitolo Tier. Grep su model|Sonnet|Opus|Haiku|GPT|claude-|gpt- e su subagent_type|Task tool|Agent tool|model:|model=|`model` non trova nomi di modelli ne' parametri di tool specifici: solo 'tier' e mappature generiche. Righe 100-103 coprono il caso inline: 'il modello non lo scegli tu al dispatch: e' gia' quello fissato per la sessione in corso', con la regola di passare a subagent se il lavoro eccede il tier. git diff --stat: solo commands/board.md (altra issue, fuori scope), issues.json (update di stato via CLI, atteso) e skills/harness/SKILL.md sono modificati; nessun file fuori da skills/harness/ appartiene al diff di questa issue. `npm run test` (comando verify di .harness/config.json): 181/181 pass, 0 fail, incluso test/plugin-skill.test.mjs (frontmatter, link, riferimenti di SKILL.md)."
       },
       "created_at": "2026-07-31T14:07:54Z",
-      "updated_at": "2026-07-31T14:07:54Z"
+      "updated_at": "2026-07-31T16:01:33Z"
     },
     {
       "id": "a0fc54f0-79de-4b49-a357-eb0a1e2654b8",
       "title": "commands/board.md non elenca INVALID_ARGUMENT_VALUE",
       "description": "Seguito della issue 70dce12a, segnalato dal worker che l'ha svolta. Il board server ora distingue due errori di argomento: UNKNOWN_ARGUMENT per un flag che non esiste o un positional inatteso, INVALID_ARGUMENT_VALUE per un flag dichiarato ma usato male (--port o --project-dir senza valore).\n\ncommands/board.md e' stato allineato dalla issue ad5004dc, ma solo sul primo dei due: l'elenco dei codici da riportare dopo l'avvio si ferma a PORT_IN_USE, FILE_NOT_FOUND e UNKNOWN_ARGUMENT. Un agente che riceve INVALID_ARGUMENT_VALUE torna nella stessa condizione che quell'elenco esiste per evitare: nessuna istruzione, e un ritentativo alla cieca.\n\nIn piu' la voce di UNKNOWN_ARGUMENT dice 'il flag che hai passato non esiste', che dopo la separazione non copre piu' il caso del positional inatteso, che finisce ancora li'.\n\nVa aggiunto il codice allo stesso elenco, con l'azione da intraprendere (rilanciare passando il valore al flag), e corretta la frase di UNKNOWN_ARGUMENT perche' nomini entrambi i casi che ci finiscono. Solo documentazione del comando: nessuno script, nessun test.",
-      "status": "backlog",
+      "status": "done",
       "tier": "economy",
       "depends_on": [],
       "validation": {
-        "state": "unknown",
+        "state": "pass",
         "criteria": [
-          "commands/board.md elenca INVALID_ARGUMENT_VALUE accanto agli altri codici, con l'azione da intraprendere.",
-          "La voce di UNKNOWN_ARGUMENT nomina sia il flag inesistente sia il positional inatteso.",
-          "I codici elencati coincidono con quelli che scripts/board-server.mjs puo' davvero emettere.",
-          "Nessuna modifica a scripts/ o test/.",
-          "npm run test passa."
+          "commands/board.md:37-38 elenca INVALID_ARGUMENT_VALUE tra PORT_IN_USE/FILE_NOT_FOUND e UNKNOWN_ARGUMENT, con l'azione 'rilancia passando il valore (es. --port 3000)'.",
+          "commands/board.md:38-39: la voce UNKNOWN_ARGUMENT ora dice 'il flag che hai passato non esiste, oppure c'e' un positional inatteso', nominando entrambi i casi.",
+          "Verificato contro scripts/board-server.mjs: riga 92-96 emette INVALID_ARGUMENT_VALUE per ERR_PARSE_ARGS_INVALID_OPTION_VALUE (flag dichiarato senza valore); riga 98-101 emette UNKNOWN_ARGUMENT per ogni altro errore di parseArgs (flag inesistente o positional inatteso, dato che allowPositionals non e' abilitato); FILE_NOT_FOUND (riga 44) e PORT_IN_USE (riga 144) invariati. Il codice generico ERROR (riga 21, 146) resta non documentato ma era gia' cosi' prima di questa issue e fuori scope: non ha un'azione specifica, il preambolo 'riporta error e code senza ritentare alla cieca' lo copre comunque.",
+          "git diff -- scripts/ test/ e' vuoto: nessuna modifica a scripts/ o test/.",
+          "npm run test: 181/181 pass, 0 fail (suite completa, non solo i test nuovi)."
         ]
       },
       "created_at": "2026-07-31T14:11:46Z",
-      "updated_at": "2026-07-31T14:11:46Z"
+      "updated_at": "2026-07-31T16:01:46Z"
     },
     {
       "id": "2f36971e-e18e-46ea-a4f4-db6757b1aede",
