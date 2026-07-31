@@ -88,6 +88,20 @@ In dubbio, guarda quanto output ti tornerebbe addosso: è quello il costo che il
 risparmia. Skill esterne di orchestrazione possono aiutare a spezzare il lavoro, ma i criteri
 di scelta restano questi: harness non dipende da nessuna skill di terze parti.
 
+### Il tier si applica quando il subagent nasce
+
+Deciso `subagent`, il passo non è completo finché non fissi il modello dal `tier` della issue
+(mappatura nel capitolo Tier più sotto) nell'istante stesso in cui lo crei: è lì che la
+mappatura tier → modello smette di essere un dato scritto sulla issue e diventa una scelta
+fatta. Dimenticarlo non produce nessun errore né un test rosso: senza quella scelta esplicita
+il subagent eredita il modello della sessione dell'orchestratore, quasi sempre il più capace, e
+il `tier` resta un campo che nessuno ha letto.
+
+Lavorando inline il modello non lo scegli tu al dispatch: è già quello fissato per la sessione
+in corso. Il `tier` resta comunque il segnale da confrontare con quella sessione — se il lavoro
+chiede più di quanto la sessione offra, è un motivo per passare a `subagent`, non per procedere
+ignorando il tier.
+
 ### Lavorando inline, il ruolo va dichiarato
 
 Il guard tecnico contro la self-validation vive nell'**environment del processo**:
@@ -189,7 +203,12 @@ A fine lavoro il worker porta la issue a `status = in_review` con
 `validation.state = unknown`, e si ferma. **Non chiude la propria issue.**
 
 La chiusura spetta a un agente dedicato: usa l'agent **`harness-verifier`** (vedi
-[references/verification.md](references/verification.md)). Il verificatore:
+[references/verification.md](references/verification.md)). Istanzialo con il modello fissato
+dal `tier` della issue, mai inferiore a quello con cui è stato svolto il lavoro (regola nel
+capitolo Tier più sopra): è lo stesso passo del dispatch del worker, applicato qui perché è qui
+che la verifica si delega. La stessa dimenticanza qui costa di più — un verificatore che
+eredita un modello più debole di quello del worker rischia di validare un lavoro che non ha la
+capacità di giudicare davvero. Il verificatore:
 
 - controlla i `validation.criteria` della issue contro gli artefatti reali;
 - esegue il **comando di verifica** dichiarato in `.harness/config.json` — il suo esito *è*
