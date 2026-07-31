@@ -9,10 +9,11 @@
 // Usage:
 //   node board-cli.mjs [--project-dir <path>] [--view chains|cards] [--status <s>]
 //                      [--tier <t>] [--search <text>] [--all] [--width <n>] [--no-color]
-//                      [--watch]
+//                      [--watch] [--write-launcher]
 //
 // Without --watch it prints one frame and ends. With --watch it stays: it draws immediately and
-// redraws at every write on issues.json, until SIGINT.
+// redraws at every write on issues.json, until SIGINT. With --write-launcher it draws nothing at
+// all: it writes the two launchers into the project and prints where they went.
 //
 // --project-dir defaults to the process cwd: the board shows the project you are working in.
 // issues.json is never resolved next to this script — one installed copy serves every project,
@@ -27,7 +28,15 @@
 // declares, used wrong), UNKNOWN_ARGUMENT (a flag that does not exist), ERROR (the tracker is
 // there but unreadable). The same set board-server.mjs uses and commands/board.md teaches to read.
 
-import { existsSync, readFileSync, realpathSync, statSync, watch } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  watch,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -35,8 +44,18 @@ import { buildGraph } from "./board-graph.mjs";
 import { IN_FLIGHT, renderChains, renderCards } from "./board-render.mjs";
 
 const VALUE_FLAGS = new Set(["--project-dir", "--view", "--status", "--tier", "--search", "--width"]);
-const BOOL_FLAGS = new Set(["--all", "--no-color", "--watch"]);
+const BOOL_FLAGS = new Set(["--all", "--no-color", "--watch", "--write-launcher"]);
 const VIEWS = ["chains", "cards"];
+
+// Where the launchers go, and what they are called. `.harness/` is the project's local harness
+// state: the skill teaches `.harness\board`, and the shell picks the file it can run.
+const LAUNCHER_DIR = ".harness";
+const LAUNCHER_CMD = "board.cmd";
+const LAUNCHER_SH = "board.sh";
+// The same line harness-config.mjs --init writes. Repeated rather than imported: this file has no
+// other reason to depend on the configuration script, and the string is the rule itself.
+const SELF_IGNORE =
+  "# Local harness state: never committed, and never a reason to edit the project's .gitignore.\n*\n";
 
 // Below this the tree has no room left for a title, and every line runs long anyway: a width that
 // small is a typo, not a request.
@@ -56,7 +75,8 @@ const DEBOUNCE_MS = 60;
 const CLEAR = "\u001b[H\u001b[J";
 
 const USAGE_TAIL =
-  "The board takes --project-dir, --view, --status, --tier, --search, --all, --width, --no-color and --watch.";
+  "The board takes --project-dir, --view, --status, --tier, --search, --all, --width, --no-color, " +
+  "--watch and --write-launcher.";
 
 function fail(error, code) {
   process.stdout.write(`${JSON.stringify({ ok: false, error, code })}\n`);
@@ -90,6 +110,7 @@ export function parseArgs(argv) {
     all: false,
     noColor: false,
     watch: false,
+    writeLauncher: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -112,6 +133,9 @@ export function parseArgs(argv) {
       }
       if (flag === "--watch") {
         value.watch = true;
+      }
+      if (flag === "--write-launcher") {
+        value.writeLauncher = true;
       }
       continue;
     }
@@ -398,6 +422,68 @@ export function watchProject(options, deps = {}) {
   };
 }
 
+/**
+ * Writes `.harness/board.cmd` and `.harness/board.sh` into the project and returns the two paths.
+ *
+ * In a global install the plugin sits at a long path pinned to the version —
+ * `…/.claude/plugins/cache/diemrt/harness/0.6.0/scripts/board-cli.mjs`. That is fine for the agent,
+ * which receives it substituted at every invocation; it is unusable for a person who has to open a
+ * second terminal and type it. Worse, at the next update `0.6.0` becomes `0.7.0` and the command
+ * they had saved points at a directory that no longer exists — silently, because node will only say
+ * it cannot find a module. The skill rewrites these files at every clock-in, so a version bump
+ * repairs them without anybody noticing.
+ *
+ * Three details carry the whole thing:
+ * - the path written in is `fileURLToPath(import.meta.url)`. `process.argv[1]` would copy in
+ *   whatever spelling the caller happened to use, including the 8.3 short form
+ *   (`C:\Users\DIEGO_~1\…`), which works and is illegible — and illegible is precisely what these
+ *   files exist to fix.
+ * - the project is `%CD%` / `$PWD`, never the directory being written to. Whoever runs the launcher
+ *   is standing in the project they want to look at, which is not necessarily this one: one
+ *   installed copy serves every project, exactly as the rest of this script already assumes.
+ * - the tail — `%*` and `"$@"` — hands the rest of the command line to the board. It arrives after
+ *   the two flags the launcher already sets, and `parseArgs` keeps the last spelling of a flag, so
+ *   `.harness\board --width 120 --tier economy` refines the frame instead of fighting it.
+ *
+ * Everything interpolated is quoted in both files: a plugin under `C:\Program Files\…` and a
+ * project with a space in its name are not exotic cases.
+ *
+ * @param {string} projectDir
+ * @returns {string[]} the two paths written, in the order they are printed
+ */
+function writeLauncher(projectDir) {
+  const self = fileURLToPath(import.meta.url);
+  const dir = path.join(projectDir, LAUNCHER_DIR);
+  mkdirSync(dir, { recursive: true });
+
+  // `.harness/` normally arrives already self-ignoring, from harness-config.mjs --init. When this
+  // is the call that created it, it has to be made so here: these two files carry an absolute path
+  // with somebody's home directory inside it, and that is not something to let into a commit. Never
+  // overwritten — what the directory ignores is the directory's own business.
+  const ignore = path.join(dir, ".gitignore");
+  if (!existsSync(ignore)) {
+    writeFileSync(ignore, SELF_IGNORE, "utf8");
+  }
+
+  const cmdFile = path.join(dir, LAUNCHER_CMD);
+  const shFile = path.join(dir, LAUNCHER_SH);
+
+  // CRLF in the batch file, which is what cmd expects of one. LF in the shell script, where a
+  // stray \r becomes part of the interpreter's name and turns the first line into
+  // `/bin/sh^M: not found`.
+  writeFileSync(cmdFile, `@echo off\r\nnode "${self}" --project-dir "%CD%" --watch %*\r\n`, "utf8");
+  // Forward slashes in the shell script: node takes them on Windows too, and a backslash inside
+  // double quotes is one escaping rule away from being eaten by the shell that reads it.
+  const selfPosix = self.split(path.sep).join("/");
+  writeFileSync(
+    shFile,
+    `#!/bin/sh\nexec node "${selfPosix}" --project-dir "$PWD" --watch "$@"\n`,
+    "utf8"
+  );
+
+  return [cmdFile, shFile];
+}
+
 export function main() {
   const parsed = parseArgs(process.argv.slice(2));
   if (!parsed.ok) {
@@ -410,6 +496,14 @@ export function main() {
   }
   if (!statSync(options.projectDir).isDirectory()) {
     fail(`'${options.projectDir}' is not a directory.`, "FILE_NOT_FOUND");
+  }
+
+  // Before any drawing, and instead of it: this run writes files and says where, so that whoever
+  // asked can paste the path. A frame on top of that would be noise in the terminal that is about
+  // to be replaced by the launcher's own.
+  if (options.writeLauncher) {
+    process.stdout.write(`${writeLauncher(options.projectDir).join("\n")}\n`);
+    return;
   }
 
   if (options.watch) {

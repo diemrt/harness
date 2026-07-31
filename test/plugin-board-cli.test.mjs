@@ -12,7 +12,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -646,3 +646,278 @@ test("--watch disegna e resta vivo, lanciato davvero", async () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// --- il lanciatore -------------------------------------------------------------------------
+//
+// In installazione globale il percorso del plugin è lungo e agganciato alla versione. Va bene per
+// l'agente, che lo riceve sostituito a ogni invocazione, ed è inservibile per una persona che deve
+// aprire un secondo terminale — e al primo aggiornamento del plugin il comando salvato punta a una
+// cartella che non esiste più. `--write-launcher` scrive i due file col percorso risolto in quel
+// momento, e la skill li riscrive a ogni clock-in.
+//
+// Due cose qui non si verificano leggendo: che le virgolette reggano uno spazio nel percorso, e
+// che il watch parta sul progetto da cui *lanci* il file e non su quello in cui è stato scritto.
+// Per quelle i lanciatori si eseguono, perché uno script di shell che nessuno ha mai lanciato è
+// uno script che non funziona.
+
+function launcherPaths(projectDir) {
+  return {
+    cmd: path.join(projectDir, ".harness", "board.cmd"),
+    sh: path.join(projectDir, ".harness", "board.sh"),
+  };
+}
+
+// Directory con uno spazio nel nome: `C:\Program Files\…` non è un caso esotico, ed è il caso che
+// scopre se quello che il lanciatore interpola è virgolettato davvero.
+function tempSpacedProject(issues) {
+  const dir = mkdtempSync(path.join(tmpdir(), "board cli "));
+  writeFileSync(path.join(dir, "issues.json"), JSON.stringify({ issues }), "utf8");
+  return dir;
+}
+
+// Il plugin come lo si trova installato: sotto un percorso con uno spazio, e copiato per intero
+// perché board-cli.mjs importa i suoi due vicini per percorso relativo. Serve a esercitare
+// davvero il percorso virgolettato dentro i due script, che con il repo di sviluppo — senza spazi
+// — passerebbe anche senza virgolette.
+function fakePluginInstall() {
+  const dir = mkdtempSync(path.join(tmpdir(), "board plugin "));
+  for (const file of ["board-cli.mjs", "board-graph.mjs", "board-render.mjs"]) {
+    copyFileSync(path.join(__dirname, "..", "scripts", file), path.join(dir, file));
+  }
+  return path.join(dir, "board-cli.mjs");
+}
+
+// Il figlio appena ucciso può tenere ancora per un istante la directory in cui sta: su Windows
+// rimuovere la cwd di un processo vivo è EPERM, e un test che fallisce nel `finally` racconta una
+// bugia su cosa si è rotto. Una directory temporanea sopravvissuta è un problema del sistema.
+function cleanup(dir) {
+  try {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
+  } catch {
+    /* vedi sopra */
+  }
+}
+
+// `child.kill()` sul figlio ucciderebbe solo il cmd.exe (o la sh) che fa da guscio: il node in
+// watch resterebbe vivo per sempre, e la suite lascerebbe processi appesi.
+function killTree(child) {
+  if (!child.pid) {
+    return;
+  }
+  try {
+    if (process.platform === "win32") {
+      execFileSync("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore" });
+    } else {
+      process.kill(-child.pid, "SIGKILL");
+    }
+  } catch {
+    child.kill("SIGKILL");
+  }
+}
+
+function runSync(command, args, cwd) {
+  try {
+    return { code: 0, out: execFileSync(command, args, { cwd, encoding: "utf8" }) };
+  } catch (error) {
+    return { code: error.status, out: error.stdout };
+  }
+}
+
+// La sh c'è su questa macchina (Git for Windows la porta) ma non è garantita su una Windows nuda:
+// il test che la usa si salta invece di fallire per una ragione che non riguarda il lanciatore.
+const HAS_SH = (() => {
+  try {
+    execFileSync("sh", ["-c", "exit 0"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
+test("--write-launcher è un flag booleano e non prende un valore", () => {
+  assert.equal(parseArgs([]).value.writeLauncher, false);
+  assert.equal(parseArgs(["--write-launcher"]).value.writeLauncher, true);
+  assert.equal(parseArgs(["--write-launcher=1"]).code, "INVALID_ARGUMENT");
+});
+
+test("--write-launcher crea .harness/, scrive i due file e ne stampa i percorsi", () => {
+  const dir = tempProject([issue(A)]);
+  try {
+    const { code, out } = run(["--project-dir", dir, "--write-launcher"]);
+    assert.equal(code, 0);
+    const paths = launcherPaths(dir);
+    assert.equal(existsSync(paths.cmd), true, ".harness/board.cmd è sul disco");
+    assert.equal(existsSync(paths.sh), true, ".harness/board.sh è sul disco");
+    assert.ok(out.includes(paths.cmd), "il percorso del .cmd è stampato");
+    assert.ok(out.includes(paths.sh), "il percorso del .sh è stampato");
+    // Scrive e basta: il board non lo disegna, o il secondo terminale nascerebbe già sporco.
+    assert.equal(out.includes("aaaaaaaa"), false);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("i lanciatori portano il percorso reale di questo board-cli, virgolettato, e chiedono il watch", () => {
+  const dir = tempProject([issue(A)]);
+  try {
+    run(["--project-dir", dir, "--write-launcher"]);
+    const paths = launcherPaths(dir);
+    const cmd = readFileSync(paths.cmd, "utf8");
+    const sh = readFileSync(paths.sh, "utf8");
+
+    assert.ok(cmd.includes(`"${CLI}"`), "il .cmd cita board-cli.mjs per intero e fra virgolette");
+    // Nel .sh lo stesso percorso con le barre in avanti: node le accetta anche su Windows, e una
+    // barra rovescia dentro le virgolette doppie è a un passo dall'essere mangiata dalla shell.
+    assert.ok(
+      sh.includes(`"${CLI.split(path.sep).join("/")}"`),
+      "il .sh cita lo stesso file, fra virgolette"
+    );
+    // Il percorso corto 8.3 funziona ed è illeggibile: è esattamente ciò che il lanciatore esiste
+    // per evitare, quindi non deve comparire.
+    assert.equal(/~\d/.test(cmd), false, "niente percorso 8.3 nel .cmd");
+
+    assert.match(cmd, /--watch/);
+    assert.match(sh, /--watch/);
+    // Il progetto è quello di chi lancia, non quello in cui il file è stato scritto.
+    assert.ok(cmd.includes('--project-dir "%CD%"'), "il .cmd guarda la directory corrente");
+    assert.ok(sh.includes('--project-dir "$PWD"'), "il .sh guarda la directory corrente");
+    assert.equal(cmd.includes(dir), false, "il progetto non è inchiodato dentro il .cmd");
+    assert.equal(sh.includes(dir), false, "né dentro il .sh");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("board.sh dichiara l'interprete nella prima riga e non ha i ritorni a capo di Windows", () => {
+  const dir = tempProject([issue(A)]);
+  try {
+    run(["--project-dir", dir, "--write-launcher"]);
+    const sh = readFileSync(launcherPaths(dir).sh, "utf8");
+    assert.match(sh.split("\n")[0], /^#!/, "la prima riga dichiara l'interprete");
+    // Un \r dopo `#!/bin/sh` entra nel nome dell'interprete: `/bin/sh^M: not found`.
+    assert.equal(sh.includes("\r"), false);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("rilanciare --write-launcher sovrascrive senza errore e lascia file ancora buoni", () => {
+  const dir = tempProject([issue(A)]);
+  try {
+    assert.equal(run(["--project-dir", dir, "--write-launcher"]).code, 0);
+    // Riscritti a ogni clock-in: è così che un aggiornamento di versione del plugin li ripara da
+    // solo. Se la seconda scrittura fallisse su un file già esistente, non riparerebbe niente.
+    const again = run(["--project-dir", dir, "--write-launcher"]);
+    assert.equal(again.code, 0);
+    assert.match(readFileSync(launcherPaths(dir).cmd, "utf8"), /board-cli\.mjs/);
+    assert.match(readFileSync(launcherPaths(dir).sh, "utf8"), /^#!/);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test(".harness/ appena creata si auto-ignora, e un .gitignore già suo non viene toccato", () => {
+  const nuovo = tempProject([issue(A)]);
+  const esistente = tempProject([issue(A)]);
+  try {
+    // I lanciatori contengono un percorso assoluto con dentro la home di qualcuno: se questa è la
+    // chiamata che crea .harness/, la directory deve nascere già invisibile a git.
+    run(["--project-dir", nuovo, "--write-launcher"]);
+    assert.match(readFileSync(path.join(nuovo, ".harness", ".gitignore"), "utf8"), /^\*$/m);
+
+    execFileSync("node", [CLI, "--project-dir", esistente, "--write-launcher"], {
+      encoding: "utf8",
+    });
+    writeFileSync(path.join(esistente, ".harness", ".gitignore"), "# mio\n*\n", "utf8");
+    run(["--project-dir", esistente, "--write-launcher"]);
+    assert.equal(readFileSync(path.join(esistente, ".harness", ".gitignore"), "utf8"), "# mio\n*\n");
+  } finally {
+    cleanup(nuovo);
+    cleanup(esistente);
+  }
+});
+
+test("--write-launcher su un --project-dir inesistente resta FILE_NOT_FOUND", () => {
+  const assente = path.join(tmpdir(), "non-esiste-affatto-nemmeno-per-il-lanciatore");
+  const { code, out } = run(["--project-dir", assente, "--write-launcher"]);
+  assert.equal(code, 1);
+  assert.equal(JSON.parse(out).code, "FILE_NOT_FOUND");
+  assert.equal(existsSync(path.join(assente, ".harness")), false, "non ha creato niente");
+});
+
+// --- i lanciatori, eseguiti davvero --------------------------------------------------------
+
+test(
+  "il .cmd lanciato da un altro progetto guarda quel progetto, e regge gli spazi nei percorsi",
+  { skip: process.platform === "win32" ? false : "il .cmd è di cmd.exe" },
+  async () => {
+    const cli = fakePluginInstall();
+    const scritto = tempProject([issue(A, { status: "in_progress" })]);
+    const lanciato = tempSpacedProject([issue(B, { status: "in_progress" })]);
+    execFileSync("node", [cli, "--project-dir", scritto, "--write-launcher"], { encoding: "utf8" });
+    const child = spawn("cmd.exe", ["/c", launcherPaths(scritto).cmd], {
+      cwd: lanciato,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    try {
+      const seen = await firstFrame(child, /bbbbbbbb/);
+      assert.equal(
+        seen.includes("aaaaaaaa"),
+        false,
+        "guarda il progetto da cui lo lanci, non quello in cui è stato scritto"
+      );
+      assert.match(seen, /● in_progress/, "è il watch, con le card di chi è in volo");
+      assert.equal(child.exitCode, null, "e resta vivo");
+    } finally {
+      killTree(child);
+      cleanup(lanciato);
+      cleanup(scritto);
+      cleanup(path.dirname(cli));
+    }
+  }
+);
+
+test(
+  "il .sh lanciato da un altro progetto guarda quel progetto, e regge gli spazi nei percorsi",
+  { skip: HAS_SH ? false : "nessuna sh su questa macchina" },
+  async () => {
+    const cli = fakePluginInstall();
+    const scritto = tempProject([issue(A, { status: "in_progress" })]);
+    const lanciato = tempSpacedProject([issue(B, { status: "in_progress" })]);
+    execFileSync("node", [cli, "--project-dir", scritto, "--write-launcher"], { encoding: "utf8" });
+    const child = spawn("sh", [launcherPaths(scritto).sh], {
+      cwd: lanciato,
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: process.platform !== "win32",
+    });
+    try {
+      const seen = await firstFrame(child, /bbbbbbbb/);
+      assert.equal(seen.includes("aaaaaaaa"), false, "il progetto è quello di chi lancia");
+      assert.match(seen, /● in_progress/);
+      assert.equal(child.exitCode, null);
+    } finally {
+      killTree(child);
+      cleanup(lanciato);
+      cleanup(scritto);
+      cleanup(path.dirname(cli));
+    }
+  }
+);
+
+test(
+  "i lanciatori inoltrano in coda quello che gli si passa",
+  { skip: process.platform === "win32" ? false : "il .cmd è di cmd.exe" },
+  () => {
+    const dir = tempProject([issue(A)]);
+    try {
+      run(["--project-dir", dir, "--write-launcher"]);
+      // `--width abc` è rifiutato dagli argomenti, quindi il comando esce subito invece di restare
+      // in watch: prova che la coda arriva davvero al board, senza lasciare un processo appeso.
+      const { code, out } = runSync("cmd.exe", ["/c", launcherPaths(dir).cmd, "--width", "abc"], dir);
+      assert.equal(code, 1);
+      assert.equal(JSON.parse(out).code, "INVALID_ARGUMENT");
+    } finally {
+      cleanup(dir);
+    }
+  }
+);

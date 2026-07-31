@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T10:20:56Z",
+  "last_updated": "2026-07-31T10:41:53Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1224,23 +1224,17 @@
       "id": "932a5713-6066-4fb4-b6fc-69212babf14e",
       "title": "board-cli: lanciatore .harness/board per il terminale esterno",
       "description": "Task 6 del piano. Spec sezione 7.\n\n--write-launcher scrive .harness/board.cmd e .harness/board.sh nel progetto, con dentro il percorso del plugin risolto in quel momento, e stampa i percorsi scritti.\n\nServe perche' in installazione globale il percorso del plugin e' lungo e agganciato alla versione: va bene per l'agente, che lo riceve sostituito a ogni invocazione, ed e' inservibile per una persona. Al primo aggiornamento del plugin il comando salvato punta a una cartella che non esiste piu'.\n\nRiscritti a ogni clock-in, quindi un aggiornamento di versione li ripara da solo. .harness/ si auto-ignora e non entra in git.",
-      "status": "backlog",
+      "status": "done",
       "tier": "economy",
       "depends_on": [
         "f5a51fab-e8e7-4954-9020-e4a497de6504"
       ],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "--write-launcher scrive .harness/board.cmd e .harness/board.sh e ne stampa i percorsi.",
-          "I due file contengono il percorso corrente di board-cli.mjs e lanciano il watch sul progetto corrente.",
-          "board.sh dichiara l'interprete nella prima riga.",
-          "Rilanciare il comando sovrascrive i lanciatori senza errore.",
-          "npm run test passa."
-        ]
+        "state": "pass",
+        "criteria": "Verifica indipendente, tutti i comandi eseguiti fuori dal repo su directory temporanee. (1) 'node scripts/board-cli.mjs --project-dir <tmp>/proj a scritto --write-launcher' esce 0, crea .harness/board.cmd e .harness/board.sh su disco e stampa esattamente i due percorsi assoluti, uno per riga, senza disegnare il board. (2) Criterio dell'esecuzione: lanciatori scritti in A (proj a scritto, issue aaaaaaaa) ed eseguiti con cwd in B (proj b lanciato, issue bbbbbbbb, tracker diverso); sia 'cmd.exe /c A/.harness/board.cmd' sia 'sh A/.harness/board.sh' hanno disegnato l'intestazione 'proj b lanciato - 1 aperte - 0 chiuse' con la card in_progress di bbbbbbbb, senza traccia di aaaaaaaa, e sono rimasti vivi (exitCode null) fino al taskkill /t /f. Contenuti: il .cmd e' '@echo off' + CRLF + 'node QUOTE<self>QUOTE --project-dir QUOTE%CD%QUOTE --watch %*' + CRLF; il .sh e' '#!/bin/sh' + LF + 'exec node QUOTE<self con barre in avanti>QUOTE --project-dir QUOTE$PWDQUOTE --watch QUOTE$@QUOTE' + LF. Nessuno dei due contiene il percorso del progetto in cui e' stato scritto. (3) board.sh: prima riga esattamente '#!/bin/sh'; nessun ritorno a capo CR nel file, verificato leggendo i byte (test includes CR = false). (4) Rilancio di --write-launcher sulla stessa directory: exit 0 e uscita identica alla prima. (5) Gate 'npm run test': 287 pass, 0 fail, 0 skipped, 0 cancelled (baseline 277 + 10 nuovi). Percorsi con spazi esercitati davvero: copia del plugin in '<tmp>/il plugin con spazi/scripts' e progetto '<tmp>/lanciato con spazi' - entrambi i lanciatori partono e mostrano il progetto giusto. Sotto invocazione normale nei file finisce il percorso lungo reale, nessuna forma 8.3. Danni collaterali: 'git status --short' limitato a issues.json, scripts/board-cli.mjs, test/plugin-board-cli.test.mjs; dopo la suite .harness/ del repo contiene solo .gitignore, config.json, runs, nessun board.cmd o board.sh; nessun processo board-cli appeso (l'unico node 'board' vivo e' board-server.mjs, avviato alle 10:53, preesistente). Scostamenti giudicati in scopo: il .gitignore self-ignoring, scritto solo se assente e mai sovrascritto, usa la stessa identica stringa di harness-config.mjs:341 e serve l'invariante dichiarata nella description ('.harness/ si auto-ignora e non entra in git'); l'inoltro degli argomenti in coda e' gia' nello snippet del piano (Task 6, righe 1046-1047) ed e' provato: board.cmd con '--width abc' esce 1 con INVALID_ARGUMENT. Osservazione fuori contratto, non bloccante: il commento a scripts/board-cli.mjs:437-441 sostiene che fileURLToPath(import.meta.url) eviti la forma corta 8.3 che process.argv[1] copierebbe; misurato, e' falso - sotto invocazione via percorso corto i due valori sono identici e nel lanciatore finisce DIEGO_~1 (funzionante, ma illeggibile), quindi l'asserzione che nega la forma 8.3 nel .cmd non puo' fallire in questo repo, il cui percorso non contiene tilde."
       },
       "created_at": "2026-07-31T08:50:16Z",
-      "updated_at": "2026-07-31T08:50:16Z"
+      "updated_at": "2026-07-31T10:41:53Z"
     },
     {
       "id": "a9631338-849e-408b-be0f-24ecc75a3172",
@@ -1351,6 +1345,27 @@
       },
       "created_at": "2026-07-31T10:06:40Z",
       "updated_at": "2026-07-31T10:06:40Z"
+    },
+    {
+      "id": "74e09af1-a5d4-4202-ab42-e594c3c36eac",
+      "title": "board-cli: in watch i flag di vista e di stato vengono ignorati in silenzio",
+      "description": "Segnalato dal verificatore della issue 0dd43c41 come osservazione fuori contratto.\n\nIn --watch la vista e' fissa — albero piu' card delle sole issue in volo — ed e' la scelta giusta: la decide IN_FLIGHT, non chi lancia. Ma --view cards --watch e --status backlog --watch vengono accettati e poi ignorati senza dire niente. Chi filtra e non viene contraddetto crede che il filtro sia attivo, e legge un board che non e' quello che ha chiesto.\n\nLo stesso file altrove e' rumoroso per principio: parseArgs rifiuta --search --all con INVALID_ARGUMENT invece di interpretare --all come testo da cercare. La disciplina c'e', qui non e' applicata.\n\nDa decidere fra due strade, motivando: rifiutare la combinazione con INVALID_ARGUMENT, oppure accettarla stampando una riga che dice quale flag e' stato ignorato e perche'. La seconda e' piu' gentile con chi ha un alias salvato che passa --view.",
+      "status": "backlog",
+      "tier": "economy",
+      "depends_on": [
+        "0dd43c41-d40d-4ad9-afd4-de9a27059046"
+      ],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "--view e --status combinati con --watch non vengono piu' ignorati in silenzio.",
+          "La strada scelta fra rifiuto e avviso e' motivata nella description o nel codice.",
+          "Il comportamento del watch senza quei flag non cambia.",
+          "npm run test passa."
+        ]
+      },
+      "created_at": "2026-07-31T10:22:36Z",
+      "updated_at": "2026-07-31T10:22:36Z"
     }
   ]
 }
