@@ -51,11 +51,55 @@ occupata, l'avvio fallisce con `PORT_IN_USE` invece di restare a metà.
 
 - **Avvio** — al clock-in, automaticamente. Il server ascolta su `127.0.0.1` su una porta
   libera scelta a runtime.
-- **URL** — stampalo **una volta sola**, quando parte. Non aprire il browser da solo: rubare
-  il focus a ogni sessione è più fastidioso di un click.
+- **URL** — stampalo **una volta sola**, quando parte, come URL nudo su una riga propria e
+  senza decorazioni — niente code-span, niente link markdown, niente blocco di codice:
+
+  ```
+  http://127.0.0.1:53124/
+  ```
+
+  Non aprire il browser da solo: rubare il focus a ogni sessione è più fastidioso di un click.
 - **Aggiornamento** — il server osserva `issues.json` e spinge il refresh al browser. Nessun
   reload manuale, nessun polling da parte tua.
 - **Stop** — al clock-out. Non lasciare processi orfani a fine sessione.
+
+### Il doppio click che resta
+
+Un ctrl+click sull'URL stampato, in Claude Code su Windows Terminal, apre **due schede** sullo
+stesso indirizzo invece di una. Non è un difetto di questo server: la riga stampata è una sola,
+con un URL solo. La causa più probabile sono due rilevatori di link che insistono sullo stesso
+testo — l'hyperlink OSC 8 che Claude Code emette e l'auto-detection sul testo grezzo che fa
+Windows Terminal — e un click li innesca entrambi.
+
+Il 2026-07-31 è stato fatto un giro manuale con l'utente per capire se cambiare la grafia
+dell'URL bastasse: un click per forma, contando le schede aperte.
+
+| forma provata | schede aperte al click |
+|---|---|
+| URL nudo su riga propria | 2 |
+| code-span (`` `url` ``) | 2 |
+| fenced code block | 2 |
+| markdown link (`[testo](url)`) | 2 |
+
+Le quattro forme aprono tutte due schede: l'ipotesi che fosse la forma di stampa a decidere è
+**falsificata**. La causa sta fuori da quello che harness controlla — dentro Claude Code e
+Windows Terminal — e nessuna riscrittura della riga stampata la aggira. Per questo la scelta fra
+le quattro forme non è più "quale risolve il doppio click" (nessuna lo fa), ma "quale conviene
+comunque tenere":
+
+- **URL nudo su riga propria** — la forma prescritta sopra. È la più leggibile e la più facile
+  da selezionare e copiare a mano quando il click non fa quello che ci si aspetta, ed è l'unico
+  caso in cui la copia manuale serve davvero.
+- Il **code-span** aggiunge una decorazione che in tutto il resto della documentazione di
+  questo repository segna un comando da eseguire, non un indirizzo da aprire: userlo per l'URL
+  confonderebbe le due cose senza guadagnare nulla contro il doppio click.
+- Il **fenced code block** e il **link markdown** nascondono il testo nudo dietro a una cornice
+  o a un'etichetta, rendendo la selezione manuale più scomoda proprio nel caso — il doppio
+  click — in cui serve.
+
+**Il problema non è risolto**: il doppio click resta, ed è fuori dal controllo di harness. Se
+càpita, chiudi la scheda in più, oppure copia l'URL a mano dalla riga stampata invece di
+cliccarci sopra.
 
 ## Cosa non fa
 

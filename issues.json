@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T16:51:11Z",
+  "last_updated": "2026-07-31T21:15:49Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1053,22 +1053,23 @@
       "id": "2f36971e-e18e-46ea-a4f4-db6757b1aede",
       "title": "Board: un click sul link deve aprire una pagina sola",
       "description": "Un ctrl+click sull'URL stampato al clock-in apre due schede sullo stesso indirizzo, in Claude Code su Windows Terminal.\n\nIl server stampa una riga sola con un URL solo: il difetto non e' in scripts/board-server.mjs, che questa issue non tocca. L'ipotesi e' che due rilevatori di link insistano sullo stesso testo — l'hyperlink OSC 8 emesso da Claude Code e l'auto-detection di Windows Terminal — e che un click li inneschi entrambi.\n\nQuello che harness controlla e' la forma in cui stampa l'URL. Vanno provate con l'utente al click, un giro per forma, contando le schede: URL nudo su riga propria, code-span, fenced code block, markdown link. Nessun test automatico di questo repository puo' contare le schede di un browser: l'esito del giro manuale e' l'unica evidenza possibile, e va registrato.\n\nPoi commands/board.md (passo 4 dell'avvio) e skills/harness/references/board.md (Ciclo di vita) prescrivono una forma sola e dicono perche'.\n\nSpec: docs/superpowers/specs/2026-07-31-tracker-lifecycle-commands-design.md, sezione 1.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [],
       "validation": {
-        "state": "unknown",
         "criteria": [
-          "Il giro manuale e' stato eseguito con l'utente: per ogni forma provata risulta a verbale quante schede ha aperto un click.",
-          "commands/board.md, passo 4 dell'avvio, prescrive una sola forma di stampa dell'URL e la mostra testualmente.",
-          "skills/harness/references/board.md, sezione Ciclo di vita, prescrive la stessa forma di commands/board.md: i due documenti non si contraddicono.",
-          "I documenti spiegano perche' quella forma, cosi' che la scelta non venga riaperta alla prossima riformulazione della frase.",
-          "git diff non tocca scripts/board-server.mjs ne' scripts/board.html.",
-          "npm run test esce 0."
-        ]
+          "Verbale del giro manuale confermato: skills/harness/references/board.md righe 74-82, tabella con le 4 forme (URL nudo, code-span, fenced code block, markdown link) tutte a 2 schede al click, coerente coi conteggi reali riportati dall'orchestratore.",
+          "commands/board.md passo 4 (righe 32-44) prescrive l'URL nudo su riga propria e lo mostra testualmente in un blocco: 'http://127.0.0.1:53124/', vietando esplicitamente code-span/link markdown/blocco di codice.",
+          "skills/harness/references/board.md sezione Ciclo di vita (righe 50-64) prescrive la stessa forma con lo stesso esempio testuale: i due documenti non si contraddicono, e commands/board.md rimanda esplicitamente a questa sezione.",
+          "Motivazione presente in skills/harness/references/board.md righe 90-98 (perche' URL nudo e non code-span/fenced/markdown link) e riepilogo righe 84-88.",
+          "Doc non promette la risoluzione: righe 100-102 'Il problema non e' risolto: il doppio click resta' e istruzione operativa (chiudi la scheda in piu' o copia l'URL a mano); stessa istruzione ripetuta in commands/board.md righe 42-44.",
+          "git diff -- scripts/board-server.mjs scripts/board.html: output vuoto (verificato).",
+          "npm run test: 220/220 pass, exit 0 (verificato)."
+        ],
+        "state": "pass"
       },
       "created_at": "2026-07-31T15:51:03Z",
-      "updated_at": "2026-07-31T15:51:03Z"
+      "updated_at": "2026-07-31T21:15:49Z"
     },
     {
       "id": "9489f774-e8eb-43d7-a07b-3acb825ca456",
@@ -1136,7 +1137,7 @@
       "id": "cef2fd42-dd16-4400-8ddb-4ff9607778d4",
       "title": "/harness:compact propone i blocchi, chiede conferma, chiama la primitiva",
       "description": "La primitiva --compact non decide niente: sapere che \"board server\" e \"card delle dipendenze\" sono lo stesso argomento non e' deducibile da un titolo. Quel giudizio sta nel comando.\n\ncommands/compact.md: legge le issue done dal tracker; propone N blocchi tematici dicendo quali issue finiscono in ognuno e con che titolo; aspetta conferma esplicita dell'utente; solo allora chiama --compact col payload confermato, passato da file per non gestire escaping di quote nella shell; riporta archivePath e i blocchi creati.\n\nSenza conferma non chiama la primitiva: un raggruppamento sbagliato, una volta scritto, e' un archivio da disfare a mano.\n\nDichiara i codici su cui ramificare e non ritenta alla cieca: INVALID_DEPENDENCY significa scollegare prima le issue vive che puntano agli id, FORBIDDEN_ROLE significa che a lanciarlo e' un worker.\n\ninit e upgrade non prendono un comando proprio: sono meccanici e senza dialogo, e restano argomenti di /harness:issue.\n\nSpec: docs/superpowers/specs/2026-07-31-tracker-lifecycle-commands-design.md, sezioni 5.2 e 6.",
-      "status": "backlog",
+      "status": "in_review",
       "tier": "standard",
       "depends_on": [
         "c112d836-b40b-478d-962d-e4672613ea08"
@@ -1154,7 +1155,7 @@
         ]
       },
       "created_at": "2026-07-31T15:51:51Z",
-      "updated_at": "2026-07-31T15:51:51Z"
+      "updated_at": "2026-07-31T16:55:37Z"
     }
   ]
 }

@@ -29,7 +29,19 @@ ristampa l'URL che avevi e fermati.
 3. **Controlla `projectDir`.** Se non è il progetto su cui si sta lavorando, fermalo e
    rilancia con `--project-dir`: altrimenti mostri un board vuoto del progetto sbagliato,
    senza nessun errore.
-4. Stampa `url` all'utente **una volta sola**. Non aprire il browser da solo.
+4. Stampa `url` all'utente **una volta sola**, come URL nudo su una riga propria e senza
+   decorazioni — niente code-span, niente link markdown, niente blocco di codice:
+
+   ```
+   http://127.0.0.1:53124/
+   ```
+
+   Non aprire il browser da solo. Un ctrl+click su questa riga, in Claude Code su Windows
+   Terminal, può comunque aprire due schede sullo stesso indirizzo invece di una: non è un
+   difetto della forma scelta, e nessun'altra grafia lo evita (vedi il giro manuale che lo ha
+   stabilito in `${CLAUDE_PLUGIN_ROOT}/skills/harness/references/board.md`, sezione "Ciclo di
+   vita" → "Il doppio click che resta"). Se càpita, chiudi la scheda in più o copia l'URL a
+   mano dalla riga stampata invece di cliccarci sopra.
 5. Tieni `pid` e `port`: servono per lo stop.
 
 Se `ok` è `false`, riporta `error` e `code` senza ritentare alla cieca: `PORT_IN_USE` → la
