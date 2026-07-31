@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T07:40:44Z",
+  "last_updated": "2026-07-31T07:43:01Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1197,6 +1197,46 @@
       },
       "created_at": "2026-07-30T21:09:41Z",
       "updated_at": "2026-07-31T07:40:44Z"
+    },
+    {
+      "id": "3b99f4ca-3e03-4905-9b44-3d57d0da1fe6",
+      "title": "docs: verifica documentazione per commit a24e4c4",
+      "description": "Contesto commit a24e4c4: fix: route long edges where no card can hide them\n\nValuta se servono aggiornamenti a docs/, CLAUDE.md, README.md o alle reference della skill e descrivi cosa cambiare per ciascun file.\nSe non serve aggiornare nulla, chiudi la issue motivando la decisione.\n\nFile di codice modificati:\n- scripts/board.js\n\nNota: skills/harness/references/board.md e' gia' in carico alla issue 65e77ea4 (riscrittura completa della sezione Dipendenze della pagina). Qui si valuta solo se il routing degli archi lunghi vada raccontato altrove, e se lo spec docs/superpowers/specs/2026-07-30-board-workflow-design.md descriva ancora un instradamento che non esiste piu'.",
+      "status": "backlog",
+      "tier": "economy",
+      "depends_on": [],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "Verificata la documentazione per il commit a24e4c4 (fix: route long edges where no card can hide them).",
+          "Ogni file che cita l'instradamento degli archi del grafo e' aggiornato oppure e' motivato perche' non serve toccarlo.",
+          "Nessuna ripetizione introdotta fra documenti diversi e testo minimo."
+        ]
+      },
+      "created_at": "2026-07-31T07:42:21Z",
+      "updated_at": "2026-07-31T07:42:21Z"
+    },
+    {
+      "id": "a47813e7-0b7e-409f-b78b-9e0d278ee463",
+      "title": "board: le corsie lunghe ignorano gli archi corti nei corridoi",
+      "description": "Segnalato dal verificatore della issue 3fe5af9c come osservazione fuori contratto.\n\npickLane() in scripts/board.js evita che due corsie orizzontali di archi lunghi cadano sulla stessa y sopra lo stesso tratto di x: e' l'array runs, che pero' viene riempito solo per gli archi con span > 1. Gli archi corti non ci entrano mai.\n\nI loro tratti orizzontali stanno dentro i corridoi, alle altezze dei centri card, e i corridoi sono esattamente dove una corsia lunga entra ed esce. Se la y libera scelta per una corsia lunga coincide con il centro di una card di un'altra colonna, per quel tratto di corridoio le due linee si sovrappongono: torna in piccolo lo stesso problema che la issue 3fe5af9c ha risolto in grande, cioe' non capire quale punta appartiene a quale partenza.\n\nNon osservato nelle prove manuali di 3fe5af9c (corsie a 162, 182, 196 contro archi corti a 94), quindi non e' urgente: e' un caso che si presenta quando le colonne hanno altezze molto diverse.\n\nLa correzione naturale e' registrare in runs anche i tratti orizzontali degli archi con span 1, il che significa instradare tutti gli archi in un ordine solo invece che decidere il fallback arco per arco.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [
+        "3fe5af9c-aaea-499b-8858-1afb61dd39ca"
+      ],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "Una corsia orizzontale di un arco lungo non giace sulla stessa y di un tratto orizzontale di un arco corto sopra lo stesso intervallo di x.",
+          "Il caso e' coperto da un test con colonne di altezze molto diverse, che fallisce sul codice attuale.",
+          "Gli archi restano polilinee SVG da 1px con la punta sul target e il verso dalla dipendenza alla issue che la dichiara.",
+          "scripts/board-graph.mjs non e' modificato.",
+          "npm run test passa."
+        ]
+      },
+      "created_at": "2026-07-31T07:43:01Z",
+      "updated_at": "2026-07-31T07:43:01Z"
     }
   ]
 }
