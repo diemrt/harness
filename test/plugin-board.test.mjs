@@ -559,6 +559,44 @@ test("an unknown flag is refused instead of starting one more server", async () 
   }
 });
 
+test("a declared flag used badly is not reported as an unknown one", async () => {
+  // The parser fails the same way for "you invented a flag" and for "this flag of ours is missing
+  // its value", and the catch used to flatten both into UNKNOWN_ARGUMENT. The message stayed
+  // readable, but the code is what a caller branches on, and it named the wrong mistake: nobody
+  // invented --port. Both codes are asserted here and in the test above, so collapsing the catch
+  // back onto one code turns one of the two red whichever code it picks.
+  const dir = tempProject(seed());
+  try {
+    for (const argv of [["--port"], ["--project-dir"], ["--port", "--project-dir", dir]]) {
+      const run = spawnSync(process.execPath, [SERVER_PATH, ...argv], {
+        encoding: "utf8",
+        cwd: dir,
+        timeout: 10_000,
+      });
+      assert.equal(
+        run.status,
+        1,
+        `${argv.join(" ")} must exit 1, not run a server (status ${run.status}, signal ${run.signal})`
+      );
+      assert.equal(run.stderr, "", "the contract keeps stderr empty even on failure");
+      const lines = run.stdout.trim().split("\n");
+      assert.equal(lines.length, 1, "exactly one line of JSON, as for every other plugin script");
+      const parsed = JSON.parse(lines[0]);
+      assert.equal(parsed.ok, false);
+      assert.equal(
+        parsed.code,
+        "INVALID_ARGUMENT_VALUE",
+        `${argv.join(" ")} names a flag the script declares: that is not an unknown argument`
+      );
+      assert.equal("data" in parsed, false, "a refused start must not report a url or a pid");
+      // The human reading the line still needs to know which flag went wrong.
+      assert.match(parsed.error, /--(port|project-dir)/);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("the flags the board does declare keep working", async () => {
   // The other half of the strict parser: refusing the unknown must not refuse the known.
   const dir = tempProject(seed([issue("11111111-1111-1111-1111-111111111111")]));

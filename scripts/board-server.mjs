@@ -18,7 +18,7 @@
 //   {"ok":true,"data":{"url":"...","port":1234,"pid":999,"projectDir":"..."}}
 //   {"ok":false,"error":"<message>","code":"<CODE>"}
 //
-// Error codes: UNKNOWN_ARGUMENT, FILE_NOT_FOUND, PORT_IN_USE, ERROR.
+// Error codes: UNKNOWN_ARGUMENT, INVALID_ARGUMENT_VALUE, FILE_NOT_FOUND, PORT_IN_USE, ERROR.
 
 import { createServer } from "node:http";
 import { existsSync, readFileSync, statSync, watch } from "node:fs";
@@ -85,6 +85,16 @@ function main() {
       },
     }));
   } catch (error) {
+    // parseArgs raises the same kind of error for two different mistakes, and the `code` is the
+    // part callers branch on: labelling both UNKNOWN_ARGUMENT told whoever asked "you invented a
+    // flag" even when the flag was one of ours, just left without its value. The message stays
+    // readable either way; the diagnosis is what has to be right.
+    if (error.code === "ERR_PARSE_ARGS_INVALID_OPTION_VALUE") {
+      writeFail(
+        `${error.message.replace(/\.?$/, ".")} Both --project-dir and --port take a value.`,
+        "INVALID_ARGUMENT_VALUE"
+      );
+    }
     writeFail(
       `${error.message.replace(/\.?$/, ".")} The board server takes --project-dir and --port only; it is stopped by killing its pid.`,
       "UNKNOWN_ARGUMENT"
