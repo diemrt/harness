@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T14:23:54Z",
+  "last_updated": "2026-07-31T15:51:51Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1056,6 +1056,145 @@
       },
       "created_at": "2026-07-31T14:11:46Z",
       "updated_at": "2026-07-31T14:11:46Z"
+    },
+    {
+      "id": "2f36971e-e18e-46ea-a4f4-db6757b1aede",
+      "title": "Board: un click sul link deve aprire una pagina sola",
+      "description": "Un ctrl+click sull'URL stampato al clock-in apre due schede sullo stesso indirizzo, in Claude Code su Windows Terminal.\n\nIl server stampa una riga sola con un URL solo: il difetto non e' in scripts/board-server.mjs, che questa issue non tocca. L'ipotesi e' che due rilevatori di link insistano sullo stesso testo — l'hyperlink OSC 8 emesso da Claude Code e l'auto-detection di Windows Terminal — e che un click li inneschi entrambi.\n\nQuello che harness controlla e' la forma in cui stampa l'URL. Vanno provate con l'utente al click, un giro per forma, contando le schede: URL nudo su riga propria, code-span, fenced code block, markdown link. Nessun test automatico di questo repository puo' contare le schede di un browser: l'esito del giro manuale e' l'unica evidenza possibile, e va registrato.\n\nPoi commands/board.md (passo 4 dell'avvio) e skills/harness/references/board.md (Ciclo di vita) prescrivono una forma sola e dicono perche'.\n\nSpec: docs/superpowers/specs/2026-07-31-tracker-lifecycle-commands-design.md, sezione 1.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "Il giro manuale e' stato eseguito con l'utente: per ogni forma provata risulta a verbale quante schede ha aperto un click.",
+          "commands/board.md, passo 4 dell'avvio, prescrive una sola forma di stampa dell'URL e la mostra testualmente.",
+          "skills/harness/references/board.md, sezione Ciclo di vita, prescrive la stessa forma di commands/board.md: i due documenti non si contraddicono.",
+          "I documenti spiegano perche' quella forma, cosi' che la scelta non venga riaperta alla prossima riformulazione della frase.",
+          "git diff non tocca scripts/board-server.mjs ne' scripts/board.html.",
+          "npm run test esce 0."
+        ]
+      },
+      "created_at": "2026-07-31T15:51:03Z",
+      "updated_at": "2026-07-31T15:51:03Z"
+    },
+    {
+      "id": "9489f774-e8eb-43d7-a07b-3acb825ca456",
+      "title": "schema_version nel tracker, tollerando i file che non ce l'hanno",
+      "description": "--upgrade deve sapere da che versione parte e --init deve sapere cosa scrivere: entrambi presuppongono che issues.json dichiari il proprio schema, e oggi non lo fa.\n\nVa introdotta la costante SCHEMA_VERSION in scripts/issue-manager.mjs con valore 1 — lo schema descritto oggi in references/issues.md — e la chiave schema_version in cima a issues.json, accanto a last_updated.\n\nChiave assente vale versione 0, e il file si legge lo stesso: nessun comando esistente cambia comportamento, nessun progetto va aggiornato per continuare a funzionare. E' la stessa scelta gia' fatta per tier e per depends_on.\n\nIl writer preserva quello che trova: se il file ha schema_version lo riscrive identico, se non ce l'ha non lo aggiunge. Solo --init e --upgrade scrivono quel campo. Un --insert che timbrasse 1 su un file v0 dichiarerebbe una migrazione mai eseguita, e il campo perderebbe l'unica cosa che lo rende utile.\n\nSpec: docs/superpowers/specs/2026-07-31-tracker-lifecycle-commands-design.md, sezione 2.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "scripts/issue-manager.mjs espone una costante SCHEMA_VERSION con valore 1.",
+          "Su un tracker temporaneo privo di schema_version, --get e --get-all rispondono ok:true come prima: la chiave assente non e' un errore.",
+          "Un --insert o --update su un file privo di schema_version lo lascia privo: la chiave non viene aggiunta.",
+          "Un --insert o --update su un file che ha schema_version lo riscrive con lo stesso valore.",
+          "test/plugin-issue-manager.test.mjs copre i tre casi sopra su directory temporanea.",
+          "references/issues.md documenta schema_version, il valore corrente e la semantica della chiave assente.",
+          "npm run test esce 0 e issues.json alla radice non e' stato modificato a mano."
+        ]
+      },
+      "created_at": "2026-07-31T15:51:03Z",
+      "updated_at": "2026-07-31T15:51:03Z"
+    },
+    {
+      "id": "b6100ba5-f743-42a2-8084-4c143d9bc5b2",
+      "title": "--upgrade: migrazioni idempotenti sullo schema del tracker",
+      "description": "Il comando porta issues.json da schema_version a SCHEMA_VERSION, aggiungendo i campi nuovi coi loro default.\n\nServe una lista ordinata di migrazioni, ognuna con la versione che produce: si applicano solo quelle comprese fra la versione del file e quella corrente. La migrazione 0 -> 1 materializza depends_on: [] dove la chiave manca.\n\nNon tocca i valori esistenti e non rimuove niente: aggiunge campi nuovi col default e basta. Un campo deprecato lo cancella l'utente, quando decide di cancellarlo.\n\nIdempotente: un file gia' a SCHEMA_VERSION risponde ok:true con migrated 0 e non viene riscritto. Un file a versione superiore a SCHEMA_VERSION viene rifiutato: e' uno script vecchio davanti a dati nuovi, e riscriverli li degraderebbe.\n\nNe' --insert ne' --update fanno auto-upgrade: la migrazione e' un'azione esplicita dell'utente.\n\ndata: { from, to, migrated }, con migrated il numero di issue effettivamente toccate.\n\nSpec: docs/superpowers/specs/2026-07-31-tracker-lifecycle-commands-design.md, sezione 3.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [
+        "9489f774-e8eb-43d7-a07b-3acb825ca456"
+      ],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "--upgrade su un tracker temporaneo privo di schema_version risponde ok:true con from 0 e to 1, e scrive schema_version 1 nel file.",
+          "Dopo l'upgrade ogni issue ha depends_on; quelle che gia' lo avevano conservano il valore, e nessun altro campo cambia o sparisce.",
+          "Un secondo --upgrade di seguito risponde ok:true con migrated 0 e lascia il file identico byte per byte.",
+          "--upgrade su un file con schema_version maggiore di SCHEMA_VERSION esce 1 con un code stabile e non scrive.",
+          "test/plugin-issue-manager.test.mjs copre i quattro casi sopra su directory temporanea.",
+          "references/issues.md documenta --upgrade (cosa aggiunge, cosa non tocca) e commands/issue.md documenta l'argomento upgrade.",
+          "npm run test esce 0."
+        ]
+      },
+      "created_at": "2026-07-31T15:51:13Z",
+      "updated_at": "2026-07-31T15:51:13Z"
+    },
+    {
+      "id": "0f0374ce-6c87-485a-9554-c07d8afa854d",
+      "title": "--init: crea issues.json col seed minimo, senza mai sovrascriverlo",
+      "description": "Oggi issues.json nasce solo al primo --insert: non c'e' modo di crearlo di proposito su un progetto nuovo.\n\n--init lo crea nella directory del progetto col seed minimo { schema_version, last_updated, issues: [] }, dove schema_version vale SCHEMA_VERSION.\n\nSe il file esiste gia', rifiuta con il code nuovo ALREADY_EXISTS e non scrive niente. Un init che sovrascrive e' un init che cancella un tracker vivo, e nessun flag di conferma vale quel rischio: chi vuole ripartire da zero rimuove il file a mano, esplicitamente.\n\nRispetta --project-dir come tutti gli altri comandi dello script.\n\ndata: { path, created: true }.\n\nSpec: docs/superpowers/specs/2026-07-31-tracker-lifecycle-commands-design.md, sezione 4.",
+      "status": "backlog",
+      "tier": "economy",
+      "depends_on": [
+        "9489f774-e8eb-43d7-a07b-3acb825ca456"
+      ],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "--init in una directory temporanea senza issues.json lo crea e risponde ok:true con data.created true e data.path del file creato.",
+          "Il file creato ha schema_version pari a SCHEMA_VERSION, issues array vuoto e last_updated valorizzato.",
+          "--init dove issues.json esiste gia' esce 1 con code ALREADY_EXISTS e lascia il file esistente identico byte per byte.",
+          "--init rispetta --project-dir, e --help lo elenca fra i comandi.",
+          "test/plugin-issue-manager.test.mjs copre i tre casi sopra su directory temporanea.",
+          "references/issues.md documenta --init e il code ALREADY_EXISTS; commands/issue.md documenta l'argomento init.",
+          "npm run test esce 0."
+        ]
+      },
+      "created_at": "2026-07-31T15:51:13Z",
+      "updated_at": "2026-07-31T15:51:13Z"
+    },
+    {
+      "id": "c112d836-b40b-478d-962d-e4672613ea08",
+      "title": "--compact: archivia le done e le sostituisce coi blocchi decisi a monte",
+      "description": "--compact e' la primitiva che rimpicciolisce issues.json senza perdere lo storico. Non decide i raggruppamenti: li riceve gia' fatti in --issue-data-file, come blocks: [ { title, description, issue_ids } ].\n\nValida: ogni id esiste ed e' done, nessun id compare in due blocchi, nessun blocco e' vuoto, title e description stanno nei limiti gia' in vigore.\n\nRifiuta con INVALID_DEPENDENCY se una issue viva dichiara in depends_on uno degli id da archiviare, elencando gli id che puntano. Come per --delete: riscrivere quei riferimenti muterebbe issue che il chiamante non ha nominato. Chi compatta scollega prima.\n\nArchivia gli oggetti originali interi in .harness/archive/<timestamp>.json con lo schema_version sotto cui erano scritti, li toglie da issues.json e inserisce una issue per blocco: status done, validation.state pass, criteria col path dell'archivio e la lista id + titolo coperti.\n\nSotto HARNESS_ROLE=worker rifiuta con FORBIDDEN_ROLE: scrive record done/pass. L'archivio non si rilegge: --get, --get-all e il board vedono solo issues.json.\n\ndata: { archivePath, removed, blocks: [ { id, title, archivedCount } ] }.\n\nSpec: 2026-07-31-tracker-lifecycle-commands-design.md, sezione 5.1.",
+      "status": "backlog",
+      "tier": "reasoning",
+      "depends_on": [
+        "9489f774-e8eb-43d7-a07b-3acb825ca456"
+      ],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "Su tracker temporaneo, --compact con un blocco di N issue done: le N spariscono da issues.json e compare una issue done/pass col titolo del blocco.",
+          "Gli oggetti issue originali stanno in .harness/archive/<timestamp>.json, interi e identici a com'erano, con lo schema_version del tracker.",
+          "La issue blocco riporta in validation.criteria il path dell'archivio e id + titolo di ogni issue coperta.",
+          "--compact esce 1 con INVALID_DEPENDENCY elencando gli id che puntano, se una issue viva dipende da un id da archiviare; il file resta intatto.",
+          "--compact esce 1 senza scrivere se un id non esiste, non e' done, compare in due blocchi o un blocco e' vuoto; con HARNESS_ROLE=worker esce 1 con FORBIDDEN_ROLE.",
+          "test/plugin-issue-manager.test.mjs copre i casi sopra su directory temporanea; references/issues.md documenta --compact e l'archivio.",
+          "npm run test esce 0 e issues.json alla radice non e' stato compattato per prova."
+        ]
+      },
+      "created_at": "2026-07-31T15:51:51Z",
+      "updated_at": "2026-07-31T15:51:51Z"
+    },
+    {
+      "id": "cef2fd42-dd16-4400-8ddb-4ff9607778d4",
+      "title": "/harness:compact propone i blocchi, chiede conferma, chiama la primitiva",
+      "description": "La primitiva --compact non decide niente: sapere che \"board server\" e \"card delle dipendenze\" sono lo stesso argomento non e' deducibile da un titolo. Quel giudizio sta nel comando.\n\ncommands/compact.md: legge le issue done dal tracker; propone N blocchi tematici dicendo quali issue finiscono in ognuno e con che titolo; aspetta conferma esplicita dell'utente; solo allora chiama --compact col payload confermato, passato da file per non gestire escaping di quote nella shell; riporta archivePath e i blocchi creati.\n\nSenza conferma non chiama la primitiva: un raggruppamento sbagliato, una volta scritto, e' un archivio da disfare a mano.\n\nDichiara i codici su cui ramificare e non ritenta alla cieca: INVALID_DEPENDENCY significa scollegare prima le issue vive che puntano agli id, FORBIDDEN_ROLE significa che a lanciarlo e' un worker.\n\ninit e upgrade non prendono un comando proprio: sono meccanici e senza dialogo, e restano argomenti di /harness:issue.\n\nSpec: docs/superpowers/specs/2026-07-31-tracker-lifecycle-commands-design.md, sezioni 5.2 e 6.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [
+        "c112d836-b40b-478d-962d-e4672613ea08"
+      ],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "Esiste commands/compact.md con frontmatter description, argument-hint e allowed-tools coerente con gli altri comandi in commands/.",
+          "Il documento impone di proporre i blocchi e di attendere conferma esplicita dell'utente prima di invocare --compact.",
+          "Il documento impone di passare il payload con --issue-data-file, non inline.",
+          "Il documento dice cosa fare su INVALID_DEPENDENCY e su FORBIDDEN_ROLE, senza ritentare alla cieca.",
+          "test/plugin-commands.test.mjs copre esistenza e frontmatter del comando nuovo.",
+          "Il comando e' stato invocato in una sessione reale di questo repository dopo il riavvio, come impone CLAUDE.md.",
+          "npm run test esce 0."
+        ]
+      },
+      "created_at": "2026-07-31T15:51:51Z",
+      "updated_at": "2026-07-31T15:51:51Z"
     }
   ]
 }
