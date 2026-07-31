@@ -30,6 +30,25 @@
     /* Smooth fade-in for rendered cards */
     .issue-card { animation: fadeIn .18s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+    /* Jumping to a dependency is an anchor and nothing else: the browser scrolls, and :target
+       says which card was asked for. Matching against the URL hash rather than a class is what
+       makes it survive the SSE re-render, which rebuilds the whole list through innerHTML and
+       would wipe any class JavaScript had put there. */
+    html { scroll-behavior: smooth; }
+    .issue-card:target {
+      /* Literal colour and not daisyUI's --p on purpose. That variable holds bare oklch
+         components, and wrapping them in the wrong colour function makes the whole outline
+         invalid at computed-value time: every longhand silently falls back to none, so the
+         highlight just does not appear and nothing reports it. This value is daisyUI's own
+         primary for the theme the page pins on <html>. */
+      outline: 2px solid oklch(49.12% 0.3096 275.75);
+      outline-offset: 2px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .issue-card { animation: none; }
+    }
   </style>
 </head>
 <body class="min-h-screen bg-base-200 text-base-content">
@@ -295,7 +314,14 @@
       el.emptyState.classList.add("hidden");
       el.emptyState.classList.remove("flex");
 
-      el.issuesList.innerHTML = items.map(issueCard).join("");
+      // Both indexes are built from what is about to be rendered, before rendering it: the set
+      // decides which dependency chips can be jumped to, and the map resolves the tooltips.
+      // Titles come from the whole payload rather than from `items`, so a dependency filtered
+      // out of this view is still named in its tooltip even though its chip is inert.
+      const visibleIds = new Set(items.map((it) => it.id));
+      const titleById = new Map(state.issues.map((it) => [it.id, it.title || ""]));
+
+      el.issuesList.innerHTML = items.map((it) => issueCard(it, visibleIds, titleById)).join("");
       refreshIcons();
     }
 
@@ -328,7 +354,42 @@
       return "";
     }
 
-    function issueCard(it) {
+    // The dependency chain the 1-WIP rule is written around is stored on the issue, and the board
+    // was the one place it stayed invisible: a card with three dependencies looked exactly like a
+    // card with none. One chip per dependency, in the order the field declares them — the CLI
+    // already refuses duplicates and self-references, so nothing is filtered or reordered here.
+    // visibleIds and titleById are arguments instead of reads of `state` because that is what
+    // makes this callable from the test, which pulls the function out of the served page and runs
+    // it in a scope where none of this page's globals exist.
+    function renderDependsOn(dependsOn, visibleIds, titleById) {
+      if (!Array.isArray(dependsOn) || dependsOn.length === 0) return "";
+
+      const chips = dependsOn.map((id) => {
+        // Eight characters, not thirty-six: three full GUIDs in a row are more hexadecimal than
+        // description on the card. The whole id stays one hover away, next to the title of what
+        // it points at — an id the payload does not know keeps the first half of that tooltip.
+        const short = String(id).slice(0, 8);
+        const title = titleById.get(id);
+        const tip = title ? `${id} — ${title}` : String(id);
+
+        // Two branches and not three: a dependency filtered out of this render and an id absent
+        // from the tracker both mean the jump has nowhere to land, which is the whole content of
+        // the grey. A <span> rather than a disabled <a>, so an inert chip never joins the tab
+        // order as a control that then refuses to answer.
+        if (visibleIds.has(id)) {
+          return `<a href="#issue-${escapeHtml(id)}" class="badge badge-sm badge-outline font-mono hover:badge-primary" title="${escapeHtml(tip)}">${escapeHtml(short)}</a>`;
+        }
+        return `<span class="badge badge-sm badge-ghost font-mono opacity-60" title="${escapeHtml(tip)}">${escapeHtml(short)}</span>`;
+      });
+
+      return `
+        <div class="mt-2 flex flex-wrap items-center gap-1.5">
+          <span class="text-xs uppercase tracking-wide opacity-60">Dipende da</span>
+          ${chips.join("")}
+        </div>`;
+    }
+
+    function issueCard(it, visibleIds, titleById) {
       const meta = statusMeta(it.status);
       const validation = it.validation || {};
       const vMeta = VALIDATION_META[validation.state] || VALIDATION_META.unknown;
@@ -348,7 +409,7 @@
         </div>` : "";
 
       return `
-        <article class="issue-card card bg-base-100 shadow-sm border border-base-200 hover:shadow-md transition-shadow">
+        <article id="issue-${escapeHtml(it.id)}" class="issue-card card bg-base-100 shadow-sm border border-base-200 hover:shadow-md transition-shadow">
           <div class="card-body p-5">
             <div class="flex items-start justify-between gap-3">
               <h2 class="card-title text-base leading-snug">${escapeHtml(it.title)}</h2>
@@ -359,6 +420,8 @@
                 </span>
               </div>
             </div>
+
+            ${renderDependsOn(it.depends_on, visibleIds, titleById)}
 
             ${it.description ? `<p class="text-sm text-base-content/80 mt-2 preserve-newlines">${escapeHtml(it.description)}</p>` : ""}
 

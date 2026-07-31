@@ -273,6 +273,12 @@ test("the page keeps the features the copied viewer had", async () => {
       "loadingState",
       "emptyState",
       "errorState",
+      'id="issue-', // anchor target of a dependency chip
+      "\\.issue-card:target", // and what says which card the jump landed on
+      // The outline colour is checked as a string because no test here runs a browser, and the
+      // way this broke once was silent: hsl() around daisyUI's --p, which holds bare oklch
+      // components, is invalid at computed-value time and drops the whole outline to none.
+      "outline: 2px solid oklch\\(",
     ]) {
       assert.match(html, new RegExp(marker), `the board page lost: ${marker}`);
     }
@@ -382,6 +388,107 @@ test("the tier is badged when set, and absent otherwise", async () => {
       "the value must not be able to close the tag it sits in"
     );
     assert.match(injected, /&quot;&gt;/, "quote and angle bracket must arrive escaped");
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a dependency that is being rendered gets a chip that jumps to it", async () => {
+  const dir = tempProject(seed());
+  const { child, url } = await startServer(dir);
+  try {
+    const html = await (await fetch(url)).text();
+    const { renderDependsOn } = extractFunctions(html, ["renderDependsOn", "escapeHtml"]);
+
+    const target = "aaaaaaaa-1111-1111-1111-111111111111";
+    const rendered = renderDependsOn(
+      [target],
+      new Set([target]),
+      new Map([[target, "the issue that must close first"]])
+    );
+
+    assert.match(rendered, new RegExp(`<a href="#issue-${target}"`), "the chip must be an anchor onto the target card");
+    assert.match(rendered, />aaaaaaaa</, "the chip shows the first eight characters of the id");
+    assert.equal(rendered.includes(`>${target}<`), false, "the whole GUID does not belong on the chip");
+    // The tooltip is where the id stays copyable and the title says what it points at.
+    assert.match(rendered, new RegExp(`title="${target} — the issue that must close first"`));
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a dependency nobody is rendering gets an inert chip, whether it is filtered out or gone", async () => {
+  const dir = tempProject(seed());
+  const { child, url } = await startServer(dir);
+  try {
+    const html = await (await fetch(url)).text();
+    const { renderDependsOn } = extractFunctions(html, ["renderDependsOn", "escapeHtml"]);
+
+    // In the payload, but filtered out of this render: the title is still known.
+    const filtered = "bbbbbbbb-2222-2222-2222-222222222222";
+    const outOfView = renderDependsOn([filtered], new Set(), new Map([[filtered, "a closed dependency"]]));
+    assert.match(outOfView, /^\s*<div/);
+    assert.match(outOfView, /<span[^>]*title="bbbbbbbb-2222-2222-2222-222222222222 — a closed dependency"/);
+    assert.equal(outOfView.includes("<a "), false, "an unreachable chip must not be a link");
+    assert.equal(outOfView.includes("href="), false, "an unreachable chip must not carry an href");
+
+    // Not in the payload at all: the CLI forbids it, a hand edit of issues.json does not.
+    const unknown = "cccccccc-3333-3333-3333-333333333333";
+    const orphan = renderDependsOn([unknown], new Set(), new Map());
+    assert.equal(orphan.includes("href="), false);
+    assert.match(orphan, new RegExp(`title="${unknown}"`), "an id nobody knows keeps the id alone as its tooltip");
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("no dependencies means no block at all, and the declared order is kept", async () => {
+  const dir = tempProject(seed());
+  const { child, url } = await startServer(dir);
+  try {
+    const html = await (await fetch(url)).text();
+    const { renderDependsOn } = extractFunctions(html, ["renderDependsOn", "escapeHtml"]);
+
+    // Most issues depend on nothing: an empty label with no chips under it would be noise on
+    // every card of the board, so absence renders as absence.
+    assert.equal(renderDependsOn([], new Set(), new Map()), "");
+    assert.equal(renderDependsOn(undefined, new Set(), new Map()), "");
+    assert.equal(renderDependsOn(null, new Set(), new Map()), "");
+
+    const first = "dddddddd-4444-4444-4444-444444444444";
+    const second = "eeeeeeee-5555-5555-5555-555555555555";
+    const rendered = renderDependsOn([first, second], new Set([first, second]), new Map());
+    assert.ok(
+      rendered.indexOf("dddddddd") < rendered.indexOf("eeeeeeee"),
+      "the chips must follow the order the field declares"
+    );
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a dependency's title cannot break out of the tooltip it is written into", async () => {
+  const dir = tempProject(seed());
+  const { child, url } = await startServer(dir);
+  try {
+    const html = await (await fetch(url)).text();
+    const { renderDependsOn } = extractFunctions(html, ["renderDependsOn", "escapeHtml"]);
+
+    // The title of another issue reaches an attribute here, and titles are free text.
+    const id = "ffffffff-6666-6666-6666-666666666666";
+    const rendered = renderDependsOn([id], new Set([id]), new Map([[id, '"><script>alert(1)</script>']]));
+
+    assert.equal(rendered.includes("<script>"), false, "a title must never render as markup");
+    assert.equal(
+      rendered.includes('"><script'),
+      false,
+      "the title must not be able to close the attribute it sits in"
+    );
+    assert.match(rendered, /&quot;&gt;/);
   } finally {
     stop(child);
     rmSync(dir, { recursive: true, force: true });

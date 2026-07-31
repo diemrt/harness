@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T13:38:54Z",
+  "last_updated": "2026-07-31T13:51:00Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1019,25 +1019,17 @@
       "id": "f38fa140-663e-4adf-8c02-dbce5bcbd401",
       "title": "board: card delle dipendenze fra titolo e description",
       "description": "Mostra sulla card cio' che depends_on ha aggiunto al tracker e che il board ignora: da quali issue una issue dipende.\n\nFra la riga del titolo (scripts/board.html:353-361) e la description (:363) entra un blocco con un'etichetta e un chip per dipendenza, nell'ordine dell'array. Il chip porta i primi 8 caratteri del GUID in mono; il suo title porta il GUID intero, piu' il titolo della issue puntata quando quell'id e' nel payload.\n\nDue rami, non tre: se la issue puntata e' fra quelle renderizzate in questo giro il chip e' un <a href=\"#issue-<guid>\">, altrimenti e' uno <span> grigio e inerte. Cosi' filtrata dalla vista e id inesistente collassano nello stesso stato, e la distinzione sopravvive solo nel title. Uno <span> e non un <a> disabilitato: non deve entrare nella tabulazione fingendosi un comando.\n\nIl salto non usa JavaScript: id=\"issue-<guid>\" sull'article, scroll-behavior nel CSS e .issue-card:target per evidenziare l'arrivo. :target si valuta contro l'hash dell'URL, quindi l'evidenziazione sopravvive da sola al re-render che SSE fa via innerHTML.\n\nLa funzione riceve id visibili e titoli come argomenti invece di leggere state: e' la condizione perche' il test possa chiamarla.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
         "97b9d3ee-9d74-4463-b90f-7c1357a1c6d5"
       ],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "board.html definisce renderDependsOn(dependsOn, visibleIds, titleById): niente accesso a state ne' al DOM, ritorna stringa.",
-          "Il blocco compare fra la riga del titolo e la description; con depends_on assente o vuoto non produce alcun markup.",
-          "Chip di 8 caratteri in mono; il title porta il GUID intero e, quando l'id e' noto, anche il titolo della issue.",
-          "Dipendenza fra le renderizzate: <a href=\"#issue-<guid>\">. Filtrata via o id ignoto: <span> senza href, non focusabile.",
-          "Ogni card porta id=\"issue-<guid>\"; il CSS evidenzia .issue-card:target e rispetta prefers-reduced-motion.",
-          "test/plugin-board.test.mjs chiama renderDependsOn via extractFunctions: vuoto, visibile, filtrata, id ignoto, ordine, escaping.",
-          "npm run test passa."
-        ]
+        "state": "pass",
+        "criteria": "1) board.html:364 renderDependsOn(dependsOn, visibleIds, titleById); grep di state|document|window|el. sul corpo 364-390 non trova nulla, ogni ramo ritorna stringa (\"\" o template literal). 2) chiamata a board.html:424, fra la riga del titolo (h2 a :415) e la description (:426); renderDependsOn([]|undefined|null) === \"\" verificato dal test a test/plugin-board.test.mjs:457-459. 3) chip = id.slice(0,8) con class font-mono; title = `<guid> — <titolo>` quando noto, solo guid altrimenti (board.html:377-382); probe in Chromium: linkText \"aaaaaaaa\", linkTitle \"aaaaaaaa-1111-1111-1111-111111111111 — visibile\", chipTitle del non visibile con il guid intero. 4) visibleIds.has(id) -> <a href=\"#issue-<guid>\"> (:380), altrimenti <span> (:382); probe in Chromium sull'output reale della funzione: chipTag SPAN, chipHasHref false, chipHasTabindex false, chip.focus() non sposta activeElement (chipFocusable false), mentre il link e' tabbabile. 5) article id=\"issue-${escapeHtml(it.id)}\" a board.html:412; CSS a :39 .issue-card:target. Verificato non solo per stringa ma in Chromium (chrome-headless-shell 1228) applicando l'intero <style> della pagina a una card col guid reale e hash impostato: :target matcha e outline computa solid | 2px | oklch(0.4912 0.3096 275.75) | offset 2px. Controprova sulla stesura precedente: `outline: 2px solid hsl(var(--p))` con --p a componenti oklch nudi computa outline-style none / width 3px, cioe' il fallimento silenzioso descritto; CSS.supports sul letterale oklch e' true. prefers-reduced-motion (board.html:48): con --force-prefers-reduced-motion il probe legge scroll-behavior auto e animation-name none, senza il flag smooth e fadeIn. 6) test/plugin-board.test.mjs:394-497, quattro prove che estraggono renderDependsOn via extractFunctions e coprono vuoto/assente/null, visibile, filtrata, id ignoto, ordine dell'array e escaping del titolo in attributo; piu' i marker id=\"issue-, .issue-card:target e outline: 2px solid oklch( aggiunti alla prova sui marker (:276-281). 7) npm run test (gate da .harness/config.json): tests 179, pass 179, fail 0, incluse le quattro nuove prove. git status --short: solo issues.json, scripts/board.html, test/plugin-board.test.mjs; nessun file non tracciato, nessuna modifica fuori scope."
       },
       "created_at": "2026-07-31T13:35:25Z",
-      "updated_at": "2026-07-31T13:35:25Z"
+      "updated_at": "2026-07-31T13:51:00Z"
     }
   ]
 }
