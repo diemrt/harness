@@ -455,7 +455,11 @@ export function renderCriteria(criteria, width) {
   return [];
 }
 
+// CORRETTO DOPO L'ESECUZIONE — la prima stesura faceva `new Date(iso)` e scartava solo NaN. Ma
+// `new Date(null)` non è una data invalida: è l'epoch, e una issue senza `created_at` veniva
+// datata 1 gennaio 1970 con l'aria di un dato vero.
 function formatDate(iso) {
+  if (typeof iso !== "string" || iso.trim() === "") return "—";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -470,7 +474,9 @@ export function renderCard(issue, { width = 100 } = {}) {
   lines.push(`${head}${" ".repeat(gap)}${tier}`);
   lines.push(...wrapText(issue.title, width));
 
-  if (issue.description) {
+  // CORRETTO DOPO L'ESECUZIONE — una description di soli spazi è truthy, e apriva un blocco vuoto
+  // che si legge come un campo andato perso.
+  if (typeof issue.description === "string" && issue.description.trim() !== "") {
     lines.push("", ...wrapText(issue.description, width));
   }
 
@@ -485,11 +491,18 @@ export function renderCard(issue, { width = 100 } = {}) {
   return lines.join("\n");
 }
 
+// CORRETTO DOPO L'ESECUZIONE — ogni card apre e chiude con SEP, quindi unirle con "\n" stampava
+// due righelli attaccati fra una card e l'altra. Il confine è uno: tre righelli per due card.
 export function renderCards(issues, { width = 100 } = {}) {
   if (!Array.isArray(issues) || issues.length === 0) {
     return "Nessuna issue da mostrare con questi filtri.";
   }
-  return issues.map((issue) => renderCard(issue, { width })).join("\n");
+  return issues
+    .map((issue, index) => {
+      const card = renderCard(issue, { width });
+      return index === 0 ? card : card.slice(card.indexOf("\n") + 1);
+    })
+    .join("\n");
 }
 ```
 

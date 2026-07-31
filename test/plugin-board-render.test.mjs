@@ -10,7 +10,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildGraph } from "../scripts/board-graph.mjs";
-import { components, renderChains, SEP, shortId } from "../scripts/board-render.mjs";
+import {
+  components,
+  renderCard,
+  renderCards,
+  renderChains,
+  renderCriteria,
+  SEP,
+  shortId,
+  wrapText,
+} from "../scripts/board-render.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const RENDER_PATH = path.resolve(__dirname, "..", "scripts", "board-render.mjs");
@@ -45,6 +54,10 @@ test("board-render.mjs is pure: no fs, no process, no console", () => {
   assert.equal(typeof renderChains, "function");
   assert.equal(typeof SEP, "function");
   assert.equal(typeof shortId, "function");
+  assert.equal(typeof wrapText, "function");
+  assert.equal(typeof renderCriteria, "function");
+  assert.equal(typeof renderCard, "function");
+  assert.equal(typeof renderCards, "function");
 
   const source = readFileSync(RENDER_PATH, "utf8");
   assert.doesNotMatch(source, /node:fs/);
@@ -161,4 +174,130 @@ test("l'intestazione porta progetto, conteggi e branch", () => {
   const out = renderChains({ graph, ...opts, counts: { open: 6, done: 84 } });
   assert.match(out, /harness · 6 aperte · 84 chiuse/);
   assert.match(out, /main/);
+});
+
+// --- La card: i sette campi della issue, senza perdite -----------------------------------------
+
+const card = (extra) => renderCard(issue(A, extra), { width: 70 });
+
+test("wrapText va a capo sulle parole e conserva le newline originali", () => {
+  assert.deepEqual(wrapText("uno due tre quattro", 9), ["uno due", "tre", "quattro"]);
+  assert.deepEqual(wrapText("prima\n\nseconda", 20), ["prima", "", "seconda"]);
+  assert.deepEqual(wrapText("", 20), [""]);
+  // Una parola più lunga della larghezza non si spezza: si sfora, perché un id tagliato a metà
+  // non è più un id.
+  assert.deepEqual(wrapText("parolalunghissima", 5), ["parolalunghissima"]);
+  // Il limite è la larghezza, inclusa: una riga che la riempie esatta non va a capo.
+  assert.deepEqual(wrapText("abc def", 7), ["abc def"]);
+  assert.deepEqual(wrapText("abc def", 6), ["abc", "def"]);
+  // Una riga di soli spazi è una riga vuota: rendere gli spazi lascerebbe sporcizia invisibile
+  // in coda a una riga che il lettore vede vuota.
+  assert.deepEqual(wrapText("prima\n   \nseconda", 20), ["prima", "", "seconda"]);
+  // Un campo assente non è una riga di testo: è nessun testo.
+  assert.deepEqual(wrapText(null, 20), [""]);
+  assert.deepEqual(wrapText(undefined, 20), [""]);
+});
+
+test("la card porta tutti e sette i campi", () => {
+  const out = card({
+    status: "in_progress",
+    tier: "reasoning",
+    title: "titolo della issue",
+    description: "prima riga\nseconda riga",
+    validation: { state: "unknown", criteria: ["primo criterio", "secondo criterio"] },
+    created_at: "2026-07-30T21:09:41Z",
+    updated_at: "2026-07-31T07:14:34Z",
+  });
+  assert.match(out, /in_progress/);
+  assert.match(out, /reasoning/);
+  assert.match(out, /titolo della issue/);
+  assert.match(out, /prima riga/);
+  assert.match(out, /seconda riga/);
+  assert.match(out, /Validazione · unknown/);
+  assert.match(out, /primo criterio/);
+  assert.match(out, /secondo criterio/);
+  assert.match(out, new RegExp(A), "l'id è completo, non abbreviato");
+  // Data e ora locali: il fuso della macchina decide le cifre, non il test.
+  assert.match(
+    out,
+    /creata \d{2} \S+ \d{2}:\d{2} · aggiornata \d{2} \S+ \d{2}:\d{2}/,
+    "le due date, con data e ora"
+  );
+});
+
+test("un titolo lunghissimo senza spazi resta intero nella card", () => {
+  const title = "riprogettazioneincrementaledellagenerazionedelletestatedellaboard";
+  const out = card({ title });
+  assert.ok(
+    out.split("\n").includes(title),
+    "il titolo sfora la larghezza invece di essere spezzato a metà parola"
+  );
+});
+
+test("criteria come stringa è reso quanto criteria come array", () => {
+  const out = card({ validation: { state: "pass", criteria: "evidenza della verifica" } });
+  assert.match(out, /Validazione · pass/);
+  assert.match(out, /evidenza della verifica/);
+});
+
+test("criteria come stringa multilinea non lascia righe di soli spazi", () => {
+  const out = card({ validation: { state: "fail", criteria: "prima riga\n\nseconda riga" } });
+  const lines = out.split("\n");
+  assert.ok(lines.includes("  prima riga"));
+  assert.ok(lines.includes("  seconda riga"));
+  assert.equal(
+    lines.some((line) => line !== line.trimEnd()),
+    false,
+    "una riga vuota è vuota, non due spazi che nessuno vede"
+  );
+});
+
+test("criteria array vuoto: il blocco resta, l'elenco no", () => {
+  const out = card({ validation: { state: "unknown", criteria: [] } });
+  assert.match(out, /Validazione · unknown/);
+  assert.equal(out.includes("○"), false, "nessun pallino senza criterio dietro");
+  assert.equal(/\n\n\n/.test(out), false, "e nessun blocco vuoto al posto dell'elenco");
+});
+
+test("renderCriteria scarta le voci che non sono testo", () => {
+  assert.deepEqual(renderCriteria([null, "", "   ", 42, "vero criterio"], 70), ["  ○ vero criterio"]);
+  assert.deepEqual(renderCriteria(undefined, 70), []);
+  assert.deepEqual(renderCriteria("   ", 70), []);
+});
+
+test("una issue senza validation non stampa il blocco di validazione", () => {
+  assert.equal(card({ validation: null }).includes("Validazione"), false);
+  assert.equal(card({ validation: {} }).includes("Validazione"), false);
+});
+
+test("description vuota non apre un blocco vuoto", () => {
+  assert.equal(/\n\n\n/.test(card({ description: "" })), false);
+  assert.equal(/\n\n\n/.test(card({ description: "   \n  " })), false);
+});
+
+test("tier assente vale standard", () => {
+  const out = card({ tier: undefined });
+  assert.match(out, /standard/);
+});
+
+test("una data mancante o illeggibile non diventa il primo gennaio 1970", () => {
+  // new Date(null) è l'epoch, non una data invalida: senza guardia la card daterebbe al 1970
+  // ogni issue a cui manca il campo.
+  assert.match(card({ created_at: null, updated_at: "ieri" }), /creata — · aggiornata —/);
+});
+
+test("renderCards separa le card e dice quando non ce ne sono", () => {
+  const out = renderCards([issue(A), issue(B)], { width: 70 });
+  assert.equal((out.match(/aaaaaaaa|bbbbbbbb/g) || []).length, 2);
+
+  // Il righello è un confine: fra due card ce n'è uno, non due incollati.
+  const lines = out.split("\n");
+  const rule = SEP(70);
+  assert.equal(lines.filter((line) => line === rule).length, 3, "tre confini per due card");
+  for (let i = 1; i < lines.length; i += 1) {
+    assert.equal(lines[i] === rule && lines[i - 1] === rule, false, "due righelli adiacenti");
+  }
+
+  assert.match(renderCards([], { width: 70 }), /nessuna issue/i);
+  assert.match(renderCards(null, { width: 70 }), /nessuna issue/i);
 });

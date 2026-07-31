@@ -4,7 +4,8 @@
 // assert.match instead of a browser, a server and a port.
 //
 // The chain view is an indented tree: one branch per connected component of the depends_on graph,
-// plus a group for the issues that neither depend on anything nor are depended upon.
+// plus a group for the issues that neither depend on anything nor are depended upon. The card view
+// is the opposite trade: few issues, all of every field, nothing truncated.
 
 import { GHOST_UNKNOWN } from "./board-graph.mjs";
 
@@ -210,4 +211,141 @@ export function renderChains({ graph, project, branch, counts, width = 100 }) {
   }
 
   return blocks.join("\n");
+}
+
+// Word wrap that keeps the author's newlines: a description written on three paragraphs stays on
+// three paragraphs, because in issues.json the break is the author's and not the layout's. A word
+// longer than the width is not broken — a chopped id is not an id, and the ids are exactly the
+// words that overflow. A line of blanks is a blank line: keeping its spaces would leave trailing
+// whitespace nobody can see and every diff can.
+export function wrapText(text, width) {
+  const source = typeof text === "string" ? text : "";
+  const out = [];
+  for (const paragraph of source.split("\n")) {
+    if (paragraph.trim() === "") {
+      out.push("");
+      continue;
+    }
+    let line = "";
+    for (const word of paragraph.split(/\s+/).filter(Boolean)) {
+      if (line === "") {
+        line = word;
+      } else if (line.length + 1 + word.length <= width) {
+        line += ` ${word}`;
+      } else {
+        out.push(line);
+        line = word;
+      }
+    }
+    if (line !== "") {
+      out.push(line);
+    }
+  }
+  return out.length === 0 ? [""] : out;
+}
+
+// Indent that leaves an empty line empty instead of turning it into two spaces.
+function indent(lines, pad) {
+  return lines.map((line) => (line === "" ? "" : `${pad}${line}`));
+}
+
+// criteria reaches here in two shapes and neither is normalized in issues.json: an array at
+// creation, a string at closure and on every issue that predates the array. Rendering one only
+// would blank out half the tracker. Anything that is not text — a null slipped into the array, an
+// empty entry — is not a criterion and gets no bullet of its own.
+export function renderCriteria(criteria, width) {
+  if (Array.isArray(criteria)) {
+    const lines = [];
+    for (const entry of criteria) {
+      if (typeof entry !== "string" || entry.trim() === "") {
+        continue;
+      }
+      const wrapped = wrapText(entry, width - 4);
+      lines.push(`  ○ ${wrapped[0]}`);
+      lines.push(...indent(wrapped.slice(1), "    "));
+    }
+    return lines;
+  }
+  if (typeof criteria === "string" && criteria.trim() !== "") {
+    return indent(wrapText(criteria, width - 2), "  ");
+  }
+  return [];
+}
+
+// Only a string is a date here. `new Date(null)` is not an invalid date, it is the epoch: without
+// this guard an issue missing a timestamp would be dated 1 January 1970 with a straight face.
+function formatDate(iso) {
+  if (typeof iso !== "string" || iso.trim() === "") {
+    return "—";
+  }
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+  return date.toLocaleString("it-IT", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * One issue, whole: nothing truncated, because in the terminal beside the editor the room is the
+ * reader's to give. A block is printed only when it has something in it — an empty line opening a
+ * description that is not there reads as a field that was lost, not as a field that is empty.
+ *
+ * @param {object} issue the issue as issues.json stores it
+ * @param {object} [options]
+ * @param {number} [options.width] the columns to lay the text out on
+ * @returns {string}
+ */
+export function renderCard(issue, { width = 100 } = {}) {
+  const lines = [SEP(width)];
+
+  const tier = issue.tier || "standard";
+  const head = `● ${issue.status}`;
+  const gap = Math.max(2, width - head.length - tier.length);
+  lines.push(`${head}${" ".repeat(gap)}${tier}`);
+  lines.push(...wrapText(issue.title, width));
+
+  const description = typeof issue.description === "string" ? issue.description.trim() : "";
+  if (description !== "") {
+    lines.push("", ...wrapText(description, width));
+  }
+
+  const validation = issue.validation;
+  if (validation && (validation.state || validation.criteria)) {
+    lines.push("", `Validazione · ${validation.state || "unknown"}`);
+    lines.push(...renderCriteria(validation.criteria, width));
+  }
+
+  lines.push(
+    "",
+    issue.id,
+    `creata ${formatDate(issue.created_at)} · aggiornata ${formatDate(issue.updated_at)}`
+  );
+  lines.push(SEP(width));
+  return lines.join("\n");
+}
+
+/**
+ * The cards of a list of issues, stacked. The rule that closes a card is the same rule that opens
+ * the next: printing both would draw a double line at every seam.
+ *
+ * @param {object[]} issues
+ * @param {object} [options]
+ * @param {number} [options.width] the columns to lay the text out on
+ * @returns {string}
+ */
+export function renderCards(issues, { width = 100 } = {}) {
+  if (!Array.isArray(issues) || issues.length === 0) {
+    return "Nessuna issue da mostrare con questi filtri.";
+  }
+  return issues
+    .map((issue, index) => {
+      const card = renderCard(issue, { width });
+      return index === 0 ? card : card.slice(card.indexOf("\n") + 1);
+    })
+    .join("\n");
 }

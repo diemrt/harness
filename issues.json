@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T09:14:26Z",
+  "last_updated": "2026-07-31T09:28:26Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1151,24 +1151,17 @@
       "id": "aaae9161-4b26-4b85-a7ee-69683656c9fa",
       "title": "board-render: card con tutti i campi della issue",
       "description": "Task 2 del piano. Spec sezione 4.\n\nwrapText(), renderCriteria(), renderCard(), renderCards(). La card riproduce i sette campi della card web di oggi senza perdite: stato, tier, titolo, description con le newline originali, blocco validazione, id completo, date.\n\nvalidation.criteria arriva in due forme e nessuna e' normalizzata in issues.json: array alla creazione, stringa alla chiusura e su ogni issue precedente all'array. Renderne una sola azzererebbe meta' del tracker.\n\nUna parola piu' lunga della larghezza non si spezza: un id tagliato a meta' non e' piu' un id.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
         "85d40484-ceb0-4c79-a5f3-3d4e768a56ad"
       ],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "wrapText va a capo sulle parole, conserva le newline originali e non spezza una parola piu' lunga della larghezza.",
-          "La card stampa stato, tier, titolo, description, validazione, id completo e le due date.",
-          "criteria come array e criteria come stringa sono entrambe rese.",
-          "Una issue con validation null non stampa il blocco di validazione.",
-          "renderCards senza issue dice che non c'e' niente da mostrare.",
-          "npm run test passa."
-        ]
+        "state": "pass",
+        "criteria": "Verifica indipendente, moduli reali importati da script temporanei fuori dal repo; tracker letto e mai scritto se non da questa chiusura. (1) wrapText: wrapText('a\n\n\n\nb',20)->['a','','','','b'] (newline originali conservate, anche multiple), wrapText('x <uuid> y',10)->['x','aaaaaaaa-1111-1111-1111-111111111111','y'] (parola piu' lunga della larghezza non spezzata), wrapText('prima\n   \nseconda',20)->['prima','','seconda'], wrapText(null/42/{})->[''], nessuna eccezione con width 0 o negativa. (2) Card: audit su TUTTE le 93 issue reali di issues.json (renderCard width 90) con controllo campo per campo - status, tier (o 'standard'), titolo, description parola per parola, 'Validazione · <state>', criteri parola per parola, id completo, 'creata '/'· aggiornata ': 0 perdite, 0 righe con whitespace in coda, 0 date 1970. Confronto col riferimento storico issueCard() in scripts/board.js:291-338: tutti e sette i campi presenti (formato data senza anno conforme all'esempio dello spec §4). (3) Rese dal tracker reale in sola lettura entrambe le forme: 70dce12a (criteria array, 5 voci, elenco con '  ○ ') e 28fc023e (criteria stringa lunga, indentata a 2 spazi); renderCriteria([null,'','   ',42,'vero'],70)->['  ○ vero'], renderCriteria('   ')->[] e renderCriteria([])->[]. (4) validation null -> nessuna riga 'Validazione' nella card (verificato anche con validation {}). (5) renderCards([],{width:70}) e renderCards(null) -> 'Nessuna issue da mostrare con questi filtri.'; due card -> 3 righelli, mai due adiacenti. (6) Gate .harness/config.json 'npm run test': 228 pass, 0 fail (216 di baseline + 12 nuovi). Modulo puro riletto a sorgente: unico import './board-graph.mjs' (a sua volta senza import), nessun node:fs/process/console/globalThis, nessun effetto a livello di modulo, render deterministico e non muta la issue in ingresso; unico ingresso ambientale toLocaleString senza timeZone, come gia' board.js:117-125. scripts/board-graph.mjs non modificato (git diff vuoto). Osservazioni fuori contratto, non bloccanti: (a) docs/superpowers/plans/2026-07-31-board-terminale.md risulta modificato oltre ai tre file attesi - solo annotazioni 'CORRETTO DOPO L'ESECUZIONE' sui difetti corretti, stessa pratica gia' committata in HEAD alla riga 171; l'orchestratore decida se includerlo nel commit; (b) renderCards([issue,null]) solleva TypeError (nessuna guardia sugli elementi non-oggetto); (c) validation {criteria:[]} senza state stampa 'Validazione · unknown' vuoto dove issueCard() (board.js:298) non stampava blocco - non raggiungibile sul tracker reale, tutte e 93 le issue hanno state; (d) l'indentazione iniziale di una riga di description viene assorbita dal word wrap ('  - primo' -> '- primo'), dove la card web la conservava con preserve-newlines: 8 issue reali hanno righe indentate."
       },
       "created_at": "2026-07-31T08:50:16Z",
-      "updated_at": "2026-07-31T08:50:16Z"
+      "updated_at": "2026-07-31T09:28:26Z"
     },
     {
       "id": "03268e64-df9c-4634-87a4-9aff28337a34",
