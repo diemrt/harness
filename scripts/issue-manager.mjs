@@ -26,7 +26,7 @@
 //
 // Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_TIER, INVALID_DEPENDENCY,
 //              INVALID_INPUT, INVALID_JSON, LIMIT_EXCEEDED, NOT_FOUND, FILE_NOT_FOUND,
-//              MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE, ALREADY_EXISTS.
+//              MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE, ALREADY_EXISTS, SCHEMA_TOO_NEW.
 //
 // Length limits: title and description are capped (see LIMITS) so an issue stays readable by a
 // human instead of turning into an untitled document. Over the cap the payload is rejected with
@@ -102,12 +102,35 @@ const TIERS = ["economy", "standard", "reasoning"];
 
 // The schema this script currently implements, i.e. the shape documented in references/issues.md.
 // A tracker declares which version it was written against via the root-level `schema_version` key,
-// sitting next to `last_updated`. Only --init and --upgrade (--upgrade not implemented by this
-// script yet) ever WRITE that key; every other command here only reads issues.json and rewrites it
-// unchanged on the fields it does not own — see writeIssuesFile(). An absent key reads as version 0,
-// and that is not an error: it is the same choice already made for `tier` and `depends_on`, a new
-// field never invalidates data written before it existed.
+// sitting next to `last_updated`. Only --init and --upgrade ever WRITE that key; every other
+// command here only reads issues.json and rewrites it unchanged on the fields it does not own —
+// see writeIssuesFile(). An absent key reads as version 0, and that is not an error: it is the
+// same choice already made for `tier` and `depends_on`, a new field never invalidates data
+// written before it existed.
 const SCHEMA_VERSION = 1;
+
+// Ordered migrations for --upgrade. Each entry names the schema version it PRODUCES (`to`) and a
+// function that migrates one issue object, returning either the same reference (untouched) or a
+// new object (touched) — never mutating its argument. Entries are appended, never inserted or
+// renumbered: the meaning of `to: 1` can never shift under a tracker that upgrades from an old
+// version later than one that upgraded right away. --upgrade applies only the entries whose `to`
+// falls strictly after the file's current version and at most SCHEMA_VERSION — see
+// upgradeTracker() below.
+const MIGRATIONS = [
+  {
+    to: 1,
+    // 0 -> 1: materialize depends_on: [] where the key is missing. An issue written before the
+    // field existed already READS as "no dependencies" everywhere else in this script (see
+    // validateDependencyGraph, deleteIssue); this migration only makes that reading explicit on
+    // disk, it does not change what any command returns for that issue.
+    migrateIssue(issue) {
+      if (hasProp(issue, "depends_on")) {
+        return issue;
+      }
+      return { ...issue, depends_on: [] };
+    },
+  },
+];
 
 // Helper: exception carrying the failure envelope fields, thrown by any validator/reader and
 // caught once at the top level so exactly one JSON line is ever emitted.
@@ -515,8 +538,7 @@ function readIssuesFile() {
 // actually owns (issues, last_updated here). Any other root key found on disk — schema_version
 // included — rides along untouched: this function never enumerates or filters root keys, so a
 // file that has schema_version gets it back byte-for-byte, and a file that does not have it never
-// gets one added. Only --init and --upgrade (--upgrade not this script, yet) are meant to write
-// that key.
+// gets one added. Only --init and --upgrade are meant to write that key.
 function writeIssuesFile(data) {
   data.last_updated = nowTimestamp();
   const serialized = JSON.stringify(data, null, 2);
@@ -542,6 +564,69 @@ function initTracker() {
   writeOk({ path: issuesFilePath, created: true });
 }
 
+// Function to bring issues.json from its own schema_version up to SCHEMA_VERSION, running only
+// the migrations in between. An absent key reads as version 0 (see the SCHEMA_VERSION comment
+// above) — the same tracker every other command already accepts without a migration.
+//
+// Idempotent by construction: a file already at SCHEMA_VERSION returns before touching disk at
+// all, so a second --upgrade in a row leaves the file byte-for-byte identical to the first result.
+// A file AHEAD of SCHEMA_VERSION — declaring a version this script does not know — is refused with
+// SCHEMA_TOO_NEW and nothing is written: that is a script older than its data, and rewriting the
+// file would silently degrade whatever the newer schema added.
+function upgradeTracker() {
+  const data = readIssuesFile();
+  const fromVersion = hasProp(data, "schema_version") ? data.schema_version : 0;
+
+  if (typeof fromVersion !== "number" || !Number.isInteger(fromVersion) || fromVersion < 0) {
+    fail(
+      `'${issuesFilePath}' has a 'schema_version' of ${JSON.stringify(data.schema_version)}, which is not a non-negative integer.`,
+      "INVALID_INPUT"
+    );
+  }
+
+  if (fromVersion > SCHEMA_VERSION) {
+    fail(
+      `'${issuesFilePath}' declares schema_version ${fromVersion}, newer than the ${SCHEMA_VERSION} this ` +
+        "script implements. This is an old copy of the harness plugin in front of newer data; " +
+        "upgrade the plugin instead of running --upgrade, which would rewrite the file against a " +
+        "schema it does not know and degrade it.",
+      "SCHEMA_TOO_NEW"
+    );
+  }
+
+  if (fromVersion === SCHEMA_VERSION) {
+    // Nothing to do, and nothing written: re-running --upgrade on an up-to-date tracker must be a
+    // no-op all the way down to the bytes on disk.
+    writeOk({ from: fromVersion, to: SCHEMA_VERSION, migrated: 0 });
+    return;
+  }
+
+  const issues = Array.isArray(data.issues) ? data.issues : [];
+  // Tracked per issue, not per migration step: an issue touched by two migrations in the same run
+  // must still count once in `migrated`, which reports how many ISSUES changed, not how many
+  // field-level edits were made.
+  const touched = new Array(issues.length).fill(false);
+  let migratedIssues = issues;
+
+  for (const migration of MIGRATIONS) {
+    if (migration.to <= fromVersion || migration.to > SCHEMA_VERSION) {
+      continue;
+    }
+    migratedIssues = migratedIssues.map((issue, index) => {
+      const next = migration.migrateIssue(issue);
+      if (next !== issue) {
+        touched[index] = true;
+      }
+      return next;
+    });
+  }
+
+  data.issues = migratedIssues;
+  data.schema_version = SCHEMA_VERSION;
+  writeIssuesFile(data);
+  writeOk({ from: fromVersion, to: SCHEMA_VERSION, migrated: touched.filter(Boolean).length });
+}
+
 // 1. Function to display help information
 function showHelp() {
   const lines = [
@@ -554,6 +639,7 @@ function showHelp() {
     "node issue-manager.mjs --update --issue-id <id> (--issue-data '<json>' | --issue-data-file <path>)",
     "node issue-manager.mjs --delete --issue-id <id>",
     "node issue-manager.mjs --init",
+    "node issue-manager.mjs --upgrade",
     "",
     "Project resolution:",
     "  --project-dir <path>  directory holding issues.json (default: the current directory).",
@@ -567,7 +653,7 @@ function showHelp() {
     "",
     "Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_TIER, INVALID_DEPENDENCY,",
     "             INVALID_INPUT, INVALID_JSON, LIMIT_EXCEEDED, NOT_FOUND, FILE_NOT_FOUND,",
-    "             MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE, ALREADY_EXISTS",
+    "             MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE, ALREADY_EXISTS, SCHEMA_TOO_NEW",
     "",
     "Role guard: when env var HARNESS_ROLE=worker, --insert/--update requests that set",
     "status=done or validation.state=pass are rejected with FORBIDDEN_ROLE (no self-validation).",
@@ -585,6 +671,14 @@ function showHelp() {
     "  --init      : { path, created: true } — creates issues.json with the minimal seed",
     "                { schema_version, last_updated, issues: [] }. Fails with ALREADY_EXISTS and",
     "                writes nothing if the file is already there: remove it yourself to start over.",
+    "  --upgrade   : { from, to, migrated } — brings issues.json's schema_version (absent reads as",
+    "                0) up to SCHEMA_VERSION, running only the migrations in between. Adds new",
+    "                fields with their default (0->1 materializes depends_on: [] where missing);",
+    "                never touches or removes an existing value. Idempotent: a file already at",
+    "                SCHEMA_VERSION returns migrated: 0 and is NOT rewritten. A file declaring a",
+    "                schema_version ABOVE SCHEMA_VERSION fails with SCHEMA_TOO_NEW and writes",
+    "                nothing: that is an old script in front of newer data. Neither --insert nor",
+    "                --update ever runs a migration on your behalf.",
     "",
     "Passing the payload:",
     "  --issue-data-file <path>  reads the JSON from a file — no shell quoting/escaping",
@@ -795,6 +889,7 @@ function main() {
       update: { type: "boolean" },
       delete: { type: "boolean" },
       init: { type: "boolean" },
+      upgrade: { type: "boolean" },
       "issue-id": { type: "string" },
       "issue-data": { type: "string" },
       "issue-data-file": { type: "string" },
@@ -866,6 +961,8 @@ function main() {
     deleteIssue(issueId);
   } else if (values.init) {
     initTracker();
+  } else if (values.upgrade) {
+    upgradeTracker();
   } else {
     fail("Invalid task specified. Use '--help' for usage information.", "UNKNOWN_COMMAND");
   }

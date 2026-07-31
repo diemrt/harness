@@ -27,8 +27,8 @@ la costante `SCHEMA_VERSION` (oggi `1`).
   funzionare — stessa scelta già fatta per `tier` e per `depends_on`.
 - **il writer preserva quello che trova.** Se il file ha `schema_version`, ogni scrittura
   (`--insert`, `--update`, `--delete`) lo riscrive identico; se non ce l'ha, non lo aggiunge.
-  Solo `--init` scrive deliberatamente quel campo, in un file che prima non esisteva —
-  `--upgrade`, non ancora parte di questa CLI, farà lo stesso su un file già presente.
+  Solo `--init` (file nuovo) e `--upgrade` (file già presente) scrivono deliberatamente quel
+  campo. Né `--insert` né `--update` fanno mai la migrazione al posto tuo.
 
 ## Comandi
 
@@ -58,6 +58,9 @@ node "$SCRIPTS/issue-manager.mjs" --get-all --project-dir /path/to/project
 
 # creare issues.json di proposito, col seed minimo (rifiuta se il file esiste già)
 node "$SCRIPTS/issue-manager.mjs" --init
+
+# portare issues.json allo schema corrente
+node "$SCRIPTS/issue-manager.mjs" --upgrade
 ```
 
 L'id di una issue creata si legge da `.data.id` della risposta, **non** dal testo del
@@ -92,6 +95,35 @@ file a mano, esplicitamente.
 
 `data`: `{ path, created: true }`.
 
+## `--upgrade`
+
+Porta `issues.json` dal proprio `schema_version` (assente = versione `0`) a `SCHEMA_VERSION`,
+eseguendo solo le migrazioni comprese fra le due versioni. La logica vive in una **lista
+ordinata** di migrazioni interna allo script, ognuna con la versione che produce (`to`); si
+applicano solo quelle con `to` maggiore della versione del file e non superiore a
+`SCHEMA_VERSION`. La migrazione `0 → 1` materializza `depends_on: []` dove la chiave manca.
+
+- **aggiunge soltanto:** ogni migrazione mette il default sui campi nuovi, non tocca i valori
+  esistenti e non rimuove niente. Un campo deprecato lo cancella l'utente, quando decide di
+  cancellarlo;
+- **idempotente:** un file già a `SCHEMA_VERSION` risponde `ok:true` con `migrated: 0` e **non
+  viene riscritto** — il file resta identico byte per byte, anche a `--upgrade` lanciato più
+  volte di fila;
+- **un file a versione superiore a `SCHEMA_VERSION`** viene rifiutato con `SCHEMA_TOO_NEW` e non
+  scrive niente: è uno script vecchio davanti a dati più nuovi di lui, e riscriverli
+  degraderebbe quello che lo schema più recente porta;
+- **mai automatico:** né `--insert` né `--update` eseguono una migrazione al posto tuo — restano
+  a leggere e scrivere `schema_version` così come lo trovano (vedi sopra). L'upgrade è
+  un'azione esplicita.
+
+```bash
+node "$SCRIPTS/issue-manager.mjs" --upgrade
+```
+
+`data`: `{ from, to, migrated }`, con `migrated` il numero di issue **effettivamente toccate**
+dalle migrazioni applicate (un'issue toccata da più migrazioni nello stesso giro conta una
+volta sola).
+
 ## Paginazione
 
 `--get-all` è paginato:
@@ -124,6 +156,7 @@ eccezione: testo semplice). Su stderr non viene scritto nulla.
 | `--update` | l'issue aggiornata |
 | `--delete` | `{ id, deleted }` |
 | `--init` | `{ path, created: true }` |
+| `--upgrade` | `{ from, to, migrated }` |
 
 | Parametro | Uso |
 |---|---|
@@ -272,6 +305,7 @@ Il `code` è stabile: usalo per la logica, il messaggio è per gli umani.
 | `UNKNOWN_COMMAND` | nessun comando riconosciuto (vedi `--help`) |
 | `FORBIDDEN_ROLE` | con `HARNESS_ROLE=worker`, tentativo di impostare `status=done` o `validation.state=pass` |
 | `ALREADY_EXISTS` | `--init` quando `issues.json` esiste già: rifiutato, niente viene scritto |
+| `SCHEMA_TOO_NEW` | `--upgrade` su un file con `schema_version` maggiore di `SCHEMA_VERSION`: rifiutato, niente viene scritto |
 
 `FORBIDDEN_ROLE` è il guard tecnico contro la self-validation: un processo lanciato con
 `HARNESS_ROLE=worker` non può chiudere la propria issue, può arrivare al massimo a

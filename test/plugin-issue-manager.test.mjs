@@ -1351,8 +1351,8 @@ test("--help documents depends_on and INVALID_DEPENDENCY", () => {
 // schema_version — a root-level key, not part of any issue. The seeded tracker used everywhere
 // else in this suite (baseSeed()) deliberately carries no schema_version: it stands in for every
 // project that used the tracker before this key existed, and every command must keep working on
-// it without a migration. Only --init and --upgrade (not implemented by this script) are meant to
-// write the key at all: every other command must leave it exactly as found — present or absent.
+// it without a migration. Only --init and --upgrade are meant to write the key at all: every
+// other command must leave it exactly as found — present or absent.
 // ---------------------------------------------------------------------------
 
 // Reads the whole root object of issues.json, not just its `issues` array, so a test can assert
@@ -1531,6 +1531,166 @@ test("--help lists --init among the commands", () => {
     assert.equal(result.status, 0);
     assert.match(result.stdout, /--init/);
     assert.match(result.stdout, /ALREADY_EXISTS/);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// --upgrade — migrates issues.json from its own schema_version (absent reads as 0) up to
+// SCHEMA_VERSION, applying only the migrations in between.
+// ---------------------------------------------------------------------------
+
+// A seed with mixed depends_on presence: ID_TWO already declares one (pointing at ID_ONE, itself
+// with no depends_on key at all — a legal edge under a schema-less tracker), ID_ONE and ID_THREE
+// have no depends_on key at all. Lets a single fixture cover both halves of migration 0 -> 1: the
+// key that must appear where it is missing, and the value that must survive where it is already
+// there.
+function upgradeSeed() {
+  const seed = baseSeed();
+  const issueTwo = seed.issues.find((i) => i.id === ID_TWO);
+  issueTwo.depends_on = [ID_ONE];
+  return seed;
+}
+
+test("(a) --upgrade on a tracker without schema_version reports ok:true, from:0, to:1, and writes schema_version:1", () => {
+  const { dir } = setupTempProject(upgradeSeed());
+  try {
+    assert.ok(!("schema_version" in rootData(dir)), "the fixture must start without the key");
+
+    const data = assertOk(run(dir, ["--upgrade"]));
+    assert.deepEqual(data, { from: 0, to: SCHEMA_VERSION, migrated: 2 });
+
+    assert.equal(rootData(dir).schema_version, SCHEMA_VERSION, "the file on disk must carry the new version");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("(b) after --upgrade every issue has depends_on; issues that already had it keep their value, and no other field changes or disappears", () => {
+  const { dir } = setupTempProject(upgradeSeed());
+  const before = upgradeSeed();
+  try {
+    assertOk(run(dir, ["--upgrade"]));
+    const after = rootData(dir).issues;
+
+    assert.equal(after.length, before.issues.length);
+    for (const beforeIssue of before.issues) {
+      const afterIssue = after.find((i) => i.id === beforeIssue.id);
+      assert.ok(afterIssue, `issue ${beforeIssue.id} must survive the upgrade`);
+
+      // depends_on: materialized to [] where it was missing, preserved where it was already set.
+      const expectedDependsOn = Array.isArray(beforeIssue.depends_on) ? beforeIssue.depends_on : [];
+      assert.deepEqual(afterIssue.depends_on, expectedDependsOn);
+
+      // Every other field is untouched, including updated_at: adding a field is not editing the
+      // issue, and the migration must not read as a second --update pass.
+      for (const field of ["title", "description", "status", "validation", "created_at", "updated_at"]) {
+        assert.deepEqual(afterIssue[field], beforeIssue[field], `field '${field}' of ${beforeIssue.id} must be untouched`);
+      }
+      // No key present before is missing after, and no key absent before was invented besides
+      // depends_on.
+      const beforeKeys = new Set([...Object.keys(beforeIssue), "depends_on"]);
+      assert.deepEqual(new Set(Object.keys(afterIssue)), beforeKeys);
+    }
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("(c) a second --upgrade in a row reports ok:true, migrated:0, and leaves the file byte-for-byte identical", () => {
+  const { dir } = setupTempProject(upgradeSeed());
+  try {
+    assertOk(run(dir, ["--upgrade"])); // first upgrade: 0 -> 1, writes the file
+
+    const issuesPath = path.join(dir, "issues.json");
+    const beforeSecondRun = readFileSync(issuesPath); // Buffer, not string: compare raw bytes
+
+    const data = assertOk(run(dir, ["--upgrade"]));
+    assert.deepEqual(data, { from: SCHEMA_VERSION, to: SCHEMA_VERSION, migrated: 0 });
+
+    const afterSecondRun = readFileSync(issuesPath);
+    assert.ok(
+      beforeSecondRun.equals(afterSecondRun),
+      "an --upgrade on a tracker already at SCHEMA_VERSION must not rewrite the file at all"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("SCHEMA_TOO_NEW: --upgrade on a file with schema_version above SCHEMA_VERSION exits 1 and writes nothing", () => {
+  const { dir } = setupTempProject(seedWithSchemaVersion(SCHEMA_VERSION + 1));
+  try {
+    const issuesPath = path.join(dir, "issues.json");
+    const before = readFileSync(issuesPath); // Buffer, not string: compare raw bytes
+
+    const result = run(dir, ["--upgrade"]);
+    assertFail(result, "SCHEMA_TOO_NEW");
+
+    const after = readFileSync(issuesPath);
+    assert.ok(before.equals(after), "a tracker newer than this script must be left untouched byte for byte");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--upgrade on a tracker already at SCHEMA_VERSION (from a fresh --init) is a same-run no-op", () => {
+  const { dir } = setupTempProject(null);
+  try {
+    assertOk(run(dir, ["--init"]));
+    const issuesPath = path.join(dir, "issues.json");
+    const before = readFileSync(issuesPath);
+
+    const data = assertOk(run(dir, ["--upgrade"]));
+    assert.deepEqual(data, { from: SCHEMA_VERSION, to: SCHEMA_VERSION, migrated: 0 });
+
+    const after = readFileSync(issuesPath);
+    assert.ok(before.equals(after), "a tracker seeded by --init is already current and must not be rewritten");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--upgrade respects --project-dir", () => {
+  const target = setupTempProject(upgradeSeed());
+  const elsewhere = setupTempProject(null);
+  try {
+    const result = runFrom(elsewhere.dir, ["--upgrade", "--project-dir", target.dir]);
+    const data = assertOk(result);
+    assert.deepEqual(data, { from: 0, to: SCHEMA_VERSION, migrated: 2 });
+    assert.equal(
+      existsSync(path.join(elsewhere.dir, "issues.json")),
+      false,
+      "the cwd must be left alone when --project-dir is given"
+    );
+  } finally {
+    cleanup(target.dir);
+    cleanup(elsewhere.dir);
+  }
+});
+
+test("neither --insert nor --update runs a migration: a file without schema_version stays without it", () => {
+  const { dir } = setupTempProject(upgradeSeed());
+  try {
+    assertOk(run(dir, ["--insert", "--issue-data", JSON.stringify({ title: "T", description: "D", status: "backlog" })]));
+    assertOk(run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "in_progress" })]));
+    assert.ok(
+      !("schema_version" in rootData(dir)),
+      "--insert/--update must never stamp schema_version onto a file that never had it"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--help lists --upgrade and SCHEMA_TOO_NEW", () => {
+  const { dir } = setupTempProject();
+  try {
+    const result = run(dir, ["--help"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /--upgrade/);
+    assert.match(result.stdout, /SCHEMA_TOO_NEW/);
   } finally {
     cleanup(dir);
   }

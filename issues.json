@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T16:20:18Z",
+  "last_updated": "2026-07-31T16:32:08Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1088,25 +1088,17 @@
       "id": "b6100ba5-f743-42a2-8084-4c143d9bc5b2",
       "title": "--upgrade: migrazioni idempotenti sullo schema del tracker",
       "description": "Il comando porta issues.json da schema_version a SCHEMA_VERSION, aggiungendo i campi nuovi coi loro default.\n\nServe una lista ordinata di migrazioni, ognuna con la versione che produce: si applicano solo quelle comprese fra la versione del file e quella corrente. La migrazione 0 -> 1 materializza depends_on: [] dove la chiave manca.\n\nNon tocca i valori esistenti e non rimuove niente: aggiunge campi nuovi col default e basta. Un campo deprecato lo cancella l'utente, quando decide di cancellarlo.\n\nIdempotente: un file gia' a SCHEMA_VERSION risponde ok:true con migrated 0 e non viene riscritto. Un file a versione superiore a SCHEMA_VERSION viene rifiutato: e' uno script vecchio davanti a dati nuovi, e riscriverli li degraderebbe.\n\nNe' --insert ne' --update fanno auto-upgrade: la migrazione e' un'azione esplicita dell'utente.\n\ndata: { from, to, migrated }, con migrated il numero di issue effettivamente toccate.\n\nSpec: docs/superpowers/specs/2026-07-31-tracker-lifecycle-commands-design.md, sezione 3.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
         "9489f774-e8eb-43d7-a07b-3acb825ca456"
       ],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "--upgrade su un tracker temporaneo privo di schema_version risponde ok:true con from 0 e to 1, e scrive schema_version 1 nel file.",
-          "Dopo l'upgrade ogni issue ha depends_on; quelle che gia' lo avevano conservano il valore, e nessun altro campo cambia o sparisce.",
-          "Un secondo --upgrade di seguito risponde ok:true con migrated 0 e lascia il file identico byte per byte.",
-          "--upgrade su un file con schema_version maggiore di SCHEMA_VERSION esce 1 con un code stabile e non scrive.",
-          "test/plugin-issue-manager.test.mjs copre i quattro casi sopra su directory temporanea.",
-          "references/issues.md documenta --upgrade (cosa aggiunge, cosa non tocca) e commands/issue.md documenta l'argomento upgrade.",
-          "npm run test esce 0."
-        ]
+        "state": "pass",
+        "criteria": "Verificato su scripts/issue-manager.mjs (git diff) e con prove indipendenti in directory temp via --project-dir (mai su repo/root). (1) --upgrade su tracker senza schema_version: {\"ok\":true,\"data\":{\"from\":0,\"to\":1,\"migrated\":1}}, file scritto con schema_version:1. (2) issue con depends_on gia' valorizzato (A -> [B]) resta invariato dopo upgrade, issue senza la chiave (B) riceve depends_on:[] e migrated conta 1 (issue toccate, non campi) - coerente col test (b) del worker. (3) secondo --upgrade di seguito: {\"migrated\":0}, diff byte-a-byte fra il file pre e post identico (confermato anche dal test (c) che confronta Buffer via readFileSync, non JSON riparsato). (4) file con schema_version:99 (> SCHEMA_VERSION=1): exit 1, code SCHEMA_TOO_NEW, file post identico byte-a-byte al pre (diff vuoto). (5) --insert su file senza schema_version: la chiave resta assente dopo, nessun auto-upgrade. npm run test (comando verify di .harness/config.json) esce 0 con 200/200 test pass, incluse le 8 nuove voce su --upgrade in test/plugin-issue-manager.test.mjs (il worker ne dichiara 9, discrepanza minore nel conteggio - i 4 casi richiesti dai criteri sono comunque tutti coperti, osservazione fuori scope). data e' {from,to,migrated} confermato in tutte le prove. references/issues.md documenta --upgrade (sezione dedicata + tabella data + error code) e commands/issue.md ha la sezione 'upgrade -> aggiorna lo schema'; body di commands/issue.md e' 3993 caratteri (< 4000, gate del test plugin-commands.test.mjs), verificato che i tagli fatti per rientrare nel limite (intro, riassunto tracker vuoto, criteria/tier, LIMIT_EXCEEDED, sezione update) non abbiano rimosso informazione operativa: l'unico punto delicato (il 'tieni un riassunto nel campo' su LIMIT_EXCEEDED) e' stato spostato con rimando esplicito a 'Cosa fare quando...' in references/issues.md, dove il testo integrale resta presente (righe 247-248). git diff -- issues.json mostra solo la transizione di stato/timestamp di questa issue, nessuna modifica manuale. Nessun file toccato dal verificatore oltre alla chiusura della issue."
       },
       "created_at": "2026-07-31T15:51:13Z",
-      "updated_at": "2026-07-31T15:51:13Z"
+      "updated_at": "2026-07-31T16:32:08Z"
     },
     {
       "id": "0f0374ce-6c87-485a-9554-c07d8afa854d",

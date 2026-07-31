@@ -1,13 +1,13 @@
 ---
 description: Operazioni sul tracker harness — elenca le issue per stato, creane una nuova, aggiornane una esistente. Senza argomenti mostra lo stato del tracker.
-argument-hint: "[list <stato> | show <id> | new <descrizione> | update <id> <modifica> | init]"
+argument-hint: "[list <stato> | show <id> | new <descrizione> | update <id> <modifica> | init | upgrade]"
 allowed-tools: Bash, Read, Write
 ---
 
-Operazioni sul tracker del progetto corrente. Il contratto completo della CLI — schema,
-paginazione, codici di errore, semantica di `validation` — è in
+Operazioni sul tracker del progetto corrente. Contratto completo della CLI — schema,
+paginazione, errori, `validation` — in
 `${CLAUDE_PLUGIN_ROOT}/skills/harness/references/issues.md`: leggilo prima di comporre un
-payload che non sia uno dei casi qui sotto.
+payload fuori dai casi sotto.
 
 Tutte le invocazioni passano dallo script del plugin. **Non aprire e non editare
 `issues.json` a mano**, nemmeno per un campo: si perde la consistenza dei dati.
@@ -28,9 +28,8 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --get-all --status in_rev
 node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --get-all --status backlog
 ```
 
-Riassumi in una tabella `id` (accorciato), `title`, `status`. Se il tracker è vuoto dillo:
-un progetto senza `issues.json` si legge come tracker vuoto, senza errore e senza creare
-niente.
+Riassumi in tabella `id` (accorciato), `title`, `status`; un progetto senza `issues.json` si
+legge come tracker vuoto — dillo, non è un errore e non crea niente.
 
 ## `list [stato]` → un solo stato
 
@@ -48,13 +47,12 @@ Trasforma la descrizione dell'utente in `title`, `description` e `validation.cri
 I criteri sono la parte che conta: devono essere verificabili da un altro agente che non ha
 visto questa conversazione — "funziona bene" non lo è, "il comando X esce 0 e stampa Y" sì.
 
-`criteria` è un **array**, un elemento per criterio; `title`, `description` e criteri hanno
-limiti di lunghezza, e la `description` va in paragrafi separati da riga vuota. Valori e regole
-stanno in `references/issues.md`, sezione "Limiti di formato": leggili invece di indovinare.
+`criteria` è un **array**, un elemento per criterio; `title`/`description`/criteri hanno
+limiti di lunghezza (sezione "Limiti di formato" in `references/issues.md`), e `description`
+va in paragrafi separati da riga vuota.
 
-Proponi anche un `tier` (`economy`, `standard`, `reasoning`) dicendo perché: lo userà chi
-dispatcha per scegliere l'agente. Se il lavoro non è inquadrabile ometti il campo — assente vale
-`standard`, meglio di un tier inventato.
+Proponi anche un `tier` (`economy`, `standard`, `reasoning`) dicendo perché — lo usa chi
+dispatcha; omettilo se il lavoro non è inquadrabile (assente vale `standard`).
 
 Scrivi il payload **su file** e passalo con `--issue-data-file` (nessun escaping di quote da
 gestire nella shell), con `"status":"backlog"` e
@@ -62,26 +60,30 @@ gestire nella shell), con `"status":"backlog"` e
 chiedi conferma **prima** di scrivere. L'id della issue creata si legge da `.data.id` della
 risposta, non dal testo del messaggio.
 
-Se la CLI risponde `LIMIT_EXCEEDED`, non comprimere il testo: tieni un riassunto nel campo e
-rimanda a un documento del progetto, col path nella description. Il documento lo scrive
-l'utente, eventualmente con le skill di spec presenti nell'ambiente — proponile se ci sono,
-harness non le invoca da sé.
+`LIMIT_EXCEEDED`: non comprimere il testo, rimanda a un documento del progetto (path nella
+description) — vedi "Cosa fare quando..." in `references/issues.md`. Harness non scrive
+documenti da sé; proponi le skill di spec presenti nell'ambiente, se ci sono.
 
 ## `update <id> <modifica>` → aggiornare
 
-`--update --issue-id <id> --issue-data-file <path>`: merge, i campi omessi restano invariati,
-ma un campo presente dev'essere valido.
+`--update --issue-id <id> --issue-data-file <path>`: merge, campi omessi invariati, un campo
+presente dev'essere valido.
 
-**Da qui non si chiude una issue.** Non portare mai una issue allo stato `done` e non
-impostare mai `validation.state` a `pass`: la chiusura spetta a un agente diverso da chi ha
-svolto il lavoro, e si lancia con `/harness:verify`. Il worker arriva al massimo a
-`in_review` con `state` a `unknown`; oltre, con `HARNESS_ROLE=worker`, la CLI rifiuta con
-`FORBIDDEN_ROLE`.
+**Da qui non si chiude una issue.** Non portare mai lo stato a `done` né `validation.state` a
+`pass`: la chiusura spetta a un agente diverso da chi ha svolto il lavoro, con
+`/harness:verify`. Il worker arriva al massimo a `in_review` / `unknown`; oltre, con
+`HARNESS_ROLE=worker`, la CLI rifiuta `FORBIDDEN_ROLE`.
 
 ## `init` → crea il tracker
 
 `--init`, `data: { path, created: true }`; file già esistente → `ALREADY_EXISTS`, nessuna
 scrittura.
+
+## `upgrade` → aggiorna lo schema
+
+`--upgrade` porta `issues.json` a `SCHEMA_VERSION`, aggiunge solo campi nuovi coi default (mai
+automatico da `new`/`update`). `data: { from, to, migrated }`; già aggiornato → `migrated: 0`,
+nessuna scrittura; più nuovo di questo script → `SCHEMA_TOO_NEW`, nessuna scrittura.
 
 ## Errori
 
