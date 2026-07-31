@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T13:32:28Z",
+  "last_updated": "2026-07-31T13:35:25Z",
   "rules": {
     "single_active_issue": false
   },
@@ -979,6 +979,73 @@
       },
       "created_at": "2026-07-30T15:38:42Z",
       "updated_at": "2026-07-31T13:31:00Z"
+    },
+    {
+      "id": "97b9d3ee-9d74-4463-b90f-7c1357a1c6d5",
+      "title": "spec: ritiro del board a grafo e design nuovo della card dipendenze",
+      "description": "Allinea gli spec alla rotta presa oggi, senza cancellare il record di cio' che e' stato davvero costruito.\n\ndocs/superpowers/specs/2026-07-30-board-workflow-design.md resta al suo posto: le sezioni 1-3 documentano il campo depends_on, la validazione del grafo e le regole nella skill, tutto costruito e verificato. Le sezioni 4-10 descrivono un board a grafo che non si fa piu': quattro route statiche, board.css/board.js/board-graph.mjs, layering del DAG, chain lens, drawer, pan/zoom. Vanno marcate come ritirate da una nota in testa al documento, che dice dove il lavoro e' finito (branch backup/board-improv-2026-07-31) e perche' si e' fermato, invece di essere riscritte o rimosse.\n\nAl loro posto uno spec nuovo e datato per il lavoro di oggi, che e' molto piu' piccolo: una card fra titolo e description che elenca gli id delle dipendenze come chip cliccabili, con salto per ancora HTML ed evidenziazione via :target. Il design e' gia' stato deciso in brainstorming, questo lavoro lo mette su file.\n\nSolo documentazione: nessuno script cambia.",
+      "status": "backlog",
+      "tier": "economy",
+      "depends_on": [],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "2026-07-30-board-workflow-design.md porta in testa una nota che marca le sezioni 4-10 come ritirate e nomina il branch di backup.",
+          "Le sezioni 1-3 di quello spec restano intatte: descrivono depends_on, che e' stato costruito e verificato.",
+          "Esiste docs/superpowers/specs/2026-07-31-depends-on-card-design.md con il design della card approvato in brainstorming.",
+          "Lo spec nuovo descrive la funzione pura, i due rami del chip, il salto per ancora e l'evidenziazione :target.",
+          "Lo spec nuovo dichiara fuori scope l'arco inverso, qualsiasi vista o filtro nuovo e le scritture dal board.",
+          "Nessun file fuori da docs/ e' modificato dal diff della issue.",
+          "npm run test passa."
+        ]
+      },
+      "created_at": "2026-07-31T13:34:04Z",
+      "updated_at": "2026-07-31T13:34:04Z"
+    },
+    {
+      "id": "7bb64095-5ab6-496c-817b-bb97562fa7bd",
+      "title": "issue-manager --get-all: --status ha un default che l'help non dichiara",
+      "description": "scripts/issue-manager.mjs:763 dichiara status: { type: \"string\", default: \"backlog\" }, quindi --get-all senza --status non restituisce tutto il tracker ma solo le issue in backlog. L'help (riga 518) presenta --status fra parentesi quadre, cioe' come filtro opzionale, e il contratto del payload parla di totalCount senza dire che e' un totale filtrato.\n\nL'effetto e' silenzioso e ingannevole: su questo tracker --get-all senza filtro ha restituito 11 record su 86, e chi legge quel numero conclude che le altre 75 issue non esistono invece che sono state nascoste da un default. Nessun errore, nessun campo che dica che un filtro e' attivo.\n\nQuesto lavoro deve prima decidere quale dei due lati e' il difetto, e la decisione va scritta nella description prima di toccare il codice: togliere il default cambia il comportamento di ogni chiamante che oggi si appoggia al filtro implicito, mentre allineare l'help sancisce che il tracker di default mostra solo il backlog. Sono due contratti diversi e la issue ne implementa uno solo, dichiarato.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "La description della issue dichiara quale contratto e' stato scelto e perche', prima del diff sul codice.",
+          "issue-manager.mjs e il testo di --help concordano sul comportamento di --get-all senza --status.",
+          "test/plugin-issue-manager.test.mjs copre --get-all senza --status su un tracker con issue di stati diversi.",
+          "Se il default cambia, ogni chiamante nel repository che si appoggiava al filtro implicito e' aggiornato.",
+          "references/issues.md descrive il comportamento scelto senza contraddire l'help.",
+          "npm run test passa."
+        ]
+      },
+      "created_at": "2026-07-31T13:34:04Z",
+      "updated_at": "2026-07-31T13:34:04Z"
+    },
+    {
+      "id": "f38fa140-663e-4adf-8c02-dbce5bcbd401",
+      "title": "board: card delle dipendenze fra titolo e description",
+      "description": "Mostra sulla card cio' che depends_on ha aggiunto al tracker e che il board ignora: da quali issue una issue dipende.\n\nFra la riga del titolo (scripts/board.html:353-361) e la description (:363) entra un blocco con un'etichetta e un chip per dipendenza, nell'ordine dell'array. Il chip porta i primi 8 caratteri del GUID in mono; il suo title porta il GUID intero, piu' il titolo della issue puntata quando quell'id e' nel payload.\n\nDue rami, non tre: se la issue puntata e' fra quelle renderizzate in questo giro il chip e' un <a href=\"#issue-<guid>\">, altrimenti e' uno <span> grigio e inerte. Cosi' filtrata dalla vista e id inesistente collassano nello stesso stato, e la distinzione sopravvive solo nel title. Uno <span> e non un <a> disabilitato: non deve entrare nella tabulazione fingendosi un comando.\n\nIl salto non usa JavaScript: id=\"issue-<guid>\" sull'article, scroll-behavior nel CSS e .issue-card:target per evidenziare l'arrivo. :target si valuta contro l'hash dell'URL, quindi l'evidenziazione sopravvive da sola al re-render che SSE fa via innerHTML.\n\nLa funzione riceve id visibili e titoli come argomenti invece di leggere state: e' la condizione perche' il test possa chiamarla.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [
+        "97b9d3ee-9d74-4463-b90f-7c1357a1c6d5"
+      ],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "board.html definisce renderDependsOn(dependsOn, visibleIds, titleById): niente accesso a state ne' al DOM, ritorna stringa.",
+          "Il blocco compare fra la riga del titolo e la description; con depends_on assente o vuoto non produce alcun markup.",
+          "Chip di 8 caratteri in mono; il title porta il GUID intero e, quando l'id e' noto, anche il titolo della issue.",
+          "Dipendenza fra le renderizzate: <a href=\"#issue-<guid>\">. Filtrata via o id ignoto: <span> senza href, non focusabile.",
+          "Ogni card porta id=\"issue-<guid>\"; il CSS evidenzia .issue-card:target e rispetta prefers-reduced-motion.",
+          "test/plugin-board.test.mjs chiama renderDependsOn via extractFunctions: vuoto, visibile, filtrata, id ignoto, ordine, escaping.",
+          "npm run test passa."
+        ]
+      },
+      "created_at": "2026-07-31T13:35:25Z",
+      "updated_at": "2026-07-31T13:35:25Z"
     }
   ]
 }
