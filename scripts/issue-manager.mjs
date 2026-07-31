@@ -515,7 +515,8 @@ function showHelp() {
     "Usage:",
     "node issue-manager.mjs --help",
     "node issue-manager.mjs --get --issue-id <id>",
-    "node issue-manager.mjs --get-all [--order asc|desc] [--page 0] [--page-size 10] [--status backlog|in_progress|in_review|blocked|done]",
+    "node issue-manager.mjs --get-all [--order asc|desc] [--page 0] [--page-size 10]",
+    "                        [--status backlog|in_progress|in_review|blocked|done, default: backlog]",
     "node issue-manager.mjs --insert (--issue-data '<json>' | --issue-data-file <path>)",
     "node issue-manager.mjs --update --issue-id <id> (--issue-data '<json>' | --issue-data-file <path>)",
     "node issue-manager.mjs --delete --issue-id <id>",
@@ -541,6 +542,9 @@ function showHelp() {
     "data payload per command:",
     "  --get       : the issue object",
     "  --get-all   : { totalCount, page, pageSize, issues: [...] }",
+    "                totalCount/issues are counted AFTER the --status filter, which defaults to",
+    "                backlog when --status is omitted: a bare --get-all does not return the whole",
+    "                tracker, only its backlog slice. Pass --status explicitly to see another state.",
     "  --insert    : the created issue object (read .data.id for the new GUID)",
     "  --update    : the updated issue object",
     "  --delete    : { id, deleted }",
@@ -760,6 +764,11 @@ function main() {
       order: { type: "string", default: "asc" },
       page: { type: "string", default: "0" },
       "page-size": { type: "string", default: "10" },
+      // Deliberate default, not an oversight: every caller shipped in this repo that reads
+      // --get-all for actual workflow decisions (SKILL.md, commands/issue.md, commands/verify.md)
+      // already passes --status explicitly, so this default never silently changes their result.
+      // It exists for the bare `--get-all` case, and showHelp()/references/issues.md both spell it
+      // out so that case does not read as "the whole tracker" when it is really "the backlog".
       status: { type: "string", default: "backlog" },
     },
   });

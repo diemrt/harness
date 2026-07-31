@@ -151,6 +151,10 @@ test("--get returns the issue object", () => {
 // --get-all
 // ---------------------------------------------------------------------------
 
+// A bare --get-all on a tracker with mixed statuses is exactly the call that used to read as
+// "the whole tracker" while it silently returns only the backlog slice (ID_THREE is in_progress
+// and must NOT show up here). This default is a deliberate, documented choice — see showHelp()
+// and references/issues.md — not something a caller can discover by staring at the output alone.
 test("--get-all returns the pagination shape and defaults to backlog status", () => {
   const { dir } = setupTempProject();
   try {
@@ -317,6 +321,21 @@ test("--help prints plain text usage on stdout, exits 0, and writes nothing to s
     assert.ok(result.stdout.includes("--get-all"));
     // Help text is NOT a single JSON line
     assert.throws(() => JSON.parse(result.stdout.trim()));
+  } finally {
+    cleanup(dir);
+  }
+});
+
+// --status has a real default (see the "status" option in main()): a bare --get-all silently
+// filters to backlog instead of returning the whole tracker. The help text must say so up front,
+// not just list backlog as one of several allowed values, or the CLI's own contract re-creates
+// the exact confusion this issue was filed over.
+test("--help declares the --status default for --get-all, not just its allowed values", () => {
+  const { dir } = setupTempProject();
+  try {
+    const result = run(dir, ["--help"]);
+    assert.match(result.stdout, /--status[^\n]*default:\s*backlog/i);
+    assert.match(result.stdout, /totalCount\/issues are counted AFTER the --status filter/i);
   } finally {
     cleanup(dir);
   }

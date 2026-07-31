@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T14:11:46Z",
+  "last_updated": "2026-07-31T14:23:54Z",
   "rules": {
     "single_active_issue": false
   },
@@ -988,23 +988,16 @@
     {
       "id": "7bb64095-5ab6-496c-817b-bb97562fa7bd",
       "title": "issue-manager --get-all: --status ha un default che l'help non dichiara",
-      "description": "scripts/issue-manager.mjs:763 dichiara status: { type: \"string\", default: \"backlog\" }, quindi --get-all senza --status non restituisce tutto il tracker ma solo le issue in backlog. L'help (riga 518) presenta --status fra parentesi quadre, cioe' come filtro opzionale, e il contratto del payload parla di totalCount senza dire che e' un totale filtrato.\n\nL'effetto e' silenzioso e ingannevole: su questo tracker --get-all senza filtro ha restituito 11 record su 86, e chi legge quel numero conclude che le altre 75 issue non esistono invece che sono state nascoste da un default. Nessun errore, nessun campo che dica che un filtro e' attivo.\n\nQuesto lavoro deve prima decidere quale dei due lati e' il difetto, e la decisione va scritta nella description prima di toccare il codice: togliere il default cambia il comportamento di ogni chiamante che oggi si appoggia al filtro implicito, mentre allineare l'help sancisce che il tracker di default mostra solo il backlog. Sono due contratti diversi e la issue ne implementa uno solo, dichiarato.",
-      "status": "backlog",
+      "description": "scripts/issue-manager.mjs:763 assegna a status un default \"backlog\", quindi --get-all senza --status non restituisce tutto il tracker ma solo il backlog. L'help (riga 518) presenta --status fra parentesi quadre, come filtro opzionale, senza dichiarare il default; il payload espone totalCount senza dire che e' filtrato. Su questo tracker --get-all senza filtro ha dato 11 record su 86, senza errori ne' segnali di un filtro attivo.\n\nQuesta issue decide quale lato e' il difetto, il default o l'help, prima di scrivere codice: togliere il default cambia ogni chiamante che si appoggia al filtro implicito; allineare l'help sancisce che il default resta backlog.\n\nDecisione: il difetto e' l'help. Evidenza: ogni chiamante reale (SKILL.md, commands/issue.md, commands/verify.md) passa sempre --status esplicito; issues.md e commands/issue.md documentano gia' il default backlog; board-server.mjs legge issues.json direttamente, non issue-manager. Le uniche chiamate senza --status sono test/CI che verificano proprio quel default. Il default backlog resta invariato; il fix e' nell'help (riga 518 e sezione payload) e in issues.md, con un test che blocca la dichiarazione.",
+      "status": "done",
       "tier": "standard",
       "depends_on": [],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "La description della issue dichiara quale contratto e' stato scelto e perche', prima del diff sul codice.",
-          "issue-manager.mjs e il testo di --help concordano sul comportamento di --get-all senza --status.",
-          "test/plugin-issue-manager.test.mjs copre --get-all senza --status su un tracker con issue di stati diversi.",
-          "Se il default cambia, ogni chiamante nel repository che si appoggiava al filtro implicito e' aggiornato.",
-          "references/issues.md descrive il comportamento scelto senza contraddire l'help.",
-          "npm run test passa."
-        ]
+        "state": "pass",
+        "criteria": "Decisione dichiarata e motivata nella description (issues.json, campo description del 7bb64095): 'Decisione: il difetto e' l'help' con evidenza sui chiamanti. Ho rifatto la ricerca di --get-all nel repo (grep su tutto l'albero): SKILL.md, commands/issue.md, commands/verify.md passano sempre --status esplicito; l'unico chiamante operativo senza --status e' .github/workflows/ci.yml:29 ('--get-all --page-size 1'), ma quello step non legge/asserisce alcun contenuto: e' un fumo-test che verifica solo l'exit code 0 sul tracker reale, indifferente al filtro applicato (funzionerebbe identico con 0, 1 o 86 record). Non e' quindi un chiamante che 'si aspetta l'intero tracker': la premessa della decisione regge. Coerenza codice/help verificata eseguendo la CLI (non leggendo il sorgente) su un progetto temporaneo con 3 issue di stati diversi: 'node issue-manager.mjs --help' dichiara '[--status ..., default: backlog]' e la sezione payload spiega che totalCount/issues sono contati DOPO il filtro; 'node issue-manager.mjs --get-all --project-dir <tmp>' senza --status ha restituito solo l'issue backlog (totalCount:1 su 3), confermando che help e comportamento coincidono. test/plugin-issue-manager.test.mjs copre --get-all senza --status su un tracker con stati misti (test preesistente 'defaults to backlog status', con ID_THREE in_progress escluso) e aggiunge un test dedicato sull'help ('declares the --status default for --get-all'). references/issues.md aggiorna la nota sul default e su totalCount senza contraddire l'help. Criterio 'ogni chiamante aggiornato se il default cambia' non applicabile: il default resta backlog, invariato. Gate: 'npm run test' eseguito, 181/181 pass, 0 fail. git status --short mostra solo issues.json, scripts/issue-manager.mjs, skills/harness/references/issues.md, test/plugin-issue-manager.test.mjs modificati: nessun danno collaterale. Nessun file modificato da questo verificatore oltre alla chiusura della issue."
       },
       "created_at": "2026-07-31T13:34:04Z",
-      "updated_at": "2026-07-31T13:34:04Z"
+      "updated_at": "2026-07-31T14:23:54Z"
     },
     {
       "id": "f38fa140-663e-4adf-8c02-dbce5bcbd401",

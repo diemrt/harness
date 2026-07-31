@@ -20,6 +20,9 @@ creato). Il file nasce al **primo `--insert`**.
 
 ```bash
 # leggere: backlog (default), o uno stato specifico
+# attenzione: la prima riga NON e' l'intero tracker, e' solo il backlog. --get-all senza
+# --status non toglie il filtro, lo fissa su backlog: per vedere tutto va interrogato ogni
+# stato (vedi "Stato del tracker" in commands/issue.md) o letto issues.json direttamente.
 node "$SCRIPTS/issue-manager.mjs" --get-all
 node "$SCRIPTS/issue-manager.mjs" --get-all --status in_progress
 
@@ -65,6 +68,8 @@ Un `"validation": null` **esplicito** azzera la validazione; ometterlo la lascia
 
 Nel `data` tornano `totalCount`, `page`, `pageSize` e `issues` (sempre un array). Pagine
 totali = `ceil(totalCount / pageSize)`; una pagina oltre la fine torna `issues: []`.
+`totalCount` è calcolato **dopo** il filtro di stato, incluso quello di default: non è un
+conteggio del tracker intero, è un conteggio della fetta filtrata.
 
 ## Contratto di output
 
