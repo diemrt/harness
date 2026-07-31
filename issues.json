@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T07:20:18Z",
+  "last_updated": "2026-07-31T07:40:44Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1178,24 +1178,25 @@
       "id": "3fe5af9c-aaea-499b-8858-1afb61dd39ca",
       "title": "board: gli archi che saltano piu' livelli spariscono dietro le colonne",
       "description": "Segnalato dal verificatore della issue 1f4c689e come osservazione fuori contratto.\n\nUn arco fra nodi non adiacenti gira nel corridoio fra le colonne, come lo spec chiede, ma poi corre in orizzontale attraverso le colonne intermedie. Gli archi stanno sotto le card per scelta dichiarata, quindi quel tratto passa dietro le card ed e' invisibile: si vede la partenza, si vede la punta sul target, in mezzo il percorso sparisce.\n\nNon e' un dettaglio estetico. Gli archi lunghi sono quelli che raccontano le dipendenze non ovvie, quelle che saltano un livello e che guardando le colonne adiacenti non si indovinano: sono le uniche che il grafo serva a mostrare. Con piu' archi lunghi insieme diventa impossibile dire quale punta appartenga a quale partenza.\n\nIl layering non c'entra: board-graph.mjs calcola i livelli correttamente e non va toccato. Il problema e' il routing e l'ordine di disegno in board.js e board.css.\n\nStrade possibili, da scegliere motivando: corridoio piu' largo con tratto verticale dentro; archi sopra le card; corsie fra una riga e l'altra.",
-      "status": "in_progress",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
         "1f4c689e-6087-4536-a995-2c31b856e171"
       ],
       "validation": {
-        "state": "unknown",
+        "state": "pass",
         "criteria": [
-          "Un arco che salta almeno due livelli e' visibile per tutto il suo percorso, non solo agli estremi.",
-          "Con piu' archi lunghi nello stesso grafo resta possibile dire quale punta appartiene a quale partenza.",
-          "Gli archi restano polilinee SVG da 1px con la punta sul target e il verso dalla dipendenza alla issue che la dichiara.",
-          "scripts/board-graph.mjs non e' modificato: il difetto e' di render, non di layering.",
-          "Prova manuale su una copia del tracker con almeno un arco che salta due livelli, documentata nell'evidenza con screenshot o descrizione puntuale.",
-          "npm run test passa."
+          "1) Arco che salta due livelli visibile per tutto il percorso. Prova DOM (Chrome headless via CDP, tracker finto in tmp, http://127.0.0.1:4599/): A(8..256, y32..156) B(344..592, y32..156) C/D/E in colonna 2. polyline A->C = 256,94 270,94 270,162 666,162 666,94 680,94: il tratto orizzontale y=162 attraversa la colonna 1 sotto la card B (bottom 156) con franco 6 = channelClearance. Nessuna collisione run/card: il probe che incrocia ogni tratto orizzontale con ogni rettangolo .graph-node (offsetLeft/Top/Width/Height) ha restituito collisions: [].",
+          "2) Piu' archi lunghi restano distinguibili. Stesso grafo, due archi che saltano due livelli: A->C corsia y=162, uscita corridoio x=270, rientro x=666; A->D corsia y=182 (20px sotto, > laneStep 12), uscita x=282, rientro x=654, punta su D a y=246. Uscite, corsie e rientri tutti distinti, verificato sui punti reali della polyline e sullo screenshot.",
+          "3) Archi ancora polilinee SVG da 1px con punta sul target. Su tutte e 6 le polyline del DOM: tag POLYLINE, getComputedStyle().strokeWidth = '1px', fill 'none', marker-end='url(#graph-arrow)', il marker #graph-arrow esiste nei defs. Verso: board-graph.mjs:290 emette {from: depId, to: record.id} e board.js:552-585 chiude su [x2,y2] = bordo sinistro del target a meta' altezza (A->C finisce su 680,94 = left di C, top 32 + 62).",
+          "4) scripts/board-graph.mjs non modificato: git diff --stat elenca solo issues.json, scripts/board.js, test/plugin-board.test.mjs (247 inserzioni, 28 rimozioni). Nessuna riga di board-graph.mjs nel diff.",
+          "5) Prova manuale rifatta dal verificatore su tracker finto in directory temporanea (--project-dir, mai il tracker reale), servito da board-server.mjs pid 29232, letto sul DOM reale con Chrome 151 headless via CDP. Scenario 1 (banda libera): 5 issue, colonna intermedia piu' bassa del piano, coordinate sopra, collisions []. Scenario 2 (fallback): eliminati D ed E, colonne tutte a bottom 156, nessuna banda libera: A->C = 256,94 270,94 270,196 666,196 666,94 680,94, la corsia y=196 passa sotto ogni card e l'svg cresce a height/viewBox 220 (= 196 + padBottom 24 arrotondato al contenuto), quindi il tratto non viene tagliato. collisions [] anche qui. Server e directory temporanea rimossi a fine prova; working tree del repo lasciato con soli issues.json, scripts/board.js, test/plugin-board.test.mjs modificati.",
+          "6) npm run test (gate da .harness/config.json): tests 208, pass 208, fail 0, duration_ms 16722.",
+          "Osservazione fuori contratto (non blocca): pickLane registra in `runs` solo i tratti orizzontali degli archi lunghi; gli archi a span 1 non sono considerati nel controllo di sovrapposizione, quindi in teoria una corsia lunga puo' cadere sulla stessa y di un arco corto nel tratto di corridoio condiviso. Non osservato nelle prove (corsie 162/182/196 contro archi corti a y=94)."
         ]
       },
       "created_at": "2026-07-30T21:09:41Z",
-      "updated_at": "2026-07-31T07:14:34Z"
+      "updated_at": "2026-07-31T07:40:44Z"
     }
   ]
 }

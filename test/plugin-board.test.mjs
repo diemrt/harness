@@ -575,6 +575,7 @@ const A = "aaaaaaaa-1111-1111-1111-111111111111";
 const B = "bbbbbbbb-2222-2222-2222-222222222222";
 const C = "cccccccc-3333-3333-3333-333333333333";
 const D = "dddddddd-4444-4444-4444-444444444444";
+const E = "eeeeeeee-5555-5555-5555-555555555555";
 
 // A → B → C, plus A → C skipping a level, and D chained to nothing.
 function chainFixture() {
@@ -643,6 +644,36 @@ test("edges leave the dependency and land on the issue that declares it", () => 
   assert.match(svg, new RegExp(`points="${first.join(",")} `), "the polyline carries the points");
 });
 
+// Every stretch a polyline travels horizontally, as [y, xStart, xEnd]. This is the half of an
+// edge that can disappear: the verticals live in the corridors, where no card is ever placed.
+function horizontalRuns(edge) {
+  const runs = [];
+  for (let i = 1; i < edge.points.length; i += 1) {
+    const [ax, ay] = edge.points[i - 1];
+    const [bx, by] = edge.points[i];
+    if (ay === by && ax !== bx) {
+      runs.push([ay, Math.min(ax, bx), Math.max(ax, bx)]);
+    }
+  }
+  return runs;
+}
+
+// The edges are drawn under the cards, so a horizontal run that passes over a card is a stretch
+// of path the reader never sees. Touching a border is not crossing it: a run that starts on the
+// right edge of its source, or ends on the left edge of its target, is where it belongs.
+function coveredByCard(layout, edge) {
+  const cards = [...layout.positions.values()];
+  return horizontalRuns(edge).some(([y, x0, x1]) =>
+    cards.some(
+      (card) =>
+        y > card.y &&
+        y < card.y + card.height &&
+        x0 < card.x + card.width &&
+        card.x < x1
+    )
+  );
+}
+
 test("an edge that skips a level turns inside the corridor between the columns", () => {
   const layout = layoutGraph(chainFixture());
   const jump = layout.edges.find((edge) => edge.from === A && edge.to === C);
@@ -654,21 +685,92 @@ test("an edge that skips a level turns inside the corridor between the columns",
     turn[0] > sourceRight && turn[0] < sourceRight + GRAPH_METRICS.gapX,
     `the vertical leg must sit in the corridor (${sourceRight} < ${turn[0]} < ${sourceRight + GRAPH_METRICS.gapX})`
   );
-  // Four points, three segments: out, across, in. A straight line would have no elbow to route.
-  assert.equal(jump.points.length, 4);
-  assert.equal(jump.points[1][0], jump.points[2][0], "the middle segment is the vertical one");
+  assert.equal(jump.points[1][0], jump.points[2][0], "the leg out of the source is vertical");
 
-  // Parallel long edges must not share one line, or a fan-in reads as a single arc.
-  const second = layoutGraph(
+  const targetLeft = layout.positions.get(C).x;
+  const back = jump.points[jump.points.length - 2];
+  assert.ok(
+    back[0] < targetLeft && back[0] > targetLeft - GRAPH_METRICS.gapX,
+    `the leg into the target sits in its corridor (${targetLeft - GRAPH_METRICS.gapX} < ${back[0]} < ${targetLeft})`
+  );
+});
+
+test("a long edge is visible for its whole path, not only at its two ends", () => {
+  // Three cards at level 2 against one at level 1: the crossed column ends higher than the
+  // plane does, and the run has a band of its own to travel in.
+  const layout = layoutGraph(
+    buildGraph([
+      issue(A),
+      issue(B, { depends_on: [A] }),
+      issue(C, { depends_on: [A, B] }),
+      issue(D, { depends_on: [B] }),
+      issue(E, { depends_on: [B] }),
+    ])
+  );
+  const jump = layout.edges.find((edge) => edge.from === A && edge.to === C);
+  assert.equal(jump.span, 2);
+
+  assert.ok(horizontalRuns(jump).length > 0, "a long edge has to cross the columns somewhere");
+  assert.equal(
+    coveredByCard(layout, jump),
+    false,
+    "no stretch of a long edge may run at the height of a card it passes"
+  );
+  for (const edge of layout.edges) {
+    assert.equal(coveredByCard(layout, edge), false, `edge ${edge.from} → ${edge.to} is covered`);
+  }
+});
+
+test("when every crossed column is packed the run goes below the plane, which stays big enough", () => {
+  // One column, no gaps wide enough to hold a lane: the fallback band under the cards is the
+  // only place left, and the plane must grow to include it instead of clipping the edge.
+  const layout = layoutGraph(
+    buildGraph([
+      issue(A),
+      issue(B, { depends_on: [A] }),
+      issue(C, { depends_on: [A, B] }),
+    ])
+  );
+  const jump = layout.edges.find((edge) => edge.from === A && edge.to === C);
+  const runs = horizontalRuns(jump);
+  assert.equal(coveredByCard(layout, jump), false);
+
+  const cardsBottom = [...layout.positions.values()].reduce(
+    (max, card) => Math.max(max, card.y + card.height),
+    0
+  );
+  assert.ok(
+    runs.some(([y]) => y > cardsBottom),
+    "with no free band left the run passes under every card"
+  );
+  for (const [y] of runs) {
+    assert.ok(y < layout.height, `the plane must contain the run (${y} < ${layout.height})`);
+  }
+});
+
+test("parallel long edges keep their own lanes, so each arrowhead has one start", () => {
+  const layout = layoutGraph(
     buildGraph([
       issue(A),
       issue(B, { depends_on: [A] }),
       issue(C, { depends_on: [A, B] }),
       issue(D, { depends_on: [A, B] }),
     ])
-  ).edges.filter((edge) => edge.span > 1);
-  assert.equal(second.length, 2);
-  assert.notEqual(second[0].points[1][0], second[1].points[1][0], "each long edge gets its lane");
+  );
+  const long = layout.edges.filter((edge) => edge.span > 1);
+  assert.equal(long.length, 2);
+
+  assert.notEqual(long[0].points[1][0], long[1].points[1][0], "each long edge leaves on its own");
+  // The crossing run, not the stub out of the source: two edges leaving the same card share that
+  // point by construction, and they separate one corridor lane later.
+  const crossing = (edge) =>
+    horizontalRuns(edge).reduce((widest, run) => (run[2] - run[1] > widest[2] - widest[1] ? run : widest));
+  const first = crossing(long[0]);
+  const second = crossing(long[1]);
+  assert.ok(
+    first[0] !== second[0] || first[2] < second[1] || second[2] < first[1],
+    "two runs may not lie on the same line over the same stretch of x"
+  );
 });
 
 test("a done dependency is drawn as a compact ghost instead of an arrow out of nowhere", () => {

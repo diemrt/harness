@@ -375,8 +375,14 @@ export const GRAPH_METRICS = {
   nodeHeight: 124,
   ghostHeight: 76,
   gapX: 88, // the corridor between two columns: where every edge turns
-  gapY: 16,
+  // The gutter between two cards of one column. Not only breathing room: an edge that crosses a
+  // column travels horizontally in here, so the gutter has to hold a line with clearance on both
+  // sides. Back at the old 16 no gutter is wide enough and every long edge ends up in the
+  // overflow band at the bottom, which is the fallback, not the normal path.
+  gapY: 28,
   laneStep: 12, // multi-level edges are spread across the corridor so they stay countable
+  channelClearance: 6, // how far a horizontal run keeps off the cards it passes between
+  channelMin: 14, // a free band narrower than this cannot hold a lane, so it is not offered
   padTop: 32, // room for the level label
   padLeft: 8,
   padBottom: 24,
@@ -411,28 +417,123 @@ export function layoutGraph(graph) {
     return { level: depth, x, nodes };
   });
 
-  const edges = layoutEdges(graph, positions);
+  // Where the cards end. The edges are routed against this line — above it they look for a band
+  // no column occupies, below it lies the overflow band — so it has to be known before them.
+  const contentBottom = columns.reduce((max, column) => {
+    const last = column.nodes[column.nodes.length - 1];
+    return last ? Math.max(max, last.y + last.height) : max;
+  }, m.padTop);
+
+  const { edges, bottom } = layoutEdges(graph, positions, columns, contentBottom);
 
   const width = columns.length === 0
     ? 0
     : m.padLeft * 2 + columns.length * (m.nodeWidth + m.gapX) - m.gapX;
-  const height = columns.reduce((max, column) => {
-    const last = column.nodes[column.nodes.length - 1];
-    return last ? Math.max(max, last.y + last.height) : max;
-  }, m.padTop) + m.padBottom;
+  const height = Math.max(contentBottom, bottom) + m.padBottom;
 
   return { columns, positions, edges, width, height };
 }
 
+// The y bands a horizontal run may travel in while crossing the levels from `first` to `last`:
+// every card of those columns, grown by the clearance, is off limits, and what is left over is a
+// band. Columns are packed independently, so a band is rarely a whole row — most of the time it
+// is the space under the shortest column, which is exactly where a long edge can slip through.
+function freeBands(columns, first, last, bottom) {
+  const m = GRAPH_METRICS;
+  const blocked = [];
+  for (let level = first; level <= last; level += 1) {
+    for (const placed of columns[level] ? columns[level].nodes : []) {
+      blocked.push([placed.y - m.channelClearance, placed.y + placed.height + m.channelClearance]);
+    }
+  }
+  blocked.sort((a, b) => a[0] - b[0]);
+
+  const bands = [];
+  let cursor = m.padTop;
+  for (const [top, end] of blocked) {
+    if (top - cursor >= m.channelMin) {
+      bands.push([cursor, top]);
+    }
+    cursor = Math.max(cursor, end);
+  }
+  if (bottom - cursor >= m.channelMin) {
+    bands.push([cursor, bottom]);
+  }
+  return bands;
+}
+
+// The lane for one horizontal run: inside a free band, as close as the band allows to the
+// straight line between the two ends, and never on top of another run that shares the same
+// stretch of x — two arcs on one line are one arc to whoever is reading. `null` when nothing
+// fits: the caller then sends the edge below the plane, where by construction there is no card.
+function pickLane(bands, wanted, used, x0, x1) {
+  const m = GRAPH_METRICS;
+  const nearest = [...bands].sort(
+    (a, b) => Math.abs((a[0] + a[1]) / 2 - wanted) - Math.abs((b[0] + b[1]) / 2 - wanted)
+  );
+
+  for (const [top, end] of nearest) {
+    const start = Math.min(end, Math.max(top, wanted));
+    const steps = Math.floor((end - top) / m.laneStep);
+    for (let step = 0; step <= steps; step += 1) {
+      const candidates = step === 0
+        ? [start]
+        : [start + step * m.laneStep, start - step * m.laneStep];
+      for (const candidate of candidates) {
+        const lane = Math.round(candidate);
+        if (lane < top || lane > end) {
+          continue;
+        }
+        const clash = used.some(
+          (run) => Math.abs(run.y - lane) < m.laneStep && run.x0 < x1 && x0 < run.x1
+        );
+        if (!clash) {
+          return lane;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// Each long edge gets its own vertical inside the corridor it leaves and the one it arrives in,
+// so a fan of three arcs reads as three lines rather than one.
+function corridorOffset(lanes, level) {
+  const m = GRAPH_METRICS;
+  const lane = lanes.get(level) ?? 0;
+  lanes.set(level, lane + 1);
+  return Math.min(m.gapX - 12, 14 + lane * m.laneStep);
+}
+
+// A polyline whose consecutive points repeat draws the same segment twice: when the lane lands
+// exactly on the height of one of the two ends, the turn is not a turn and the point goes.
+function trimPoints(points) {
+  return points.filter(
+    (point, i) => i === 0 || point[0] !== points[i - 1][0] || point[1] !== points[i - 1][1]
+  );
+}
+
 // One elbow per edge: out of the dependency's right side, a turn inside the corridor, then
 // straight into the left side of the issue that declares it — so the arrow always arrives
-// pointing at the target. An edge that skips levels turns in the corridor right after its
-// source and gets its own lane there, instead of every long edge sharing one line.
-function layoutEdges(graph, positions) {
+// pointing at the target.
+//
+// An edge that skips levels cannot do the same. Its horizontal stretch crosses the columns in
+// between, and since the edges are drawn under the cards, at the height of a card that stretch
+// is simply not there: start and arrowhead visible, the path between them gone — and it is the
+// long edges that carry the dependencies the adjacent columns do not already tell you. So it is
+// routed in five segments instead of three: up or down inside the corridor after the source,
+// across at a height no card of the crossed columns occupies, then into the corridor before the
+// target. When no such height exists — every column packed edge to edge — the run goes into the
+// band below the plane, which no card can ever reach.
+function layoutEdges(graph, positions, columns, contentBottom) {
   const m = GRAPH_METRICS;
   const edges = graph && Array.isArray(graph.edges) ? graph.edges : [];
-  const lanes = new Map();
+  const leaving = new Map();
+  const arriving = new Map();
+  const runs = [];
   const routed = [];
+  let bottom = contentBottom;
+  let overflow = 0;
 
   for (const edge of edges) {
     const from = positions.get(edge.from);
@@ -449,22 +550,38 @@ function layoutEdges(graph, positions) {
     const x2 = to.x;
     const y2 = Math.round(to.y + to.height / 2);
 
-    let turn = x1 + m.gapX / 2;
-    if (span > 1) {
-      const lane = lanes.get(source.level) ?? 0;
-      lanes.set(source.level, lane + 1);
-      turn = x1 + Math.min(m.gapX - 12, 14 + lane * m.laneStep);
+    if (span <= 1) {
+      const turn = x1 + m.gapX / 2;
+      routed.push({
+        from: edge.from,
+        to: edge.to,
+        span,
+        points: trimPoints([[x1, y1], [turn, y1], [turn, y2], [x2, y2]]),
+      });
+      continue;
     }
+
+    const exit = x1 + corridorOffset(leaving, source.level);
+    const entry = x2 - corridorOffset(arriving, target.level);
+    const bands = freeBands(columns, source.level + 1, target.level - 1, contentBottom);
+
+    let lane = pickLane(bands, Math.round((y1 + y2) / 2), runs, exit, entry);
+    if (lane === null) {
+      overflow += 1;
+      lane = Math.round(contentBottom + m.gapY + overflow * m.laneStep);
+      bottom = Math.max(bottom, lane);
+    }
+    runs.push({ y: lane, x0: exit, x1: entry });
 
     routed.push({
       from: edge.from,
       to: edge.to,
       span,
-      points: [[x1, y1], [turn, y1], [turn, y2], [x2, y2]],
+      points: trimPoints([[x1, y1], [exit, y1], [exit, lane], [entry, lane], [entry, y2], [x2, y2]]),
     });
   }
 
-  return routed;
+  return { edges: routed, bottom };
 }
 
 // One <svg> for every edge, sized to the plane and sitting under the cards. The arrowhead is a
