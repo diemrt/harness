@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T08:50:16Z",
+  "last_updated": "2026-07-31T09:14:26Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1128,23 +1128,24 @@
       "id": "85d40484-ceb0-4c79-a5f3-3d4e768a56ad",
       "title": "board-render: vista catene come albero indentato",
       "description": "Task 1 del piano docs/superpowers/plans/2026-07-31-board-terminale.md. Spec: docs/superpowers/specs/2026-07-31-board-terminale-design.md sezione 3.\n\nNuovo scripts/board-render.mjs: components(), renderChains(), SEP(), shortId(). Modulo puro — niente process, niente fs, niente console — che riceve il grafo di board-graph.mjs e restituisce una stringa.\n\nUna catena non ha nome: si identifica con l'id corto della radice, calcolata dalle componenti connesse via chainOf(). Un nodo con piu' genitori compare una volta sola, appeso alla dipendenza di livello piu' alto, con la riga 'attende <id> <id>'. Il marcatore lavorabile segna le issue le cui dipendenze sono tutte chiuse. Un ciclo non si disegna: id coinvolti ed elenco piatto.\n\nboard-graph.mjs non si tocca.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [],
       "validation": {
-        "state": "unknown",
+        "state": "pass",
         "criteria": [
-          "scripts/board-render.mjs esiste, non importa node:fs ne' node:process e non chiama console.",
-          "Una issue senza dipendenze finisce in 'senza catena', non in una catena.",
-          "Il titolo di sezione di una catena e' l'id corto della sua radice.",
-          "Una issue con dipendenze tutte chiuse e' marcata lavorabile, una con dipendenze aperte no.",
-          "Un nodo con tre genitori compare su una riga sola, con gli id attesi elencati sotto.",
-          "Un ciclo stampa gli id coinvolti e ripiega sull'elenco piatto.",
-          "npm run test passa, test/plugin-board-render.test.mjs incluso."
+          "1) scripts/board-render.mjs esiste (213 righe). Letto il sorgente riga per riga, non solo il test: unico import e' `import { GHOST_UNKNOWN } from \"./board-graph.mjs\"` (riga 9), modulo a sua volta puro. grep -nE 'process|console|require(|node:' sul file: nessun match oltre a quell'import. Nessuna scrittura, nessun I/O, nessun globale di ambiente.",
+          "2) Probe indipendente: buildGraph([A,B->A,C,D->C,S]) -> S finisce sotto 'senza catena', non in una catena; components() ne conta 2, le sezioni disegnate sono 2.",
+          "3) Titolo sezione = id corto della radice: probe con radice P1 -> 'catena · P1-PPPPP'; sul tracker reale (render read-only di issues.json) -> 'catena · 85d40484', che e' il nodo di livello 0.",
+          "4) Probe [A done, B->A, C->B, K->id sconosciuto]: la riga di B porta '► lavorabile', quella di C no, A compare come fantasma '✓ aaaaaaaa'.",
+          "5) RIVERIFICA. Costruite 6 topologie diverse piu' 400 DAG casuali, contando le righe. Controesempio del fail precedente [Q1->Z, Q2->Z, Z->{P1,P2,P3}, P1, P2, P3]: 1 sola intestazione, 1 riga per issue, 1 sola riga 'attende P1 P2 P3'. Zigzag [N1->M1, N2->{M1,M2}, N3->{M2,M3}, N4->M3] e tre-genitori-a-profondita'-miste: idem. Stress con oracolo union-find indipendente su 400 DAG casuali: intestazioni == componenti connesse, 1 riga per nodo, 1 riga 'attende' per nodo multi-genitore, 0 fallimenti. Sul tracker reale: 1 sezione, ogni nodo su 1 riga sola (85d40484 non e' piu' duplicata).",
+          "6) Probe [A->B, B->A, C, D->C, S]: stampa '⚠ ciclo nelle dipendenze', 'issue coinvolte: A B' ed elenco piatto di tutti i nodi non fantasma, nessuna intestazione di catena.",
+          "7) Gate `npm run test` (da .harness/config.json): tests 216, pass 216, fail 0. Erano 208 prima: gli 8 nuovi sono di test/plugin-board-render.test.mjs, tra cui 'board-render.mjs is pure' e la regressione 'una componente connessa e' una sezione sola'.",
+          "Invariante: scripts/board-graph.mjs non modificato (assente da git status --short; ultimo commit che lo tocca 2f0a3df). Diff limitato a scripts/board-render.mjs e test/plugin-board-render.test.mjs (nuovi), docs/.../2026-07-31-board-terminale.md e issues.json. Osservazione fuori contratto, non bloccante: nel blocco di codice del Task 1 del piano resta 'import { chainOf } from \"./board-graph.mjs\"' (riga 159) ora inutilizzato, e la description di questa issue cita ancora chainOf()."
         ]
       },
       "created_at": "2026-07-31T08:50:16Z",
-      "updated_at": "2026-07-31T08:50:16Z"
+      "updated_at": "2026-07-31T09:14:26Z"
     },
     {
       "id": "aaae9161-4b26-4b85-a7ee-69683656c9fa",
@@ -1281,6 +1282,28 @@
       },
       "created_at": "2026-07-31T08:50:16Z",
       "updated_at": "2026-07-31T08:50:16Z"
+    },
+    {
+      "id": "a3d32b99-de85-419f-a8be-f11d24c50ff6",
+      "title": "board-render: un id sconosciuto non e' una dipendenza soddisfatta",
+      "description": "Segnalato dal worker della issue 85d40484 come osservazione fuori contratto.\n\nisWorkable() tratta ogni nodo fantasma come dipendenza chiusa. I fantasmi pero' sono due cose diverse, e board-graph.mjs le distingue gia' con GHOST_DONE e GHOST_UNKNOWN: una dipendenza davvero chiusa, e un depends_on che punta a un id che il tracker non conosce.\n\nOggi il secondo caso rende la issue lavorabile e disegna il fantasma con la spunta, come se fosse done. Ma un id sconosciuto non e' un lavoro finito: e' un dato rotto, e marcarlo lavorabile dice a chi legge che puo' partire quando invece qualcuno ha cancellato o sbagliato a scrivere una dipendenza.\n\nLa CLI impedisce di creare un depends_on verso un id inesistente, quindi il caso nasce solo da una modifica a mano di issues.json — che e' esattamente lo scenario per cui board-graph.mjs ha la guardia sui cicli. Il board non e' un posto dove si perde un dato.\n\nDa fare: marcatore distinto per il fantasma sconosciuto (non la spunta) ed esclusione dal calcolo di lavorabile.",
+      "status": "backlog",
+      "tier": "economy",
+      "depends_on": [
+        "85d40484-ceb0-4c79-a5f3-3d4e768a56ad"
+      ],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "Un fantasma GHOST_UNKNOWN e' reso con un marcatore diverso da quello di una dipendenza chiusa.",
+          "Una issue che dipende da un id sconosciuto non e' marcata lavorabile.",
+          "Una issue che dipende solo da issue chiuse resta marcata lavorabile.",
+          "scripts/board-graph.mjs non e' modificato.",
+          "npm run test passa."
+        ]
+      },
+      "created_at": "2026-07-31T09:00:07Z",
+      "updated_at": "2026-07-31T09:00:07Z"
     }
   ]
 }

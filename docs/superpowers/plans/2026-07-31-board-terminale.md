@@ -156,7 +156,7 @@ Expected: FAIL — `Cannot find module '../scripts/board-render.mjs'`
 // console. It takes data and options and returns a string, which is what makes a change to the
 // way the board looks a matter of one assert.equal instead of a browser.
 
-import { chainOf } from "./board-graph.mjs";
+import { GHOST_UNKNOWN } from "./board-graph.mjs";
 
 export const IN_FLIGHT = ["in_progress", "in_review", "blocked"];
 
@@ -168,15 +168,35 @@ export function shortId(id) {
   return String(id || "").slice(0, 8);
 }
 
-// The connected components of the depends_on graph: the chains the 1-WIP rule talks about.
-// board-graph.mjs already knows how to walk a chain from one node; grouping is a visited set on
-// top of it, which is why that module does not need to change.
+// CORRETTO DOPO LA VERIFICA — la prima stesura di questo piano usava `chainOf(graph, id).ids`, che
+// NON è una componente connessa: risale per dependsOn e scende per dependents, quindi due fratelli
+// della stessa dipendenza finiscono in insiemi disgiunti. Una componente usciva a pezzi e un nodo
+// presente in più pezzi veniva disegnato una volta per pezzo. Serve un attraversamento che segua
+// gli archi in entrambi i versi insieme.
+function reach(graph, startId) {
+  const seen = new Set([startId]);
+  const queue = [startId];
+  while (queue.length > 0) {
+    const node = graph.byId.get(queue.shift());
+    if (!node) continue;
+    for (const id of [...node.dependsOn, ...node.dependents]) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      queue.push(id);
+    }
+  }
+  return [...seen];
+}
+
+// The connected components of the depends_on graph: the chains the 1-WIP rule talks about, and
+// SKILL.md defines them exactly this way — two issues are in the same chain when a path of
+// dependencies joins them, in one direction or the other.
 export function components(graph) {
   const seen = new Set();
   const found = [];
   for (const node of graph.nodes) {
     if (node.unchained || seen.has(node.id)) continue;
-    const ids = chainOf(graph, node.id).ids;
+    const ids = reach(graph, node.id);
     for (const id of ids) seen.add(id);
     const nodes = ids.map((id) => graph.byId.get(id)).filter(Boolean);
     // A chain has no name: it is a fact of the graph and no field of the tracker baptises it.
