@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T16:01:46Z",
+  "last_updated": "2026-07-31T16:07:59Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1074,23 +1074,15 @@
       "id": "9489f774-e8eb-43d7-a07b-3acb825ca456",
       "title": "schema_version nel tracker, tollerando i file che non ce l'hanno",
       "description": "--upgrade deve sapere da che versione parte e --init deve sapere cosa scrivere: entrambi presuppongono che issues.json dichiari il proprio schema, e oggi non lo fa.\n\nVa introdotta la costante SCHEMA_VERSION in scripts/issue-manager.mjs con valore 1 — lo schema descritto oggi in references/issues.md — e la chiave schema_version in cima a issues.json, accanto a last_updated.\n\nChiave assente vale versione 0, e il file si legge lo stesso: nessun comando esistente cambia comportamento, nessun progetto va aggiornato per continuare a funzionare. E' la stessa scelta gia' fatta per tier e per depends_on.\n\nIl writer preserva quello che trova: se il file ha schema_version lo riscrive identico, se non ce l'ha non lo aggiunge. Solo --init e --upgrade scrivono quel campo. Un --insert che timbrasse 1 su un file v0 dichiarerebbe una migrazione mai eseguita, e il campo perderebbe l'unica cosa che lo rende utile.\n\nSpec: docs/superpowers/specs/2026-07-31-tracker-lifecycle-commands-design.md, sezione 2.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "scripts/issue-manager.mjs espone una costante SCHEMA_VERSION con valore 1.",
-          "Su un tracker temporaneo privo di schema_version, --get e --get-all rispondono ok:true come prima: la chiave assente non e' un errore.",
-          "Un --insert o --update su un file privo di schema_version lo lascia privo: la chiave non viene aggiunta.",
-          "Un --insert o --update su un file che ha schema_version lo riscrive con lo stesso valore.",
-          "test/plugin-issue-manager.test.mjs copre i tre casi sopra su directory temporanea.",
-          "references/issues.md documenta schema_version, il valore corrente e la semantica della chiave assente.",
-          "npm run test esce 0 e issues.json alla radice non e' stato modificato a mano."
-        ]
+        "state": "pass",
+        "criteria": "scripts/issue-manager.mjs:109 const SCHEMA_VERSION = 1 (git diff confirms addition with comment). writeIssuesFile() (scripts/issue-manager.mjs:518-525) mutates only data.last_updated and serializes the whole root `data` object unchanged, no schema_version-specific code; readIssuesFile() (line 501-507) does plain JSON.parse of the whole file. test/plugin-issue-manager.test.mjs adds 6 tests after line 1346, all on setupTempProject()->mkdtempSync(tmpdir()) (never touching repo issues.json): '--get and --get-all respond ok:true on a tracker without schema_version', '--insert on a file without schema_version leaves it without the key', '--update on a file without schema_version leaves it without the key', '--insert on a file that has schema_version rewrites it with the same value', '--update on a file that has schema_version rewrites it with the same value', plus a bonus test for a value differing from SCHEMA_VERSION. skills/harness/references/issues.md gained a '## schema_version' section documenting the constant, value 1, absent-key=0 semantics, and writer preservation. git diff -- issues.json shows only last_updated/status(backlog->in_review)/updated_at churn for this issue's transition, no schema_version key introduced into the real tracker. npm run test (the verify command from .harness/config.json) exited 0: 'tests 187, pass 187, fail 0, cancelled 0'. git status --short shows only the 4 declared files (issues.json, scripts/issue-manager.mjs, skills/harness/references/issues.md, test/plugin-issue-manager.test.mjs). No files modified by verifier besides this issue closure."
       },
       "created_at": "2026-07-31T15:51:03Z",
-      "updated_at": "2026-07-31T15:51:03Z"
+      "updated_at": "2026-07-31T16:07:59Z"
     },
     {
       "id": "b6100ba5-f743-42a2-8084-4c143d9bc5b2",

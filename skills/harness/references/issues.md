@@ -16,6 +16,21 @@ Lo script vive nel plugin, i dati nel progetto. `issues.json` viene risolto cont
 Un progetto senza `issues.json` si legge come tracker vuoto (nessun errore, nessun file
 creato). Il file nasce al **primo `--insert`**.
 
+## `schema_version`
+
+`issues.json` può portare, in cima e accanto a `last_updated`, la chiave `schema_version`: la
+versione dello schema descritto in questa pagina. Lo script conosce la propria versione tramite
+la costante `SCHEMA_VERSION` (oggi `1`).
+
+- **chiave assente = versione 0, e il file si legge lo stesso.** Nessun comando cambia
+  comportamento in base a questa chiave, nessun progetto va aggiornato per continuare a
+  funzionare — stessa scelta già fatta per `tier` e per `depends_on`.
+- **il writer preserva quello che trova.** Se il file ha `schema_version`, ogni scrittura
+  (`--insert`, `--update`, `--delete`) lo riscrive identico; se non ce l'ha, non lo aggiunge.
+  Comandi come `--init` e `--upgrade` — che scrivono deliberatamente quel campo — non fanno
+  parte di questa CLI: finché non esistono, `schema_version` non compare mai su un file che non
+  lo aveva già.
+
 ## Comandi
 
 ```bash

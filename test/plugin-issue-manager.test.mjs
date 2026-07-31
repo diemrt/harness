@@ -1346,3 +1346,109 @@ test("--help documents depends_on and INVALID_DEPENDENCY", () => {
     cleanup(dir);
   }
 });
+
+// ---------------------------------------------------------------------------
+// schema_version — a root-level key, not part of any issue. The seeded tracker used everywhere
+// else in this suite (baseSeed()) deliberately carries no schema_version: it stands in for every
+// project that used the tracker before this key existed, and every command must keep working on
+// it without a migration. Only --init and --upgrade (not implemented by this script) are meant to
+// write the key at all: every other command must leave it exactly as found — present or absent.
+// ---------------------------------------------------------------------------
+
+// Reads the whole root object of issues.json, not just its `issues` array, so a test can assert
+// on schema_version (or its absence) the same way storedIssues() asserts on individual issues.
+function rootData(dir) {
+  return JSON.parse(readFileSync(path.join(dir, "issues.json"), "utf8"));
+}
+
+function seedWithSchemaVersion(version) {
+  const seed = baseSeed();
+  seed.schema_version = version;
+  return seed;
+}
+
+test("--get and --get-all respond ok:true on a tracker without schema_version", () => {
+  const { dir } = setupTempProject(); // baseSeed() has no schema_version key
+  try {
+    assert.ok(!("schema_version" in rootData(dir)), "the fixture must start without the key");
+
+    const getResult = assertOk(run(dir, ["--get", "--issue-id", ID_ONE]));
+    assert.equal(getResult.id, ID_ONE);
+
+    const getAllResult = assertOk(run(dir, ["--get-all"]));
+    assert.equal(getAllResult.totalCount, 2);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--insert on a file without schema_version leaves it without the key", () => {
+  const { dir } = setupTempProject();
+  try {
+    assert.ok(!("schema_version" in rootData(dir)));
+    const payload = JSON.stringify({ title: "T", description: "D", status: "backlog" });
+    assertOk(run(dir, ["--insert", "--issue-data", payload]));
+    assert.ok(
+      !("schema_version" in rootData(dir)),
+      "an --insert must not stamp schema_version onto a file that never had it"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--update on a file without schema_version leaves it without the key", () => {
+  const { dir } = setupTempProject();
+  try {
+    assert.ok(!("schema_version" in rootData(dir)));
+    assertOk(
+      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "in_progress" })])
+    );
+    assert.ok(
+      !("schema_version" in rootData(dir)),
+      "an --update must not stamp schema_version onto a file that never had it"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--insert on a file that has schema_version rewrites it with the same value", () => {
+  const { dir } = setupTempProject(seedWithSchemaVersion(1));
+  try {
+    assert.equal(rootData(dir).schema_version, 1);
+    const payload = JSON.stringify({ title: "T", description: "D", status: "backlog" });
+    assertOk(run(dir, ["--insert", "--issue-data", payload]));
+    assert.equal(rootData(dir).schema_version, 1, "the existing value must survive untouched");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--update on a file that has schema_version rewrites it with the same value", () => {
+  const { dir } = setupTempProject(seedWithSchemaVersion(1));
+  try {
+    assert.equal(rootData(dir).schema_version, 1);
+    assertOk(
+      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "in_progress" })])
+    );
+    assert.equal(rootData(dir).schema_version, 1, "the existing value must survive untouched");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+// A file with a schema_version other than the script's own SCHEMA_VERSION is out of scope here
+// (that comparison belongs to the future --upgrade), but the value stored must still be whatever
+// was on disk, not silently normalised to the constant this script implements.
+test("--update preserves a schema_version that differs from this script's own SCHEMA_VERSION", () => {
+  const { dir } = setupTempProject(seedWithSchemaVersion(0));
+  try {
+    assertOk(
+      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "in_progress" })])
+    );
+    assert.equal(rootData(dir).schema_version, 0, "an unrelated value must not be coerced to 1");
+  } finally {
+    cleanup(dir);
+  }
+});

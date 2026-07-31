@@ -99,6 +99,15 @@ const LIMITS = {
 // tier reads as "standard".
 const TIERS = ["economy", "standard", "reasoning"];
 
+// The schema this script currently implements, i.e. the shape documented in references/issues.md.
+// A tracker declares which version it was written against via the root-level `schema_version` key,
+// sitting next to `last_updated`. Only --init and --upgrade (not implemented by this script yet)
+// ever WRITE that key; every other command here only reads issues.json and rewrites it unchanged
+// on the fields it does not own — see writeIssuesFile(). An absent key reads as version 0, and that
+// is not an error: it is the same choice already made for `tier` and `depends_on`, a new field
+// never invalidates data written before it existed.
+const SCHEMA_VERSION = 1;
+
 // Helper: exception carrying the failure envelope fields, thrown by any validator/reader and
 // caught once at the top level so exactly one JSON line is ever emitted.
 class IssueManagerError extends Error {
@@ -500,6 +509,12 @@ function readIssuesFile() {
 // Helper: save the root data object back to issues.json, updating last_updated.
 // Written atomically: a temp file in the same directory is written first, then renamed over the
 // target, so a crash mid-write never leaves issues.json truncated or corrupt.
+//
+// `data` is the object readIssuesFile() handed back, only ever mutated on the fields a command
+// actually owns (issues, last_updated here). Any other root key found on disk — schema_version
+// included — rides along untouched: this function never enumerates or filters root keys, so a
+// file that has schema_version gets it back byte-for-byte, and a file that does not have it never
+// gets one added. Only --init and --upgrade (not this script, yet) are meant to write that key.
 function writeIssuesFile(data) {
   data.last_updated = nowTimestamp();
   const serialized = JSON.stringify(data, null, 2);
