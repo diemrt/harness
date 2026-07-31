@@ -26,9 +26,11 @@ la costante `SCHEMA_VERSION` (oggi `1`).
   comportamento in base a questa chiave, nessun progetto va aggiornato per continuare a
   funzionare — stessa scelta già fatta per `tier` e per `depends_on`.
 - **il writer preserva quello che trova.** Se il file ha `schema_version`, ogni scrittura
-  (`--insert`, `--update`, `--delete`) lo riscrive identico; se non ce l'ha, non lo aggiunge.
-  Solo `--init` (file nuovo) e `--upgrade` (file già presente) scrivono deliberatamente quel
-  campo. Né `--insert` né `--update` fanno mai la migrazione al posto tuo.
+  (`--insert`, `--update`, `--delete`, `--compact`) lo riscrive identico; se non ce l'ha, non lo
+  aggiunge. Solo `--init` (file nuovo) e `--upgrade` (file già presente) scrivono deliberatamente
+  quel campo. Né `--insert` né `--update` fanno mai la migrazione al posto tuo. `--compact` non
+  lo scrive nemmeno lui: lo **legge** per timbrarlo sull'archivio, così l'archivio dice sotto
+  quale schema erano scritte le issue che porta.
 
 ## Comandi
 
@@ -61,6 +63,9 @@ node "$SCRIPTS/issue-manager.mjs" --init
 
 # portare issues.json allo schema corrente
 node "$SCRIPTS/issue-manager.mjs" --upgrade
+
+# archiviare le done gia' raggruppate a monte e sostituirle coi blocchi
+node "$SCRIPTS/issue-manager.mjs" --compact --issue-data-file ./blocks.json
 ```
 
 L'id di una issue creata si legge da `.data.id` della risposta, **non** dal testo del
@@ -124,6 +129,88 @@ node "$SCRIPTS/issue-manager.mjs" --upgrade
 dalle migrazioni applicate (un'issue toccata da più migrazioni nello stesso giro conta una
 volta sola).
 
+## `--compact`
+
+Rimpicciolisce `issues.json` senza perdere lo storico: le issue chiuse che gli vengono nominate
+escono dal tracker, finiscono **intere** in un archivio, e al loro posto resta una issue per
+blocco che le riassume e dice dove sono andate.
+
+**È una primitiva: non decide i raggruppamenti.** Sapere che due issue chiuse parlano dello
+stesso argomento è giudizio, e il giudizio sta a monte — i blocchi arrivano già decisi nel
+payload. `--compact` esegue e basta.
+
+```json
+{
+  "blocks": [
+    { "title": "…", "description": "…", "issue_ids": ["<guid>", "<guid>"] }
+  ]
+}
+```
+
+Il payload si passa come per gli altri comandi (`--issue-data` o, meglio, `--issue-data-file`).
+`title` e `description` di un blocco rispettano gli **stessi limiti** di qualunque altra issue
+(80 / 1200 caratteri): un blocco diventa una issue come le altre.
+
+**Cosa viene rifiutato, e in che ordine.** Ogni controllo gira *prima* che venga scritto un solo
+byte, quindi **un rifiuto non lascia niente dietro di sé**: né `issues.json` toccato, né
+l'archivio, né la directory `.harness/`.
+
+1. `HARNESS_ROLE=worker` → `FORBIDDEN_ROLE`. Il controllo è il primo e non guarda nemmeno il
+   payload: ogni blocco che questo comando scrive è un record `done` / `pass`, che è esattamente
+   la mossa che il guard anti-self-validation esiste per impedire.
+2. forma del payload: campo sconosciuto, `blocks` assente o vuoto, blocco senza `issue_ids` o con
+   `issue_ids: []`, `title`/`description` vuoti → `INVALID_INPUT`; oltre i limiti →
+   `LIMIT_EXCEEDED`; id che non è un GUID → `INVALID_ID`. Lo stesso id in due blocchi (o due
+   volte nello stesso) → `INVALID_INPUT`: l'originale viene rimosso e sostituito una volta sola,
+   due riassunti dello stesso lavoro non possono essere entrambi veri.
+3. contro il tracker: id che non esiste → `NOT_FOUND`; issue che **non è `done`** →
+   `INVALID_STATUS`. Solo il lavoro chiuso si riassume.
+4. una issue **viva** (che resta nel tracker) dichiara in `depends_on` uno degli id da
+   archiviare → `INVALID_DEPENDENCY`, **elencando gli id che puntano**. È la stessa semantica di
+   `--delete`: far puntare quei riferimenti al blocco muterebbe issue che il chiamante non ha
+   nominato. Chi compatta scollega prima. Una dipendenza fra due issue archiviate **nello stesso
+   giro** non è un ostacolo: se ne va con loro.
+
+**L'archivio.** Su successo gli oggetti issue originali vengono scritti **interi e identici a
+com'erano** — nessuna normalizzazione, i campi sconosciuti a questa versione dello script
+compresi — in:
+
+```
+<progetto>/.harness/archive/<timestamp>.json
+```
+
+```json
+{ "schema_version": <n>, "archived_at": "<datetime>", "issues": [ /* gli originali */ ] }
+```
+
+`schema_version` è quello che il tracker dichiarava al momento dell'archiviazione (assente vale
+`0`): l'archivio **si autodescrive**, così chi lo riapre fra sei mesi non deve indovinare quale
+schema stava leggendo. Il nome del file è il timestamp del giro con i `:` sostituiti da `-`
+(illegali in un nome di file su Windows); due compattazioni nello stesso secondo prendono un
+suffisso numerico invece di sovrascriversi.
+
+`.harness/` è la directory locale che **si auto-ignora** (contiene un `.gitignore` con `*`, come
+già per `config.json`): l'archivio non entra nel repository e il `.gitignore` del progetto non
+viene toccato. La scrittura avviene in quest'ordine — `.gitignore`, archivio, `issues.json` — così
+la directory non è mai visibile a git nemmeno per un istante, e un errore a metà non lascia mai
+il tracker senza la copia.
+
+**L'archivio non viene mai riletto.** Non è un secondo tracker: `--get`, `--get-all` e il board
+continuano a vedere **solo** `issues.json`. Un `--get` su una issue archiviata risponde
+`NOT_FOUND`. È storia congelata, e il blocco che la sostituisce ne porta il path.
+
+**La issue blocco** viene inserita con `status: "done"`, `validation.state: "pass"`,
+`depends_on: []` e `tier: null`. I suoi `validation.criteria` sono l'evidenza della
+compattazione: il path dell'archivio (relativo al progetto — `issues.json` è condiviso nel
+repository, un path assoluto di un clone non significherebbe niente in un altro) e una riga
+`id + titolo` per ogni issue coperta.
+
+`data`: `{ archivePath, removed, blocks: [ { id, title, archivedCount } ] }`, con `archivePath`
+assoluto (il chiamante può aprirlo subito) e `removed` il numero di issue tolte da `issues.json`.
+
+Il giro che `--compact` **non** fa — leggere le `done`, proporre i blocchi, farli confermare — è
+il comando `/harness:compact`, che poi chiama questa primitiva col payload confermato.
+
 ## Paginazione
 
 `--get-all` è paginato:
@@ -157,6 +244,7 @@ eccezione: testo semplice). Su stderr non viene scritto nulla.
 | `--delete` | `{ id, deleted }` |
 | `--init` | `{ path, created: true }` |
 | `--upgrade` | `{ from, to, migrated }` |
+| `--compact` | `{ archivePath, removed, blocks: [ { id, title, archivedCount } ] }` |
 
 | Parametro | Uso |
 |---|---|
@@ -291,22 +379,23 @@ Il `code` è stabile: usalo per la logica, il messaggio è per gli umani.
 
 | `code` | Quando |
 |---|---|
-| `INVALID_ID` | `--issue-id` non è un GUID valido |
-| `INVALID_STATUS` | `status` fuori dai valori ammessi |
+| `INVALID_ID` | `--issue-id` non è un GUID valido, o un `issue_ids` di `--compact` non lo è |
+| `INVALID_STATUS` | `status` fuori dai valori ammessi, o `--compact` su una issue che non è `done` |
 | `INVALID_STATE` | `validation.state` fuori da `unknown`, `pass`, `fail` |
 | `INVALID_TIER` | `tier` fuori da `economy`, `standard`, `reasoning` (un `null` esplicito è valido) |
-| `INVALID_DEPENDENCY` | `depends_on` non è un array (`null` incluso), elemento non GUID, id duplicato, self-reference, id inesistente nel tracker, ciclo diretto o indiretto; oppure `--delete` di una issue da cui altre dipendono |
-| `INVALID_INPUT` | campo sconosciuto, obbligatorio mancante o vuoto, payload `{}` in update, `page-size` < 1, `criteria` di forma sbagliata (stringa a `state: unknown`, array vuoto, elemento non stringa o vuoto) |
-| `LIMIT_EXCEEDED` | `title`, `description` o un criterio oltre il limite di caratteri, o più di 7 criteri |
+| `INVALID_DEPENDENCY` | `depends_on` non è un array (`null` incluso), elemento non GUID, id duplicato, self-reference, id inesistente nel tracker, ciclo diretto o indiretto; oppure `--delete` di una issue da cui altre dipendono, o `--compact` di una issue da cui dipende una issue viva |
+| `INVALID_INPUT` | campo sconosciuto, obbligatorio mancante o vuoto, payload `{}` in update, `page-size` < 1, `criteria` di forma sbagliata (stringa a `state: unknown`, array vuoto, elemento non stringa o vuoto); in `--compact` anche `blocks` assente/vuoto, blocco vuoto, stesso id in due blocchi |
+| `LIMIT_EXCEEDED` | `title`, `description` o un criterio oltre il limite di caratteri, o più di 7 criteri (vale anche per `title`/`description` di un blocco di `--compact`) |
 | `INVALID_JSON` | payload non JSON valido |
 | `NOT_FOUND` | nessuna issue con quell'id |
 | `FILE_NOT_FOUND` | `--issue-data-file` inesistente, o `--project-dir` che non esiste |
 | `MISSING_ARGS` | flag richiesto assente, o `--issue-data` e `--issue-data-file` insieme |
 | `UNKNOWN_COMMAND` | nessun comando riconosciuto (vedi `--help`) |
-| `FORBIDDEN_ROLE` | con `HARNESS_ROLE=worker`, tentativo di impostare `status=done` o `validation.state=pass` |
+| `FORBIDDEN_ROLE` | con `HARNESS_ROLE=worker`, tentativo di impostare `status=done` o `validation.state=pass`, oppure qualunque `--compact` |
 | `ALREADY_EXISTS` | `--init` quando `issues.json` esiste già: rifiutato, niente viene scritto |
 | `SCHEMA_TOO_NEW` | `--upgrade` su un file con `schema_version` maggiore di `SCHEMA_VERSION`: rifiutato, niente viene scritto |
 
 `FORBIDDEN_ROLE` è il guard tecnico contro la self-validation: un processo lanciato con
 `HARNESS_ROLE=worker` non può chiudere la propria issue, può arrivare al massimo a
-`in_review` / `unknown`.
+`in_review` / `unknown`. Per lo stesso motivo un worker non può lanciare `--compact`: ogni blocco
+che quel comando scrive è un record `done` / `pass`.

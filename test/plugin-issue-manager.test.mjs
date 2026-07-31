@@ -1695,3 +1695,432 @@ test("--help lists --upgrade and SCHEMA_TOO_NEW", () => {
     cleanup(dir);
   }
 });
+
+// ---------------------------------------------------------------------------
+// --compact — archives the closed issues named by the caller into
+// .harness/archive/<timestamp>.json and replaces them with one done/pass issue per block.
+//
+// It is a primitive: it groups nothing on its own, the blocks arrive already decided. Every test
+// here runs on a throwaway project directory, never on the tracker of this repository.
+// ---------------------------------------------------------------------------
+
+const ARCHIVE_SUBPATH = path.join(".harness", "archive");
+
+// Two closed issues to archive and one live one to leave behind.
+//
+// ID_ONE is deliberately a LEGACY record — no `tier`, no `depends_on`, plus a `legacy_note` key
+// this script has never heard of — so the archive can be checked for storing the originals WHOLE
+// rather than whatever shape today's script would rebuild.
+function compactSeed() {
+  const seed = baseSeed();
+  seed.schema_version = SCHEMA_VERSION;
+
+  const one = seed.issues.find((i) => i.id === ID_ONE);
+  one.status = "done";
+  one.validation = { criteria: "evidence for one", state: "pass" };
+  one.legacy_note = "written before half these fields existed";
+
+  const two = seed.issues.find((i) => i.id === ID_TWO);
+  two.status = "done";
+  two.tier = "economy";
+  two.depends_on = [ID_ONE];
+  two.validation = { criteria: ["evidence for two"], state: "pass" };
+
+  const three = seed.issues.find((i) => i.id === ID_THREE);
+  three.status = "backlog";
+  three.depends_on = [];
+
+  return seed;
+}
+
+function oneBlock(issueIds, overrides = {}) {
+  return JSON.stringify({
+    blocks: [
+      {
+        title: "Board e dipendenze",
+        description: "Le issue chiuse su board server e card delle dipendenze.",
+        issue_ids: issueIds,
+        ...overrides,
+      },
+    ],
+  });
+}
+
+function archiveFiles(dir) {
+  const archiveDir = path.join(dir, ARCHIVE_SUBPATH);
+  return existsSync(archiveDir) ? readdirSync(archiveDir) : [];
+}
+
+// The whole point of a refusal: the tracker is untouched byte for byte AND no archive was even
+// started. `.harness/` must not exist at all, not merely be empty.
+function assertNothingWritten(dir, before) {
+  const after = readFileSync(path.join(dir, "issues.json"));
+  assert.ok(before.equals(after), "issues.json must be untouched byte for byte on a refusal");
+  assert.equal(
+    existsSync(path.join(dir, ".harness")),
+    false,
+    "a refused --compact must not create .harness/ either"
+  );
+}
+
+test("--compact archives a block of done issues: they leave issues.json, a done/pass block takes their place", () => {
+  const { dir } = setupTempProject(compactSeed());
+  try {
+    const data = assertOk(run(dir, ["--compact", "--issue-data", oneBlock([ID_ONE, ID_TWO])]));
+
+    assert.equal(data.removed, 2);
+    assert.equal(data.blocks.length, 1);
+    assert.match(data.blocks[0].id, GUID_RE);
+    assert.equal(data.blocks[0].title, "Board e dipendenze");
+    assert.equal(data.blocks[0].archivedCount, 2);
+    assert.equal(typeof data.archivePath, "string");
+    assert.ok(data.archivePath.endsWith(".json"));
+
+    const stored = storedIssues(dir);
+    assert.equal(stored.length, 2, "two archived issues out, one block issue in");
+    assert.equal(stored.find((i) => i.id === ID_ONE), undefined);
+    assert.equal(stored.find((i) => i.id === ID_TWO), undefined);
+    assert.ok(stored.find((i) => i.id === ID_THREE), "the live issue must stay");
+
+    const block = stored.find((i) => i.id === data.blocks[0].id);
+    assert.ok(block, "the block issue must be stored");
+    assert.equal(block.title, "Board e dipendenze");
+    assert.equal(block.description, "Le issue chiuse su board server e card delle dipendenze.");
+    assert.equal(block.status, "done");
+    assert.equal(block.validation.state, "pass");
+    assert.deepEqual(block.depends_on, [], "a block summarises history, it depends on nothing");
+    assert.equal(block.tier, null);
+    assert.equal(typeof block.created_at, "string");
+    assert.equal(typeof block.updated_at, "string");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--compact writes the ORIGINAL issue objects, whole, into .harness/archive/<timestamp>.json with the tracker's schema_version", () => {
+  const { dir } = setupTempProject(compactSeed());
+  const before = compactSeed().issues;
+  try {
+    const data = assertOk(run(dir, ["--compact", "--issue-data", oneBlock([ID_ONE, ID_TWO])]));
+
+    const files = archiveFiles(dir);
+    assert.equal(files.length, 1, "exactly one archive file per --compact run");
+    assert.equal(path.basename(data.archivePath), files[0], "data.archivePath must name the file written");
+    // A colon cannot appear in a Windows filename, so the timestamp is stamped with dashes.
+    assert.match(files[0], /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z(-\d+)?\.json$/);
+
+    const archive = JSON.parse(readFileSync(path.join(dir, ARCHIVE_SUBPATH, files[0]), "utf8"));
+    assert.equal(archive.schema_version, SCHEMA_VERSION, "the archive self-describes the schema it was written under");
+    assert.equal(typeof archive.archived_at, "string");
+    assert.equal(archive.issues.length, 2);
+
+    for (const id of [ID_ONE, ID_TWO]) {
+      const original = before.find((i) => i.id === id);
+      const archived = archive.issues.find((i) => i.id === id);
+      assert.deepEqual(archived, original, `issue ${id} must be archived exactly as it was stored`);
+      assert.deepEqual(
+        new Set(Object.keys(archived)),
+        new Set(Object.keys(original)),
+        `no key of ${id} may be invented or dropped by the archiver`
+      );
+    }
+    // The legacy record is the proof: a field this script knows nothing about survives untouched.
+    assert.equal(
+      archive.issues.find((i) => i.id === ID_ONE).legacy_note,
+      "written before half these fields existed"
+    );
+    assert.ok(
+      !("depends_on" in archive.issues.find((i) => i.id === ID_ONE)),
+      "the archiver must not normalise a legacy issue on its way in"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--compact records the archive path and the id + title of every covered issue in the block's criteria", () => {
+  const { dir } = setupTempProject(compactSeed());
+  try {
+    const data = assertOk(run(dir, ["--compact", "--issue-data", oneBlock([ID_ONE, ID_TWO])]));
+    const block = storedIssues(dir).find((i) => i.id === data.blocks[0].id);
+    const criteria = block.validation.criteria;
+
+    assert.ok(Array.isArray(criteria), "the evidence is a bullet list, one line per covered issue plus the path");
+    assert.equal(criteria.length, 3);
+
+    const archiveFile = archiveFiles(dir)[0];
+    // Project-relative, with forward slashes: issues.json is shared through the repository, and an
+    // absolute path from one clone means nothing in another.
+    assert.ok(
+      criteria.some((c) => c.includes(`.harness/archive/${archiveFile}`)),
+      `criteria must carry the archive path, got: ${JSON.stringify(criteria)}`
+    );
+    assert.ok(criteria.some((c) => c.includes(ID_ONE) && c.includes("Issue One")));
+    assert.ok(criteria.some((c) => c.includes(ID_TWO) && c.includes("Issue Two")));
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--compact accepts several blocks at once and keeps each one's ids apart", () => {
+  const { dir } = setupTempProject(compactSeed());
+  try {
+    const payload = JSON.stringify({
+      blocks: [
+        { title: "Primo blocco", description: "La prima issue.", issue_ids: [ID_ONE] },
+        { title: "Secondo blocco", description: "La seconda issue.", issue_ids: [ID_TWO] },
+      ],
+    });
+    const data = assertOk(run(dir, ["--compact", "--issue-data", payload]));
+
+    assert.equal(data.removed, 2);
+    assert.deepEqual(
+      data.blocks.map((b) => [b.title, b.archivedCount]),
+      [["Primo blocco", 1], ["Secondo blocco", 1]]
+    );
+
+    const stored = storedIssues(dir);
+    assert.equal(stored.length, 3, "one live issue plus two block issues");
+    const first = stored.find((i) => i.id === data.blocks[0].id);
+    const second = stored.find((i) => i.id === data.blocks[1].id);
+    assert.ok(first.validation.criteria.some((c) => c.includes(ID_ONE)));
+    assert.ok(!first.validation.criteria.some((c) => c.includes(ID_TWO)));
+    assert.ok(second.validation.criteria.some((c) => c.includes(ID_TWO)));
+    assert.ok(!second.validation.criteria.some((c) => c.includes(ID_ONE)));
+
+    // Both blocks of one run share one archive file: a compaction is a single event.
+    assert.equal(archiveFiles(dir).length, 1);
+    assert.equal(JSON.parse(readFileSync(path.join(dir, ARCHIVE_SUBPATH, archiveFiles(dir)[0]), "utf8")).issues.length, 2);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("the archive is never read back: --get on an archived id is NOT_FOUND and --get-all only sees issues.json", () => {
+  const { dir } = setupTempProject(compactSeed());
+  try {
+    const data = assertOk(run(dir, ["--compact", "--issue-data", oneBlock([ID_ONE, ID_TWO])]));
+
+    assertFail(run(dir, ["--get", "--issue-id", ID_ONE]), "NOT_FOUND");
+    assertFail(run(dir, ["--get", "--issue-id", ID_TWO]), "NOT_FOUND");
+
+    const done = assertOk(run(dir, ["--get-all", "--status", "done"]));
+    assert.equal(done.totalCount, 1, "only the block issue is done now");
+    assert.equal(done.issues[0].id, data.blocks[0].id);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--compact writes .harness/.gitignore before the archive, so the directory never reaches the repository", () => {
+  const { dir } = setupTempProject(compactSeed());
+  try {
+    // ID_TWO, not ID_ONE: nothing points at ID_TWO, so a single-issue block is enough here.
+    assertOk(run(dir, ["--compact", "--issue-data", oneBlock([ID_TWO])]));
+    const gitignore = readFileSync(path.join(dir, ".harness", ".gitignore"), "utf8");
+    assert.match(gitignore, /^\*$/m, "the .harness directory must ignore itself entirely");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--compact preserves a tracker without schema_version and archives it as version 0", () => {
+  const seed = compactSeed();
+  delete seed.schema_version;
+  const { dir } = setupTempProject(seed);
+  try {
+    assertOk(run(dir, ["--compact", "--issue-data", oneBlock([ID_TWO])]));
+    assert.ok(
+      !("schema_version" in rootData(dir)),
+      "--compact must not stamp schema_version onto a file that never had it"
+    );
+    const archive = JSON.parse(readFileSync(path.join(dir, ARCHIVE_SUBPATH, archiveFiles(dir)[0]), "utf8"));
+    assert.equal(archive.schema_version, 0, "an absent key reads as version 0, and the archive says so");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("INVALID_DEPENDENCY: --compact is refused, listing the ids that point, while a live issue depends on one being archived", () => {
+  const seed = compactSeed();
+  seed.issues.find((i) => i.id === ID_THREE).depends_on = [ID_ONE];
+  const { dir } = setupTempProject(seed);
+  try {
+    const before = readFileSync(path.join(dir, "issues.json")); // Buffer, not string: compare raw bytes
+    const failure = assertFail(run(dir, ["--compact", "--issue-data", oneBlock([ID_ONE, ID_TWO])]), "INVALID_DEPENDENCY");
+
+    assert.ok(failure.error.includes(ID_THREE), "the message must name the live issue that points");
+    assert.ok(failure.error.includes(ID_ONE), "the message must name the archived id it points at");
+
+    assertNothingWritten(dir, before);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("a dependency between two issues archived in the same run is not an obstacle: only live pointers are", () => {
+  // ID_TWO depends on ID_ONE in compactSeed(); archiving both together leaves nothing dangling.
+  const { dir } = setupTempProject(compactSeed());
+  try {
+    const data = assertOk(run(dir, ["--compact", "--issue-data", oneBlock([ID_ONE, ID_TWO])]));
+    assert.equal(data.removed, 2);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("NOT_FOUND: --compact with an id that is not in the tracker writes nothing", () => {
+  const { dir } = setupTempProject(compactSeed());
+  try {
+    const before = readFileSync(path.join(dir, "issues.json"));
+    assertFail(run(dir, ["--compact", "--issue-data", oneBlock([ID_ONE, UNKNOWN_GUID])]), "NOT_FOUND");
+    assertNothingWritten(dir, before);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("INVALID_STATUS: --compact with an issue that is not done writes nothing", () => {
+  const { dir } = setupTempProject(compactSeed());
+  try {
+    const before = readFileSync(path.join(dir, "issues.json"));
+    const failure = assertFail(run(dir, ["--compact", "--issue-data", oneBlock([ID_ONE, ID_THREE])]), "INVALID_STATUS");
+    assert.ok(failure.error.includes(ID_THREE));
+    assertNothingWritten(dir, before);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("INVALID_INPUT: --compact with the same id in two blocks writes nothing", () => {
+  const { dir } = setupTempProject(compactSeed());
+  try {
+    const before = readFileSync(path.join(dir, "issues.json"));
+    const payload = JSON.stringify({
+      blocks: [
+        { title: "Primo blocco", description: "La prima issue.", issue_ids: [ID_ONE, ID_TWO] },
+        { title: "Secondo blocco", description: "Di nuovo la prima.", issue_ids: [ID_ONE] },
+      ],
+    });
+    const failure = assertFail(run(dir, ["--compact", "--issue-data", payload]), "INVALID_INPUT");
+    assert.ok(failure.error.includes(ID_ONE), "the message must name the id claimed twice");
+    assertNothingWritten(dir, before);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("INVALID_INPUT: --compact with an empty block, or no blocks at all, writes nothing", () => {
+  const { dir } = setupTempProject(compactSeed());
+  try {
+    const before = readFileSync(path.join(dir, "issues.json"));
+    const payloads = [
+      // an empty block: it would archive nothing and still write a done record
+      JSON.stringify({
+        blocks: [
+          { title: "Primo blocco", description: "La prima issue.", issue_ids: [ID_ONE] },
+          { title: "Blocco vuoto", description: "Non copre niente.", issue_ids: [] },
+        ],
+      }),
+      JSON.stringify({ blocks: [] }),
+      JSON.stringify({ blocks: "nope" }),
+      JSON.stringify({}),
+      JSON.stringify({ blocks: [{ title: "B", description: "d", issue_ids: [ID_ONE] }], extra: 1 }),
+      JSON.stringify({ blocks: [{ title: "B", description: "d", issue_ids: [ID_ONE], status: "done" }] }),
+      oneBlock([ID_ONE], { title: "   " }),
+      oneBlock([ID_ONE], { description: "" }),
+    ];
+    for (const payload of payloads) {
+      assertFail(run(dir, ["--compact", "--issue-data", payload]), "INVALID_INPUT");
+    }
+    assertNothingWritten(dir, before);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("INVALID_ID / INVALID_JSON: a malformed id or payload is refused before anything is written", () => {
+  const { dir } = setupTempProject(compactSeed());
+  try {
+    const before = readFileSync(path.join(dir, "issues.json"));
+    assertFail(run(dir, ["--compact", "--issue-data", oneBlock(["not-a-guid"])]), "INVALID_ID");
+    assertFail(run(dir, ["--compact", "--issue-data", "{not json"]), "INVALID_JSON");
+    assertNothingWritten(dir, before);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("LIMIT_EXCEEDED: a block title or description over the usual limits writes nothing", () => {
+  const { dir } = setupTempProject(compactSeed());
+  try {
+    const before = readFileSync(path.join(dir, "issues.json"));
+    assertFail(run(dir, ["--compact", "--issue-data", oneBlock([ID_ONE], { title: "T".repeat(81) })]), "LIMIT_EXCEEDED");
+    assertFail(
+      run(dir, ["--compact", "--issue-data", oneBlock([ID_ONE], { description: "D".repeat(1201) })]),
+      "LIMIT_EXCEEDED"
+    );
+    assertNothingWritten(dir, before);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("MISSING_ARGS: --compact without a payload", () => {
+  const { dir } = setupTempProject(compactSeed());
+  try {
+    const before = readFileSync(path.join(dir, "issues.json"));
+    assertFail(run(dir, ["--compact"]), "MISSING_ARGS");
+    assertNothingWritten(dir, before);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("FORBIDDEN_ROLE: a worker cannot --compact, and nothing is written", () => {
+  const { dir } = setupTempProject(compactSeed());
+  try {
+    const before = readFileSync(path.join(dir, "issues.json"));
+    assertFail(
+      runWithRole(dir, ["--compact", "--issue-data", oneBlock([ID_ONE, ID_TWO])], "worker"),
+      "FORBIDDEN_ROLE"
+    );
+    assertNothingWritten(dir, before);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--compact respects --project-dir", () => {
+  const target = setupTempProject(compactSeed());
+  const elsewhere = setupTempProject(null);
+  try {
+    const data = assertOk(
+      runFrom(elsewhere.dir, ["--compact", "--project-dir", target.dir, "--issue-data", oneBlock([ID_TWO])])
+    );
+    assert.equal(data.removed, 1);
+    assert.equal(archiveFiles(target.dir).length, 1);
+    assert.equal(
+      existsSync(path.join(elsewhere.dir, ".harness")),
+      false,
+      "the cwd must be left alone when --project-dir is given"
+    );
+    assert.equal(existsSync(path.join(elsewhere.dir, "issues.json")), false);
+  } finally {
+    cleanup(target.dir);
+    cleanup(elsewhere.dir);
+  }
+});
+
+test("--help lists --compact and the shape of its payload", () => {
+  const { dir } = setupTempProject();
+  try {
+    const result = run(dir, ["--help"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /--compact/);
+    assert.match(result.stdout, /issue_ids/);
+    assert.match(result.stdout, /archivePath/);
+  } finally {
+    cleanup(dir);
+  }
+});

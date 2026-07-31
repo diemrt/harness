@@ -16,6 +16,7 @@
 // node issue-manager.mjs --delete --issue-id <issueId>
 // node issue-manager.mjs --get-all --project-dir /path/to/project
 // node issue-manager.mjs --init
+// node issue-manager.mjs --compact --issue-data-file ./blocks.json
 
 // Machine-readable contract (stdout is always a single line of JSON):
 //   success -> {"ok":true,"data":<payload>}                      exit code 0
@@ -36,7 +37,8 @@
 // Role guard: when the HARNESS_ROLE environment variable is set to "worker", a worker process
 // cannot self-validate its own work. Any --insert/--update payload that sets
 // validation.state === "pass" or status === "done" is rejected with FORBIDDEN_ROLE. A worker may
-// still move status up to "in_review" and validation.state up to "unknown". Any other/unset
+// still move status up to "in_review" and validation.state up to "unknown". --compact is refused
+// outright under that role, because every block it writes is a done/pass record. Any other/unset
 // HARNESS_ROLE leaves behavior unchanged.
 
 // Every issue in the issues.json file should have the following structure:
@@ -74,6 +76,7 @@ import { parseArgs } from "node:util";
 import { randomUUID } from "node:crypto";
 import {
   existsSync,
+  mkdirSync,
   readFileSync,
   statSync,
   writeFileSync,
@@ -116,6 +119,14 @@ const SCHEMA_VERSION = 1;
 // version later than one that upgraded right away. --upgrade applies only the entries whose `to`
 // falls strictly after the file's current version and at most SCHEMA_VERSION — see
 // upgradeTracker() below.
+// Where --compact parks the issues it takes out of issues.json. `.harness/` is the project-local,
+// self-ignoring directory the harness already uses for state that must never reach the shared
+// repository (see scripts/harness-config.mjs), and an archive is exactly that: frozen history for
+// whoever wants to read it back, not a second tracker. Nothing in this script ever reads it —
+// --get, --get-all and the board keep seeing issues.json and nothing else.
+const HARNESS_DIR = ".harness";
+const ARCHIVE_DIR = "archive";
+
 const MIGRATIONS = [
   {
     to: 1,
@@ -627,6 +638,264 @@ function upgradeTracker() {
   writeOk({ from: fromVersion, to: SCHEMA_VERSION, migrated: touched.filter(Boolean).length });
 }
 
+// Helper: validate the --compact payload — everything that can be judged from the payload alone,
+// without reading the tracker. The shape is deliberately its own, not the issue shape validated by
+// validateIssueInput(): --compact does not describe an issue, it describes how already-closed ones
+// get grouped.
+//
+//   { "blocks": [ { "title": "…", "description": "…", "issue_ids": ["<guid>", …] } ] }
+//
+// title and description are capped by the SAME limits every other issue obeys (LIMITS.title /
+// LIMITS.description): a block becomes an issue like any other, and a summary that is allowed to
+// grow past the cap would defeat the point of compacting.
+function validateCompactInput(payload) {
+  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
+    fail(
+      "Compact data must be a JSON object of the form { blocks: [ { title, description, issue_ids } ] }.",
+      "INVALID_INPUT"
+    );
+  }
+
+  const unknownFields = Object.keys(payload).filter((f) => f !== "blocks");
+  if (unknownFields.length > 0) {
+    fail(
+      `Unknown field(s) not allowed in compact input: ${unknownFields.join(", ")}. The only allowed field is 'blocks'.`,
+      "INVALID_INPUT"
+    );
+  }
+
+  if (!Array.isArray(payload.blocks) || payload.blocks.length === 0) {
+    fail(
+      "'blocks' must be a non-empty array of { title, description, issue_ids }.",
+      "INVALID_INPUT"
+    );
+  }
+
+  // Which block claimed an id first, so a duplicate can name both ends instead of just saying
+  // "duplicate". --compact removes the original and writes a block record in its place: an id in
+  // two blocks would put the same closed issue under two summaries, and only one of them could be
+  // true.
+  const claimedBy = new Map();
+
+  payload.blocks.forEach((block, index) => {
+    if (block === null || typeof block !== "object" || Array.isArray(block)) {
+      fail(`'blocks[${index}]' must be an object with 'title', 'description' and 'issue_ids'.`, "INVALID_INPUT");
+    }
+
+    const allowedBlockFields = ["title", "description", "issue_ids"];
+    const unknownBlockFields = Object.keys(block).filter((f) => !allowedBlockFields.includes(f));
+    if (unknownBlockFields.length > 0) {
+      fail(
+        `Unknown field(s) in 'blocks[${index}]': ${unknownBlockFields.join(", ")}. Allowed fields: ${allowedBlockFields.join(", ")}.`,
+        "INVALID_INPUT"
+      );
+    }
+
+    if (isNullOrWhitespace(block.title)) {
+      fail(`'blocks[${index}].title' must be a non-empty string.`, "INVALID_INPUT");
+    }
+    validateLength(`blocks[${index}].title`, block.title, LIMITS.title);
+
+    if (isNullOrWhitespace(block.description)) {
+      fail(`'blocks[${index}].description' must be a non-empty string.`, "INVALID_INPUT");
+    }
+    validateLength(`blocks[${index}].description`, block.description, LIMITS.description);
+
+    // An empty block covers nothing and would still write a done/pass record: a summary of no
+    // history at all, which is the one thing an archive summary must never be.
+    if (!Array.isArray(block.issue_ids) || block.issue_ids.length === 0) {
+      fail(
+        `'blocks[${index}].issue_ids' must be a non-empty array of issue ids: an empty block would archive nothing and still write a 'done' record.`,
+        "INVALID_INPUT"
+      );
+    }
+
+    block.issue_ids.forEach((id, idIndex) => {
+      if (typeof id !== "string" || !GUID_RE.test(id)) {
+        fail(`'blocks[${index}].issue_ids[${idIndex}]' is not a valid issue id (GUID).`, "INVALID_ID");
+      }
+      if (claimedBy.has(id)) {
+        const first = claimedBy.get(id);
+        const where =
+          first === index
+            ? `twice in 'blocks[${index}].issue_ids'`
+            : `in both 'blocks[${first}]' and 'blocks[${index}]'`;
+        fail(`Issue '${id}' is listed ${where}. An issue can only be archived once.`, "INVALID_INPUT");
+      }
+      claimedBy.set(id, index);
+    });
+  });
+}
+
+// Helper: make sure <project>/.harness exists and ignores itself BEFORE anything is written into
+// it, so the directory is never visible to git for even a moment. Same contract as
+// scripts/harness-config.mjs: a .gitignore containing `*`, which is what keeps the project's own
+// .gitignore untouched. Only written when missing — a copy already on disk (put there by
+// harness-config, or edited by the user) is left exactly as it is.
+function ensureHarnessDir(projectDir) {
+  const harnessDir = path.join(projectDir, HARNESS_DIR);
+  mkdirSync(harnessDir, { recursive: true });
+  const gitignorePath = path.join(harnessDir, ".gitignore");
+  if (!existsSync(gitignorePath)) {
+    writeFileSync(
+      gitignorePath,
+      "# Local harness state: never committed, and never a reason to edit the project's .gitignore.\n*\n",
+      "utf8"
+    );
+  }
+  return harnessDir;
+}
+
+// Helper: pick the file this run's archive goes into. The timestamp is the same one stamped into
+// the record, with ':' swapped for '-' because a colon cannot appear in a filename on Windows.
+// Two compactions inside the same second get a numeric suffix rather than overwriting each other:
+// an archive is the only surviving copy of what it holds, so it never gets clobbered.
+function resolveArchivePath(projectDir, timestamp) {
+  const dir = path.join(projectDir, HARNESS_DIR, ARCHIVE_DIR);
+  const stamp = timestamp.replace(/:/g, "-");
+  let candidate = path.join(dir, `${stamp}.json`);
+  let suffix = 1;
+  while (existsSync(candidate)) {
+    candidate = path.join(dir, `${stamp}-${suffix}.json`);
+    suffix += 1;
+  }
+  return candidate;
+}
+
+// Function to shrink issues.json without losing what was done: the closed issues named by the
+// caller are moved, whole, into .harness/archive/<timestamp>.json, and one issue per block takes
+// their place.
+//
+// This is a PRIMITIVE: it decides no grouping. Knowing that two closed issues are "the same
+// subject" is judgement, and judgement belongs to whoever calls this — the blocks arrive already
+// decided (see validateCompactInput for the payload).
+//
+// Everything that can refuse runs before the first byte is written, in this order:
+//   1. the role guard   — no payload makes a worker's compaction legitimate, so it goes first;
+//   2. the payload      — shape, limits, empty blocks, an id claimed by two blocks;
+//   3. the tracker      — every id exists and is 'done';
+//   4. the graph        — no LIVE issue may still point at an id about to be archived.
+// Step 4 is --delete's rule, for --delete's reason: rewriting those depends_on to point at the
+// block would mutate issues the caller never named. Whoever compacts unlinks first.
+function compactTracker(compactData) {
+  // Checked before the payload is even parsed, and deliberately so: every block this command
+  // writes is a status 'done' / validation.state 'pass' record, whatever the payload says, so
+  // there is no input a worker could pass that would make the call legitimate. Refusing here
+  // names the actual reason instead of whichever payload nit happened to be found first.
+  if (process.env.HARNESS_ROLE === "worker") {
+    fail(
+      "Role 'worker' cannot run --compact: every block it writes is a 'done' issue with " +
+        "validation.state 'pass' (self-validation is forbidden). Compacting the tracker requires a " +
+        "non-worker role.",
+      "FORBIDDEN_ROLE"
+    );
+  }
+
+  const payload = parseIssueData(compactData);
+  validateCompactInput(payload);
+
+  const data = readIssuesFile();
+  const issues = Array.isArray(data.issues) ? data.issues : [];
+  const byId = new Map(issues.map((issue) => [issue.id, issue]));
+
+  const archivedIds = new Set();
+  for (const block of payload.blocks) {
+    for (const id of block.issue_ids) {
+      const issue = byId.get(id);
+      if (!issue) {
+        fail(`Issue with ID '${id}' not found.`, "NOT_FOUND");
+      }
+      // Only closed work can be summarised: an issue still moving would have its history frozen
+      // under a 'done' block while the work it describes is still going on.
+      if (issue.status !== "done") {
+        fail(
+          `Issue '${id}' has status '${issue.status}': --compact only archives issues that are 'done'.`,
+          "INVALID_STATUS"
+        );
+      }
+      archivedIds.add(id);
+    }
+  }
+
+  // A dependency between two issues that are BOTH being archived leaves with them and is no
+  // problem; only an edge from an issue that stays behind would end up dangling.
+  const dependents = issues
+    .filter((issue) => !archivedIds.has(issue.id) && Array.isArray(issue.depends_on))
+    .map((issue) => ({ id: issue.id, pointsAt: issue.depends_on.filter((id) => archivedIds.has(id)) }))
+    .filter((entry) => entry.pointsAt.length > 0);
+  if (dependents.length > 0) {
+    fail(
+      `Cannot compact: ${dependents.length} live issue(s) still declare an archived id in 'depends_on' ` +
+        `(${dependents.map((d) => `${d.id} -> ${d.pointsAt.join(", ")}`).join("; ")}). ` +
+        "Remove those ids from their 'depends_on' first: rewriting them here would mutate issues you did not name.",
+      "INVALID_DEPENDENCY"
+    );
+  }
+
+  // ---- Nothing above this line writes. Everything below does. ----
+
+  const now = nowTimestamp();
+  const projectDir = path.dirname(issuesFilePath);
+  const archivePath = resolveArchivePath(projectDir, now);
+  // Project-relative and with forward slashes: this string is what the block issue carries as
+  // evidence, and issues.json is the one file the harness shares through the repository. An
+  // absolute path from one clone means nothing in another.
+  const archiveRelPath = `${HARNESS_DIR}/${ARCHIVE_DIR}/${path.basename(archivePath)}`;
+
+  // The ORIGINAL objects, as read off disk and not rebuilt: an archive that normalised its records
+  // would be an archive of what this version of the script thinks an issue looks like, not of what
+  // was actually written.
+  const archivedIssues = payload.blocks.flatMap((block) => block.issue_ids.map((id) => byId.get(id)));
+
+  // The archive self-describes: whoever reopens it in six months must not have to guess which
+  // schema they are reading. An absent key reads as version 0, exactly as everywhere else.
+  const archiveRecord = {
+    schema_version: hasProp(data, "schema_version") ? data.schema_version : 0,
+    archived_at: now,
+    issues: archivedIssues,
+  };
+
+  const blockIssues = payload.blocks.map((block) => ({
+    id: generateNewId(),
+    title: block.title,
+    description: block.description,
+    status: "done",
+    tier: null,
+    depends_on: [],
+    validation: {
+      // The evidence of a compaction is where the originals went and what they were, so the block
+      // stays traceable back to the issues it replaced without reopening the archive to find out.
+      criteria: [
+        `Archived originals: ${archiveRelPath}`,
+        ...block.issue_ids.map((id) => `${id} - ${byId.get(id).title}`),
+      ],
+      state: "pass",
+    },
+    created_at: now,
+    updated_at: now,
+  }));
+
+  data.issues = [...issues.filter((issue) => !archivedIds.has(issue.id)), ...blockIssues];
+
+  // Write order is not arbitrary: the archive first, issues.json second. A failure while writing
+  // the archive leaves the tracker exactly as it was and loses nothing; the reverse order would
+  // put a window between "the issues are gone" and "the copy exists".
+  ensureHarnessDir(projectDir);
+  mkdirSync(path.dirname(archivePath), { recursive: true });
+  writeFileSync(archivePath, JSON.stringify(archiveRecord, null, 2) + "\n", "utf8");
+  writeIssuesFile(data);
+
+  writeOk({
+    archivePath,
+    removed: archivedIds.size,
+    blocks: blockIssues.map((issue, index) => ({
+      id: issue.id,
+      title: issue.title,
+      archivedCount: payload.blocks[index].issue_ids.length,
+    })),
+  });
+}
+
 // 1. Function to display help information
 function showHelp() {
   const lines = [
@@ -640,6 +909,7 @@ function showHelp() {
     "node issue-manager.mjs --delete --issue-id <id>",
     "node issue-manager.mjs --init",
     "node issue-manager.mjs --upgrade",
+    "node issue-manager.mjs --compact (--issue-data '<json>' | --issue-data-file <path>)",
     "",
     "Project resolution:",
     "  --project-dir <path>  directory holding issues.json (default: the current directory).",
@@ -658,6 +928,7 @@ function showHelp() {
     "Role guard: when env var HARNESS_ROLE=worker, --insert/--update requests that set",
     "status=done or validation.state=pass are rejected with FORBIDDEN_ROLE (no self-validation).",
     "A worker may still set status up to in_review and validation.state up to unknown.",
+    "--compact is refused outright under that role: every block it writes is a done/pass record.",
     "",
     "data payload per command:",
     "  --get       : the issue object",
@@ -679,6 +950,20 @@ function showHelp() {
     "                schema_version ABOVE SCHEMA_VERSION fails with SCHEMA_TOO_NEW and writes",
     "                nothing: that is an old script in front of newer data. Neither --insert nor",
     "                --update ever runs a migration on your behalf.",
+    "  --compact   : { archivePath, removed, blocks: [ { id, title, archivedCount } ] } — shrinks",
+    "                issues.json without losing history. Takes the groupings ALREADY DECIDED by the",
+    "                caller, as { blocks: [ { title, description, issue_ids } ] }; it groups",
+    "                nothing itself. Every id must exist and be 'done', no id in two blocks, no",
+    "                empty block, title/description within the usual limits. Refused with",
+    "                INVALID_DEPENDENCY, listing the ids that point, when a LIVE issue still",
+    "                declares an archived id in depends_on: unlink first, this command never",
+    "                rewrites an issue you did not name. On success the original issue objects are",
+    "                written WHOLE to <project>/.harness/archive/<timestamp>.json together with the",
+    "                schema_version they were stored under, removed from issues.json, and replaced",
+    "                by one issue per block (status done, validation.state pass, criteria carrying",
+    "                the archive path and the id + title of every issue covered). The archive is",
+    "                never read back: --get, --get-all and the board see issues.json only. Any",
+    "                refusal writes nothing at all — neither issues.json nor the archive.",
     "",
     "Passing the payload:",
     "  --issue-data-file <path>  reads the JSON from a file — no shell quoting/escaping",
@@ -890,6 +1175,7 @@ function main() {
       delete: { type: "boolean" },
       init: { type: "boolean" },
       upgrade: { type: "boolean" },
+      compact: { type: "boolean" },
       "issue-id": { type: "string" },
       "issue-data": { type: "string" },
       "issue-data-file": { type: "string" },
@@ -963,6 +1249,14 @@ function main() {
     initTracker();
   } else if (values.upgrade) {
     upgradeTracker();
+  } else if (values.compact) {
+    if (!issueData) {
+      fail(
+        "Please provide the blocks to compact in JSON format (--issue-data or --issue-data-file).",
+        "MISSING_ARGS"
+      );
+    }
+    compactTracker(issueData);
   } else {
     fail("Invalid task specified. Use '--help' for usage information.", "UNKNOWN_COMMAND");
   }

@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T16:32:08Z",
+  "last_updated": "2026-07-31T16:51:11Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1120,25 +1120,17 @@
       "id": "c112d836-b40b-478d-962d-e4672613ea08",
       "title": "--compact: archivia le done e le sostituisce coi blocchi decisi a monte",
       "description": "--compact e' la primitiva che rimpicciolisce issues.json senza perdere lo storico. Non decide i raggruppamenti: li riceve gia' fatti in --issue-data-file, come blocks: [ { title, description, issue_ids } ].\n\nValida: ogni id esiste ed e' done, nessun id compare in due blocchi, nessun blocco e' vuoto, title e description stanno nei limiti gia' in vigore.\n\nRifiuta con INVALID_DEPENDENCY se una issue viva dichiara in depends_on uno degli id da archiviare, elencando gli id che puntano. Come per --delete: riscrivere quei riferimenti muterebbe issue che il chiamante non ha nominato. Chi compatta scollega prima.\n\nArchivia gli oggetti originali interi in .harness/archive/<timestamp>.json con lo schema_version sotto cui erano scritti, li toglie da issues.json e inserisce una issue per blocco: status done, validation.state pass, criteria col path dell'archivio e la lista id + titolo coperti.\n\nSotto HARNESS_ROLE=worker rifiuta con FORBIDDEN_ROLE: scrive record done/pass. L'archivio non si rilegge: --get, --get-all e il board vedono solo issues.json.\n\ndata: { archivePath, removed, blocks: [ { id, title, archivedCount } ] }.\n\nSpec: 2026-07-31-tracker-lifecycle-commands-design.md, sezione 5.1.",
-      "status": "backlog",
+      "status": "done",
       "tier": "reasoning",
       "depends_on": [
         "9489f774-e8eb-43d7-a07b-3acb825ca456"
       ],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "Su tracker temporaneo, --compact con un blocco di N issue done: le N spariscono da issues.json e compare una issue done/pass col titolo del blocco.",
-          "Gli oggetti issue originali stanno in .harness/archive/<timestamp>.json, interi e identici a com'erano, con lo schema_version del tracker.",
-          "La issue blocco riporta in validation.criteria il path dell'archivio e id + titolo di ogni issue coperta.",
-          "--compact esce 1 con INVALID_DEPENDENCY elencando gli id che puntano, se una issue viva dipende da un id da archiviare; il file resta intatto.",
-          "--compact esce 1 senza scrivere se un id non esiste, non e' done, compare in due blocchi o un blocco e' vuoto; con HARNESS_ROLE=worker esce 1 con FORBIDDEN_ROLE.",
-          "test/plugin-issue-manager.test.mjs copre i casi sopra su directory temporanea; references/issues.md documenta --compact e l'archivio.",
-          "npm run test esce 0 e issues.json alla radice non e' stato compattato per prova."
-        ]
+        "state": "pass",
+        "criteria": "Verifica indipendente con probe propri su directory temporanee (mkdtemp, mai la radice del repo): 79/79 + 25/25 + 4/4 asserzioni proprie verdi. (1) Blocco di 2 done su tracker temporaneo: le due spariscono da issues.json, resta la issue viva, compare la issue blocco status=done validation.state=pass col titolo del blocco, tier=null, depends_on=[]. (2) Archivio .harness/archive/2026-07-31T16-47-29Z.json: JSON.stringify(originale)===JSON.stringify(archiviato) incluse le chiavi sconosciute allo script (weird_key, legacy_note) e l'ordine dei campi; schema_version=1 col tracker a 1, schema_version=0 col tracker senza la chiave (e la chiave non viene aggiunta al tracker). (3) criteria del blocco: ['Archived originals: .harness/archive/<file>.json', '<id> - Alpha work', '<id> - Beta work'] - path archivio + id E titolo di ogni issue coperta, corretti anche con 2 blocchi nello stesso giro (nessun id sconfina fra blocchi). (4) INVALID_DEPENDENCY: exit 1, messaggio 'Cannot compact: 2 live issue(s)... (live1 -> a; live2 -> b, a)' con tutti gli id che puntano e i bersagli; Buffer.compare(before,after)===0 su issues.json e nessuna .harness/ creata. Dipendenza fra due issue archiviate nello stesso giro: accettata. (5) Ogni rifiuto exit 1 con sha256 di issues.json invariato, mtime invariato e .harness/ inesistente: NOT_FOUND (id inesistente), INVALID_STATUS (issue in_progress), INVALID_INPUT (id in due blocchi / due volte nello stesso / blocco vuoto / blocks vuoto / blocks assente / campo sconosciuto), LIMIT_EXCEEDED (title 81, description 1201), INVALID_ID (guid non valido), MISSING_ARGS (senza payload), FORBIDDEN_ROLE con HARNESS_ROLE=worker (anche con payload malformato: il role guard e' il primo controllo). (6) Archivio mai riletto: --get su id archiviato -> NOT_FOUND, --get-all su tutti e 5 gli status non restituisce mai gli oggetti archiviati (compaiono solo come testo nei criteria del blocco, che e' il contratto). data = { archivePath (assoluto), removed, blocks: [ { id, title, archivedCount } ] }, chiavi esatte. .harness/.gitignore preesistente NON sovrascritto (contenuto custom intatto), creato con '*' quando assente; due compattazioni nello stesso secondo -> file con suffisso -1, il primo archivio resta intatto. (7) Gate .harness/config.json 'npm run test': exit 0, tests 219 / pass 219 / fail 0. test/plugin-issue-manager.test.mjs: 19 test nuovi su setupTempProject (temp dir), inclusi archivio intero, criteria, INVALID_DEPENDENCY, i rifiuti con assertNothingWritten, FORBIDDEN_ROLE, --project-dir e --help. skills/harness/references/issues.md: sezione '## --compact' con payload, ordine dei rifiuti, archivio, tabelle data/code aggiornate. Danni collaterali: git status --short mostra solo issues.json, scripts/issue-manager.mjs, skills/harness/references/issues.md, test/plugin-issue-manager.test.mjs; git diff -- issues.json = sola transizione backlog->in_review + updated_at/last_updated; nessuna .harness/archive/ nella radice del repo e .harness/.gitignore invariato (95 byte, mtime 29 lug, precedente al lavoro)."
       },
       "created_at": "2026-07-31T15:51:51Z",
-      "updated_at": "2026-07-31T15:51:51Z"
+      "updated_at": "2026-07-31T16:51:11Z"
     },
     {
       "id": "cef2fd42-dd16-4400-8ddb-4ff9607778d4",
