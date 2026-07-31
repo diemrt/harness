@@ -1,7 +1,33 @@
 # Board: dipendenze fra issue e vista a grafo
 
 Data: 2026-07-30
-Stato: approvato in brainstorming, da pianificare
+Stato: **sezioni 1-3 costruite e verificate; sezioni 4-10 ritirate il 2026-07-31**
+
+> **Nota di ritiro (2026-07-31).**
+>
+> Le **sezioni 1, 2 e 3** sono state costruite e verificate: il campo `depends_on`, il codice
+> `INVALID_DEPENDENCY` con la guardia sui cicli e sul `--delete`, e le regole nella skill.
+> Restano il record di ciò che esiste davvero e vanno lette come tali.
+>
+> Le **sezioni da 4 a 10** — quattro route statiche, lo split in `board.css`/`board.js`/
+> `board-graph.mjs`, il restyle senza CDN, il layering del DAG, la vista a grafo, il chain
+> lens, il drawer, il pan/zoom — descrivono un board che non si sta più costruendo. Il lavoro
+> era arrivato fino alla vista a grafo funzionante ed è conservato per intero sul branch
+> **`backup/board-improv-2026-07-31`**, non cancellato.
+>
+> Non si è fermato per un difetto tecnico: si è fermato perché ogni passo apriva un ventaglio
+> di scelte di interfaccia più largo del precedente — pan/zoom, densità, temi, scorciatoie —
+> e nessuna di quelle scelte era ancora sostenuta da un bisogno visto all'uso. Lo spec
+> descriveva una destinazione decisa in un colpo solo, quando il dato (`depends_on`) era stato
+> tracciato da un giorno.
+>
+> Al suo posto si riparte dal pezzo più piccolo che rende utile quel dato:
+> [`2026-07-31-depends-on-card-design.md`](2026-07-31-depends-on-card-design.md).
+>
+> Conseguenza da non perdere: il ritiro del §3 sulla proposal `board-minimal.html` **cade
+> insieme al resto**. Quella proposal si ritirava perché la sua impostazione senza dipendenze
+> entrava in `board.css`; senza il restyle, la pagina torna a caricare le librerie da CDN e la
+> proposal torna a essere la questione aperta che era.
 
 ## Problema
 

@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T13:35:25Z",
+  "last_updated": "2026-07-31T13:38:54Z",
   "rules": {
     "single_active_issue": false
   },
@@ -984,23 +984,15 @@
       "id": "97b9d3ee-9d74-4463-b90f-7c1357a1c6d5",
       "title": "spec: ritiro del board a grafo e design nuovo della card dipendenze",
       "description": "Allinea gli spec alla rotta presa oggi, senza cancellare il record di cio' che e' stato davvero costruito.\n\ndocs/superpowers/specs/2026-07-30-board-workflow-design.md resta al suo posto: le sezioni 1-3 documentano il campo depends_on, la validazione del grafo e le regole nella skill, tutto costruito e verificato. Le sezioni 4-10 descrivono un board a grafo che non si fa piu': quattro route statiche, board.css/board.js/board-graph.mjs, layering del DAG, chain lens, drawer, pan/zoom. Vanno marcate come ritirate da una nota in testa al documento, che dice dove il lavoro e' finito (branch backup/board-improv-2026-07-31) e perche' si e' fermato, invece di essere riscritte o rimosse.\n\nAl loro posto uno spec nuovo e datato per il lavoro di oggi, che e' molto piu' piccolo: una card fra titolo e description che elenca gli id delle dipendenze come chip cliccabili, con salto per ancora HTML ed evidenziazione via :target. Il design e' gia' stato deciso in brainstorming, questo lavoro lo mette su file.\n\nSolo documentazione: nessuno script cambia.",
-      "status": "backlog",
+      "status": "done",
       "tier": "economy",
       "depends_on": [],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "2026-07-30-board-workflow-design.md porta in testa una nota che marca le sezioni 4-10 come ritirate e nomina il branch di backup.",
-          "Le sezioni 1-3 di quello spec restano intatte: descrivono depends_on, che e' stato costruito e verificato.",
-          "Esiste docs/superpowers/specs/2026-07-31-depends-on-card-design.md con il design della card approvato in brainstorming.",
-          "Lo spec nuovo descrive la funzione pura, i due rami del chip, il salto per ancora e l'evidenziazione :target.",
-          "Lo spec nuovo dichiara fuori scope l'arco inverso, qualsiasi vista o filtro nuovo e le scritture dal board.",
-          "Nessun file fuori da docs/ e' modificato dal diff della issue.",
-          "npm run test passa."
-        ]
+        "state": "pass",
+        "criteria": "1) Nota di ritiro in testa a 2026-07-30-board-workflow-design.md (righe 4-30 del file nuovo): riga Stato riscritta in 'sezioni 1-3 costruite e verificate; sezioni 4-10 ritirate il 2026-07-31' e blockquote che elenca 4-10 (route, board.css/board.js/board-graph.mjs, layering DAG, grafo, chain lens, drawer, pan/zoom) e nomina il branch backup/board-improv-2026-07-31; 'git branch --list backup/*' conferma che il branch esiste. 2) 'git diff' su quel file ha un solo hunk, @@ -1,7 +1,33 @@ (27 ins / 1 del): sezioni 1 (depends_on), 2 (INVALID_DEPENDENCY) e 3 (regole skill) byte-identiche. 3) docs/superpowers/specs/2026-07-31-depends-on-card-design.md presente (untracked, 133 righe). 4) Lo spec nuovo ha la funzione pura renderDependsOn(dependsOn, visibleIds, titleById) con motivazione dei tre argomenti (sez.1), i due rami del chip <a> vs <span> inerte con la regola visibleIds.has(id) (sez.2-3), il salto per ancora id=issue-<guid> senza JS e .issue-card:target (sez.4). 5) Sezione 'Fuori scope' (righe 126-132) dichiara l'arco inverso, qualsiasi vista/filtro/toggle nuovo e qualsiasi scrittura dal board. 6) 'git status --short' mostra solo i due file sotto docs/ piu' issues.json, il cui diff e' esclusivamente status backlog->in_review, updated_at e last_updated di questa issue. 7) Gate 'npm run test' da .harness/config.json: tests 175, pass 175, fail 0, duration 7489ms. Working tree invariato dopo il gate."
       },
       "created_at": "2026-07-31T13:34:04Z",
-      "updated_at": "2026-07-31T13:34:04Z"
+      "updated_at": "2026-07-31T13:38:54Z"
     },
     {
       "id": "7bb64095-5ab6-496c-817b-bb97562fa7bd",
