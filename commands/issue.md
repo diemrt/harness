@@ -1,6 +1,6 @@
 ---
 description: Operazioni sul tracker harness — elenca le issue per stato, creane una nuova, aggiornane una esistente. Senza argomenti mostra lo stato del tracker.
-argument-hint: "[list <stato> | show <id> | new <descrizione> | update <id> <modifica>]"
+argument-hint: "[list <stato> | show <id> | new <descrizione> | update <id> <modifica> | init]"
 allowed-tools: Bash, Read, Write
 ---
 
@@ -77,6 +77,11 @@ impostare mai `validation.state` a `pass`: la chiusura spetta a un agente divers
 svolto il lavoro, e si lancia con `/harness:verify`. Il worker arriva al massimo a
 `in_review` con `state` a `unknown`; oltre, con `HARNESS_ROLE=worker`, la CLI rifiuta con
 `FORBIDDEN_ROLE`.
+
+## `init` → crea il tracker
+
+`--init`, `data: { path, created: true }`; file già esistente → `ALREADY_EXISTS`, nessuna
+scrittura.
 
 ## Errori
 

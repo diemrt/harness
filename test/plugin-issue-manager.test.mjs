@@ -1452,3 +1452,86 @@ test("--update preserves a schema_version that differs from this script's own SC
     cleanup(dir);
   }
 });
+
+// ---------------------------------------------------------------------------
+// --init — creates issues.json with the minimal seed, and never overwrites an existing one
+// ---------------------------------------------------------------------------
+
+const SCHEMA_VERSION = 1; // mirrors the constant in scripts/issue-manager.mjs
+
+test("--init in a directory without issues.json creates it and reports created:true", () => {
+  const { dir } = setupTempProject(null);
+  try {
+    const issuesPath = path.join(dir, "issues.json");
+    assert.equal(existsSync(issuesPath), false, "the fixture must start without the file");
+
+    const data = assertOk(run(dir, ["--init"]));
+    assert.equal(data.created, true);
+    assert.equal(data.path, issuesPath);
+    assert.equal(existsSync(issuesPath), true, "--init must create the file");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--init writes the minimal seed: schema_version at SCHEMA_VERSION, empty issues, last_updated set", () => {
+  const { dir } = setupTempProject(null);
+  try {
+    assertOk(run(dir, ["--init"]));
+    const stored = rootData(dir);
+    assert.equal(stored.schema_version, SCHEMA_VERSION);
+    assert.deepEqual(stored.issues, []);
+    assert.equal(typeof stored.last_updated, "string");
+    assert.ok(stored.last_updated.length > 0);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("ALREADY_EXISTS: --init where issues.json already exists writes nothing, byte for byte", () => {
+  const { dir } = setupTempProject(); // seeded with baseSeed()
+  try {
+    const issuesPath = path.join(dir, "issues.json");
+    const before = readFileSync(issuesPath); // Buffer, not string: compare raw bytes
+
+    const result = run(dir, ["--init"]);
+    assertFail(result, "ALREADY_EXISTS");
+
+    const after = readFileSync(issuesPath);
+    assert.ok(before.equals(after), "the pre-existing file must be untouched byte for byte");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--init respects --project-dir", () => {
+  const target = setupTempProject(null);
+  const elsewhere = setupTempProject(null);
+  try {
+    const targetIssuesPath = path.join(target.dir, "issues.json");
+    const result = runFrom(elsewhere.dir, ["--init", "--project-dir", target.dir]);
+    const data = assertOk(result);
+    assert.equal(data.path, targetIssuesPath);
+    assert.equal(existsSync(targetIssuesPath), true);
+    assert.equal(
+      existsSync(path.join(elsewhere.dir, "issues.json")),
+      false,
+      "the cwd must be left alone when --project-dir is given"
+    );
+  } finally {
+    cleanup(target.dir);
+    cleanup(elsewhere.dir);
+  }
+});
+
+test("--help lists --init among the commands", () => {
+  const { dir } = setupTempProject();
+  try {
+    const result = run(dir, ["--help"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /--init/);
+    assert.match(result.stdout, /ALREADY_EXISTS/);
+  } finally {
+    cleanup(dir);
+  }
+});

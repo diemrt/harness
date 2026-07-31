@@ -14,7 +14,7 @@ Lo script vive nel plugin, i dati nel progetto. `issues.json` viene risolto cont
 - `--project-dir <path>`: override esplicito, quando non controlli la cwd.
 
 Un progetto senza `issues.json` si legge come tracker vuoto (nessun errore, nessun file
-creato). Il file nasce al **primo `--insert`**.
+creato). Il file nasce al **primo `--insert`**, oppure di proposito con `--init` (sotto).
 
 ## `schema_version`
 
@@ -27,9 +27,8 @@ la costante `SCHEMA_VERSION` (oggi `1`).
   funzionare — stessa scelta già fatta per `tier` e per `depends_on`.
 - **il writer preserva quello che trova.** Se il file ha `schema_version`, ogni scrittura
   (`--insert`, `--update`, `--delete`) lo riscrive identico; se non ce l'ha, non lo aggiunge.
-  Comandi come `--init` e `--upgrade` — che scrivono deliberatamente quel campo — non fanno
-  parte di questa CLI: finché non esistono, `schema_version` non compare mai su un file che non
-  lo aveva già.
+  Solo `--init` scrive deliberatamente quel campo, in un file che prima non esisteva —
+  `--upgrade`, non ancora parte di questa CLI, farà lo stesso su un file già presente.
 
 ## Comandi
 
@@ -56,6 +55,9 @@ node "$SCRIPTS/issue-manager.mjs" --delete --issue-id <id>
 
 # operare su un altro progetto
 node "$SCRIPTS/issue-manager.mjs" --get-all --project-dir /path/to/project
+
+# creare issues.json di proposito, col seed minimo (rifiuta se il file esiste già)
+node "$SCRIPTS/issue-manager.mjs" --init
 ```
 
 L'id di una issue creata si legge da `.data.id` della risposta, **non** dal testo del
@@ -71,6 +73,24 @@ $id = (node "$SCRIPTS/issue-manager.mjs" --insert --issue-data-file .\new-issue.
 ```
 
 Un `"validation": null` **esplicito** azzera la validazione; ometterlo la lascia invariata.
+
+## `--init`
+
+Crea `issues.json` nella directory del progetto (default cwd, o `--project-dir`) col seed
+minimo:
+
+```json
+{ "schema_version": 1, "last_updated": "<datetime>", "issues": [] }
+```
+
+`schema_version` vale la costante `SCHEMA_VERSION` dello script (oggi `1`).
+
+**Se il file esiste già, rifiuta con `ALREADY_EXISTS` e non scrive niente** — il file
+preesistente resta identico byte per byte. Nessun flag di conferma o `--force`: un `--init` che
+sovrascrive è un `--init` che cancella un tracker vivo, e chi vuole ripartire da zero rimuove il
+file a mano, esplicitamente.
+
+`data`: `{ path, created: true }`.
 
 ## Paginazione
 
@@ -103,6 +123,7 @@ eccezione: testo semplice). Su stderr non viene scritto nulla.
 | `--insert` | l'issue creata (con `id`) |
 | `--update` | l'issue aggiornata |
 | `--delete` | `{ id, deleted }` |
+| `--init` | `{ path, created: true }` |
 
 | Parametro | Uso |
 |---|---|
@@ -250,6 +271,7 @@ Il `code` è stabile: usalo per la logica, il messaggio è per gli umani.
 | `MISSING_ARGS` | flag richiesto assente, o `--issue-data` e `--issue-data-file` insieme |
 | `UNKNOWN_COMMAND` | nessun comando riconosciuto (vedi `--help`) |
 | `FORBIDDEN_ROLE` | con `HARNESS_ROLE=worker`, tentativo di impostare `status=done` o `validation.state=pass` |
+| `ALREADY_EXISTS` | `--init` quando `issues.json` esiste già: rifiutato, niente viene scritto |
 
 `FORBIDDEN_ROLE` è il guard tecnico contro la self-validation: un processo lanciato con
 `HARNESS_ROLE=worker` non può chiudere la propria issue, può arrivare al massimo a

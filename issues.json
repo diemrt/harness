@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T16:07:59Z",
+  "last_updated": "2026-07-31T16:20:18Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1112,25 +1112,17 @@
       "id": "0f0374ce-6c87-485a-9554-c07d8afa854d",
       "title": "--init: crea issues.json col seed minimo, senza mai sovrascriverlo",
       "description": "Oggi issues.json nasce solo al primo --insert: non c'e' modo di crearlo di proposito su un progetto nuovo.\n\n--init lo crea nella directory del progetto col seed minimo { schema_version, last_updated, issues: [] }, dove schema_version vale SCHEMA_VERSION.\n\nSe il file esiste gia', rifiuta con il code nuovo ALREADY_EXISTS e non scrive niente. Un init che sovrascrive e' un init che cancella un tracker vivo, e nessun flag di conferma vale quel rischio: chi vuole ripartire da zero rimuove il file a mano, esplicitamente.\n\nRispetta --project-dir come tutti gli altri comandi dello script.\n\ndata: { path, created: true }.\n\nSpec: docs/superpowers/specs/2026-07-31-tracker-lifecycle-commands-design.md, sezione 4.",
-      "status": "backlog",
-      "tier": "economy",
+      "status": "done",
+      "tier": "standard",
       "depends_on": [
         "9489f774-e8eb-43d7-a07b-3acb825ca456"
       ],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "--init in una directory temporanea senza issues.json lo crea e risponde ok:true con data.created true e data.path del file creato.",
-          "Il file creato ha schema_version pari a SCHEMA_VERSION, issues array vuoto e last_updated valorizzato.",
-          "--init dove issues.json esiste gia' esce 1 con code ALREADY_EXISTS e lascia il file esistente identico byte per byte.",
-          "--init rispetta --project-dir, e --help lo elenca fra i comandi.",
-          "test/plugin-issue-manager.test.mjs copre i tre casi sopra su directory temporanea.",
-          "references/issues.md documenta --init e il code ALREADY_EXISTS; commands/issue.md documenta l'argomento init.",
-          "npm run test esce 0."
-        ]
+        "state": "pass",
+        "criteria": "Verificati tutti i 7 criteri. (1) Probe manuale in dir vuota via --project-dir: {\"ok\":true,\"data\":{\"path\":\".../probe_empty/issues.json\",\"created\":true}}. (2) Contenuto scritto: {schema_version:1, last_updated:\"2026-07-31T16:19:41Z\", issues:[]} — schema_version = SCHEMA_VERSION (1), issues array vuoto, last_updated valorizzato. (3) Probe su file esistente: md5 identico prima/dopo (7adb4c45b82860cf9fc01eb9f844d5a3), risposta {\"ok\":false,\"code\":\"ALREADY_EXISTS\"}, exit 1; test 'ALREADY_EXISTS: --init where issues.json already exists writes nothing, byte for byte' confronta Buffer via readFileSync (non JSON riparsato) — test/plugin-issue-manager.test.mjs righe ~1490-1503. (4) --project-dir rispettato: test 'test --init respects --project-dir' passa; probe manuale conferma path risolto nella dir target e nessun file creato nella cwd. --help elenca 'node issue-manager.mjs --init' e ALREADY_EXISTS (verificato con grep sull'output reale). (5) test/plugin-issue-manager.test.mjs aggiunge 5 test nuovi che coprono creazione, seed, ALREADY_EXISTS byte-per-byte, --project-dir, --help — tutti verdi. (6) skills/harness/references/issues.md ha sezione '## --init' con seed, schema_version, comportamento ALREADY_EXISTS, tabella data e tabella codici errore aggiornate; commands/issue.md ha sezione '## init' con argument-hint aggiornato. (7) Gate .harness/config.json verify='npm run test' eseguito: 192/192 pass, exit 0 (confermato due volte). git diff -- issues.json mostra solo transizioni di stato/tier/timestamp per questa issue via CLI, nessuna modifica manuale. Nessun probe ha toccato issues.json del repo (sempre --project-dir su scratchpad temporaneo, poi rimosso)."
       },
       "created_at": "2026-07-31T15:51:13Z",
-      "updated_at": "2026-07-31T15:51:13Z"
+      "updated_at": "2026-07-31T16:20:18Z"
     },
     {
       "id": "c112d836-b40b-478d-962d-e4672613ea08",

@@ -15,6 +15,7 @@
 // node issue-manager.mjs --update --issue-id <issueId> --issue-data '<json>'
 // node issue-manager.mjs --delete --issue-id <issueId>
 // node issue-manager.mjs --get-all --project-dir /path/to/project
+// node issue-manager.mjs --init
 
 // Machine-readable contract (stdout is always a single line of JSON):
 //   success -> {"ok":true,"data":<payload>}                      exit code 0
@@ -25,7 +26,7 @@
 //
 // Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_TIER, INVALID_DEPENDENCY,
 //              INVALID_INPUT, INVALID_JSON, LIMIT_EXCEEDED, NOT_FOUND, FILE_NOT_FOUND,
-//              MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE.
+//              MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE, ALREADY_EXISTS.
 //
 // Length limits: title and description are capped (see LIMITS) so an issue stays readable by a
 // human instead of turning into an untitled document. Over the cap the payload is rejected with
@@ -101,11 +102,11 @@ const TIERS = ["economy", "standard", "reasoning"];
 
 // The schema this script currently implements, i.e. the shape documented in references/issues.md.
 // A tracker declares which version it was written against via the root-level `schema_version` key,
-// sitting next to `last_updated`. Only --init and --upgrade (not implemented by this script yet)
-// ever WRITE that key; every other command here only reads issues.json and rewrites it unchanged
-// on the fields it does not own — see writeIssuesFile(). An absent key reads as version 0, and that
-// is not an error: it is the same choice already made for `tier` and `depends_on`, a new field
-// never invalidates data written before it existed.
+// sitting next to `last_updated`. Only --init and --upgrade (--upgrade not implemented by this
+// script yet) ever WRITE that key; every other command here only reads issues.json and rewrites it
+// unchanged on the fields it does not own — see writeIssuesFile(). An absent key reads as version 0,
+// and that is not an error: it is the same choice already made for `tier` and `depends_on`, a new
+// field never invalidates data written before it existed.
 const SCHEMA_VERSION = 1;
 
 // Helper: exception carrying the failure envelope fields, thrown by any validator/reader and
@@ -514,7 +515,8 @@ function readIssuesFile() {
 // actually owns (issues, last_updated here). Any other root key found on disk — schema_version
 // included — rides along untouched: this function never enumerates or filters root keys, so a
 // file that has schema_version gets it back byte-for-byte, and a file that does not have it never
-// gets one added. Only --init and --upgrade (not this script, yet) are meant to write that key.
+// gets one added. Only --init and --upgrade (--upgrade not this script, yet) are meant to write
+// that key.
 function writeIssuesFile(data) {
   data.last_updated = nowTimestamp();
   const serialized = JSON.stringify(data, null, 2);
@@ -522,6 +524,22 @@ function writeIssuesFile(data) {
   const tmpPath = path.join(dir, `.issues.json.${process.pid}.${Date.now()}.tmp`);
   writeFileSync(tmpPath, serialized, "utf8");
   renameSync(tmpPath, issuesFilePath);
+}
+
+// Function to create a brand new issues.json in the project directory, seeded minimally.
+// Refuses outright when the file already exists: an --init that overwrote it would be an --init
+// that erases a live tracker, and no confirmation flag is worth that risk — starting over is a
+// deliberate `rm` by the caller, not a flag on this command. Nothing is written on that path.
+function initTracker() {
+  if (existsSync(issuesFilePath)) {
+    fail(
+      `'${issuesFilePath}' already exists. Remove it yourself if you want to start over; --init never overwrites.`,
+      "ALREADY_EXISTS"
+    );
+  }
+  const data = { schema_version: SCHEMA_VERSION, last_updated: nowTimestamp(), issues: [] };
+  writeIssuesFile(data);
+  writeOk({ path: issuesFilePath, created: true });
 }
 
 // 1. Function to display help information
@@ -535,6 +553,7 @@ function showHelp() {
     "node issue-manager.mjs --insert (--issue-data '<json>' | --issue-data-file <path>)",
     "node issue-manager.mjs --update --issue-id <id> (--issue-data '<json>' | --issue-data-file <path>)",
     "node issue-manager.mjs --delete --issue-id <id>",
+    "node issue-manager.mjs --init",
     "",
     "Project resolution:",
     "  --project-dir <path>  directory holding issues.json (default: the current directory).",
@@ -548,7 +567,7 @@ function showHelp() {
     "",
     "Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_TIER, INVALID_DEPENDENCY,",
     "             INVALID_INPUT, INVALID_JSON, LIMIT_EXCEEDED, NOT_FOUND, FILE_NOT_FOUND,",
-    "             MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE",
+    "             MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE, ALREADY_EXISTS",
     "",
     "Role guard: when env var HARNESS_ROLE=worker, --insert/--update requests that set",
     "status=done or validation.state=pass are rejected with FORBIDDEN_ROLE (no self-validation).",
@@ -563,6 +582,9 @@ function showHelp() {
     "  --insert    : the created issue object (read .data.id for the new GUID)",
     "  --update    : the updated issue object",
     "  --delete    : { id, deleted }",
+    "  --init      : { path, created: true } — creates issues.json with the minimal seed",
+    "                { schema_version, last_updated, issues: [] }. Fails with ALREADY_EXISTS and",
+    "                writes nothing if the file is already there: remove it yourself to start over.",
     "",
     "Passing the payload:",
     "  --issue-data-file <path>  reads the JSON from a file — no shell quoting/escaping",
@@ -772,6 +794,7 @@ function main() {
       insert: { type: "boolean" },
       update: { type: "boolean" },
       delete: { type: "boolean" },
+      init: { type: "boolean" },
       "issue-id": { type: "string" },
       "issue-data": { type: "string" },
       "issue-data-file": { type: "string" },
@@ -841,6 +864,8 @@ function main() {
       fail("Please provide an issue ID to delete.", "MISSING_ARGS");
     }
     deleteIssue(issueId);
+  } else if (values.init) {
+    initTracker();
   } else {
     fail("Invalid task specified. Use '--help' for usage information.", "UNKNOWN_COMMAND");
   }
