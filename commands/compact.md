@@ -21,11 +21,17 @@ separati i comandi dallo schema"). Nessun argomento: proponi i blocchi su tutte 
 ## 1. Leggi le issue done
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --get-all --status done --page-size 50
+node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --get-all --status done --page-size 50 | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log('totalCount '+j.data.totalCount);for(const i of j.data.issues)console.log(i.id.slice(0,8)+' | '+i.title)})"
 ```
 
-Scorri tutte le pagine se `totalCount` supera quanto mostrato. Meno di due issue `done` →
-dillo e fermati: non c'è niente da compattare.
+**Proietta id e titolo prima che l'output arrivi in contesto.** `--get-all` restituisce
+l'oggetto issue intero, description e criteri di validazione compresi: su questo repository
+sono stati 162.5KB per 88 issue, di cui la proposta usa due campi. Senza proiezione il comando
+si strozza proprio sui tracker grandi, cioè dove compattare serve di più.
+
+Scorri tutte le pagine con `--page <n>` se `totalCount` supera quanto mostrato: la proiezione
+toglie campi, non issue. Meno di due issue `done` → dillo e fermati: non c'è niente da
+compattare.
 
 ## 2. Proponi i blocchi
 

@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-03T07:33:06Z",
+  "last_updated": "2026-08-03T08:12:45Z",
   "rules": {
     "single_active_issue": false
   },
@@ -239,22 +239,15 @@
       "id": "f0b83088-eb29-4e3e-8ebc-7f43a316befc",
       "title": "/harness:compact legge le issue intere per usarne solo id e titolo",
       "description": "Il passo 1 di commands/compact.md prescrive `--get-all --status done --page-size 50` e basta. Su questo repository, alla prima invocazione reale, quella chiamata ha restituito 162.5KB per 88 issue: l'oggetto issue intero, description e criteri di validazione compresi.\n\nDi tutto quel testo la proposta usa due campi, id e titolo. Il resto entra nel contesto della sessione, lo consuma e non cambia il raggruppamento di una virgola. Su un tracker piu' grande il comando diventa inservibile proprio quando compattare serve di piu'.\n\nIl passo 1 va riscritto perche' proietti id e titolo prima che l'output arrivi in contesto (una pipe `node -e` che stampa una riga per issue, sulla falsariga di quella gia' usata nel documento per leggere `.data.id` da un insert), spiegando in una riga perche': non e' una micro-ottimizzazione, e' la differenza fra un comando che scala e uno che no.\n\nResta invariato l'obbligo di scorrere tutte le pagine quando `totalCount` supera quanto mostrato: la proiezione riduce le colonne, non le righe.\n\nEmersa dalla verifica della issue che ha introdotto il comando, e giudicata fuori dai suoi criteri di accettazione.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "Il passo 1 di commands/compact.md prescrive una lettura che porta in contesto solo id e titolo delle issue done, non l'oggetto issue intero.",
-          "Il documento dice in una riga perche' la proiezione serve, citando il costo reale della lettura non proiettata.",
-          "Il documento continua a imporre di scorrere tutte le pagine quando totalCount supera quanto mostrato.",
-          "test/plugin-commands.test.mjs asserisce la prescrizione nuova sul corpo del documento.",
-          "Il comando e' stato invocato in una sessione reale di questo repository dopo il riavvio, come impone CLAUDE.md, e la lettura del passo 1 non porta in contesto description e criteri.",
-          "npm run test esce 0."
-        ]
+        "criteria": "Tutti e sei i criteri soddisfatti. (1)(2)(3) commands/compact.md passo 1: la lettura e' ora `--get-all ... --page-size 50 | node -e '...'` che stampa solo `totalCount` e per ogni issue `id.slice(0,8) | title` (verificato riproducendo la pipe su una copia di issues.json in dir temporanea con --project-dir: totalCount 8 seguito da 8 righe id|titolo, nessuna description/criteri in output); il documento spiega in una riga il motivo citando il costo reale (\"162.5KB per 88 issue, di cui la proposta usa due campi\"); resta l'obbligo di scorrere le pagine (\"Scorri tutte le pagine con --page <n> se totalCount supera quanto mostrato\"). (4) test/plugin-commands.test.mjs aggiunge 'the compact command projects id and title when it reads the done issues' che asserisce la pipe (`| node -e`), la presenza di `.title` e di `--page` nel corpo del documento. (5) Invocazione live riportata dall'orchestratore: dopo il riavvio della sessione /harness:compact ha servito il passo 1 aggiornato, output totalCount 8 + 8 righe id|titolo, nessuna description/criterio in contesto, risparmio 14810 -> 450 byte sulle stesse 8 issue done; presa come dato non ispezionabile dai file. (6) `npm run test` nella root esce 0: 221/221 pass, incluso il nuovo test ('the compact command projects id and title when it reads the done issues', pass). Danni collaterali: git status --short mostra solo commands/compact.md, issues.json (solo il cambio di stato di questa issue, confermato da git diff) e test/plugin-commands.test.mjs modificati; nessun file untracked. Nessun file toccato dal verificatore oltre alla chiusura di questa issue; il probe di riproduzione della pipe e' stato eseguito su una copia di issues.json in una directory temporanea con --project-dir esplicito.",
+        "state": "pass"
       },
       "created_at": "2026-08-03T07:33:06Z",
-      "updated_at": "2026-08-03T07:33:06Z"
+      "updated_at": "2026-08-03T08:12:45Z"
     }
   ]
 }

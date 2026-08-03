@@ -180,6 +180,32 @@ test("the compact command waits for confirmation before calling the primitive", 
   );
 });
 
+test("the compact command projects id and title when it reads the done issues", () => {
+  // --get-all hands back whole issue objects — 162.5KB for 88 issues on this repository — of
+  // which the proposal uses two fields. Reading them unprojected starves the very sessions
+  // that most need compacting.
+  const content = body(read("compact"));
+  const readStep = content
+    .split("\n")
+    .find((line) => line.includes("--get-all") && line.includes("--status done"));
+  assert.ok(readStep, "commands/compact.md must show how to read the done issues");
+  assert.match(
+    readStep,
+    /\|\s*node -e/,
+    "the read must be piped through a projection, not dumped whole into context"
+  );
+  assert.match(
+    readStep,
+    /\.title/,
+    "the projection must keep the title: the grouping is judged on it"
+  );
+  assert.match(
+    content,
+    /--page\b/,
+    "projecting fields must not drop the duty to walk every page"
+  );
+});
+
 test("the README documents the commands under the names the plugin ships", () => {
   const readme = readFileSync(path.join(rootDir, "README.md"), "utf8");
   const documented = new Set(
