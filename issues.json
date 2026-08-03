@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-03T08:42:22Z",
+  "last_updated": "2026-08-03T08:48:21Z",
   "rules": {
     "single_active_issue": false
   },
@@ -262,6 +262,20 @@
       },
       "created_at": "2026-08-03T08:23:46Z",
       "updated_at": "2026-08-03T08:42:22Z"
+    },
+    {
+      "id": "2f76be67-521f-425c-b6f7-1fe41c72c321",
+      "title": "docs: verifica documentazione per commit cbde0b2",
+      "description": "Gate documentale sul commit cbde0b2, che tocca scripts/harness-config.mjs e scripts/issue-manager.mjs (file di codice secondo docsGate.include).\n\nIl commit ha gia' riscritto README.md, skills/harness/SKILL.md e le reference config.md, git.md, issues.md, e la verifica indipendente della issue 63406cce ha confermato che nessuna delle promesse vecchie e' sopravvissuta. Questa issue non ripete quel lavoro: controlla il perimetro che quella non copriva.\n\nDa guardare: il testo di --help dei due script, i commenti di testa che descrivono cosa harness scrive nel progetto, agents/ e commands/ (che parlano del tracker e potrebbero ripetere l'invariante caduta), references/board.md e references/external-worker.md, che nominano .harness/ per i propri file.\n\nEsito legittimo e' anche \"niente da cambiare\": in quel caso la chiusura dice cosa e' stato controllato, non si limita a dichiarare che va bene.\n\nRestano fuori, come storia congelata: .harness/archive/, docs/superpowers/specs/ e le description dei blocchi in issues.json.",
+      "status": "done",
+      "tier": "economy",
+      "depends_on": [],
+      "validation": {
+        "state": "pass",
+        "criteria": "Verifica indipendente, nessun documento modificato (diff = solo issues.json per lo stato di questa issue). Controllato con grep/lettura diretta: (1) `node scripts/harness-config.mjs --help` e `node scripts/issue-manager.mjs --help` non promettono che .harness/ si auto-ignori (harness-config.mjs --help dice esplicitamente 'Harness writes no .gitignore at all'). (2) grep case-insensitive su agents/, commands/, skills/harness/references/board.md, external-worker.md per 'issues.json|.gitignore|solo|only|mai in git|self-ignor' non trova nessuna ripetizione di 'harness aggiunge al progetto solo issues.json' ne' di '.harness/ non finisce mai in git'; board.md e external-worker.md nominano .harness/ solo per config.json e .harness/runs/<issueId>-<timestamp>.log, senza invarianti sul versionamento. (3) Verificato che l'elenco di .harness/ in README.md riga 72 e skills/harness/references/config.md righe 6-9 (config.json, archive/, runs/) e' completo rispetto a cio' che gli script scrivono davvero: harness-config.mjs scrive solo config.json (riga 354), issue-manager.mjs scrive solo archive/<timestamp>.json (riga 871), harness-worker.mjs scrive solo runs/<issueId>-<timestamp>.log (riga 237) piu' un promptFile temporaneo fuori da .harness/; nessun altro writeFileSync/mkdirSync tocca .harness/. (4) `npm run test` eseguito dal verificatore: 222/222 pass, exit code 0. Osservazione fuori scope (non blocca): .harness/board.cmd e .harness/board.sh sono relitti locali dell'harness v1, con path assoluti, aggiunti al .gitignore del progetto nel commit cbde0b2 invece che cancellati; non sono scritti da alcuno script del repository e non compaiono nell'elenco documentale, correttamente. Nessun file modificato dal verificatore oltre alla chiusura di questa issue."
+      },
+      "created_at": "2026-08-03T08:43:38Z",
+      "updated_at": "2026-08-03T08:48:21Z"
     }
   ]
 }
