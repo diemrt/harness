@@ -76,12 +76,13 @@ not use harness sees one JSON file.
 
 ## Slash commands
 
-The three repetitive actions also have explicit commands. They are shortcuts, not a second
+The repetitive actions also have explicit commands. They are shortcuts, not a second
 source of truth: the workflow lives in the `harness` skill, and each command points back at it.
 
 | Command | What it does | Without arguments |
 |---|---|---|
 | `/harness:board` | Starts the live issue board and prints its URL once; `stop` shuts it down | Starts the board for the current project |
+| `/harness:compact` | Proposes themed blocks to compact `done` issues, waits for confirmation, then archives them | Proposes blocks over every `done` issue in the tracker |
 | `/harness:issue` | Lists issues by status, creates one, updates one | Shows the tracker: `in_progress`, `in_review`, `backlog` |
 | `/harness:verify` | Hands a finished issue to the independent `harness-verifier` agent | Picks among the issues sitting in `in_review` |
 

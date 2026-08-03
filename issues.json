@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-07-31T21:15:49Z",
+  "last_updated": "2026-08-03T07:27:13Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1137,25 +1137,17 @@
       "id": "cef2fd42-dd16-4400-8ddb-4ff9607778d4",
       "title": "/harness:compact propone i blocchi, chiede conferma, chiama la primitiva",
       "description": "La primitiva --compact non decide niente: sapere che \"board server\" e \"card delle dipendenze\" sono lo stesso argomento non e' deducibile da un titolo. Quel giudizio sta nel comando.\n\ncommands/compact.md: legge le issue done dal tracker; propone N blocchi tematici dicendo quali issue finiscono in ognuno e con che titolo; aspetta conferma esplicita dell'utente; solo allora chiama --compact col payload confermato, passato da file per non gestire escaping di quote nella shell; riporta archivePath e i blocchi creati.\n\nSenza conferma non chiama la primitiva: un raggruppamento sbagliato, una volta scritto, e' un archivio da disfare a mano.\n\nDichiara i codici su cui ramificare e non ritenta alla cieca: INVALID_DEPENDENCY significa scollegare prima le issue vive che puntano agli id, FORBIDDEN_ROLE significa che a lanciarlo e' un worker.\n\ninit e upgrade non prendono un comando proprio: sono meccanici e senza dialogo, e restano argomenti di /harness:issue.\n\nSpec: docs/superpowers/specs/2026-07-31-tracker-lifecycle-commands-design.md, sezioni 5.2 e 6.",
-      "status": "in_review",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
         "c112d836-b40b-478d-962d-e4672613ea08"
       ],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "Esiste commands/compact.md con frontmatter description, argument-hint e allowed-tools coerente con gli altri comandi in commands/.",
-          "Il documento impone di proporre i blocchi e di attendere conferma esplicita dell'utente prima di invocare --compact.",
-          "Il documento impone di passare il payload con --issue-data-file, non inline.",
-          "Il documento dice cosa fare su INVALID_DEPENDENCY e su FORBIDDEN_ROLE, senza ritentare alla cieca.",
-          "test/plugin-commands.test.mjs copre esistenza e frontmatter del comando nuovo.",
-          "Il comando e' stato invocato in una sessione reale di questo repository dopo il riavvio, come impone CLAUDE.md.",
-          "npm run test esce 0."
-        ]
+        "state": "pass",
+        "criteria": "commands/compact.md: frontmatter description(>40char)/argument-hint/allowed-tools=Bash,Read,Write coerente con issue.md/board.md/verify.md (righe 1-5). Sez.3 'Aspetta conferma esplicita' impone di non chiamare --compact senza si' esplicito (righe 38-42). Sez.4 impone --issue-data-file, mai inline (righe 44-55). Sez.5 dichiara INVALID_DEPENDENCY (scollegare poi rilanciare, non retry cieco) e FORBIDDEN_ROLE (non ritentare, va fuori dal ruolo worker) righe 63-67. test/plugin-commands.test.mjs: COMMANDS include 'compact' (riga 16) quindi i test generici di esistenza/frontmatter/allowed-tools lo coprono, piu' test dedicato 'the compact command waits for confirmation before calling the primitive' (righe 157-181) su conferma/--issue-data-file/INVALID_DEPENDENCY/FORBIDDEN_ROLE. npm run test: 220/220 pass, fail 0, exit 0. Invocazione live riportata dall'orchestratore in sessione reale dopo riavvio: /harness:compact caricato dal plugin via Skill tool, step1 --get-all --status done eseguito (88 issue), step2 8 blocchi tematici proposti con id+titolo, step3 gate di conferma ha tenuto senza si' esplicito e la primitiva NON e' stata chiamata (comportamento atteso dal criterio 2, confermato dal vivo). git status --short mostra solo i 3 artefatti attesi (README.md M, test/plugin-commands.test.mjs M, commands/compact.md nuovo), nessun danno collaterale. Osservazione fuori scope non bloccante: --get-all --status done restituisce l'oggetto issue intero (162.5KB su 88 issue in questa sessione), il documento non avverte del costo di contesto ne' suggerisce una lettura piu' snella per id+titolo soltanto; non e' fra i criteri della issue, segnalata come materiale per follow-up."
       },
       "created_at": "2026-07-31T15:51:51Z",
-      "updated_at": "2026-07-31T16:55:37Z"
+      "updated_at": "2026-08-03T07:27:13Z"
     }
   ]
 }

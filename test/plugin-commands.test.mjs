@@ -13,7 +13,7 @@ const rootDir = path.resolve(__dirname, "..");
 const commandsDir = path.join(rootDir, "commands");
 
 // The names are part of the contract: they are what the user types and what the README documents.
-const COMMANDS = ["board", "issue", "verify"];
+const COMMANDS = ["board", "compact", "issue", "verify"];
 
 function commandFiles() {
   return readdirSync(commandsDir).filter((f) => f.endsWith(".md"));
@@ -151,6 +151,32 @@ test("the verify command delegates to an agent that exists and forbids self-veri
     fields["allowed-tools"] ?? "",
     /\bTask\b/,
     "verify needs the Task tool to launch the verifier subagent"
+  );
+});
+
+test("the compact command waits for confirmation before calling the primitive", () => {
+  // A wrong grouping, once written, is an archive to undo by hand: the primitive must never be
+  // called on a payload the user has not explicitly confirmed.
+  const content = read("compact");
+  assert.match(
+    body(content),
+    /conferma/i,
+    "commands/compact.md must require explicit user confirmation before archiving"
+  );
+  assert.match(
+    body(content),
+    /--issue-data-file/,
+    "compact must pass the confirmed payload by file, not inline, to avoid shell quote escaping"
+  );
+  assert.match(
+    body(content),
+    /INVALID_DEPENDENCY/,
+    "compact must branch on INVALID_DEPENDENCY instead of retrying blindly"
+  );
+  assert.match(
+    body(content),
+    /FORBIDDEN_ROLE/,
+    "compact must branch on FORBIDDEN_ROLE instead of retrying blindly"
   );
 });
 
