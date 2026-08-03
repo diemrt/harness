@@ -68,11 +68,17 @@ project has an `issues.json`. [`skills/harness/SKILL.md`](skills/harness/SKILL.m
 
 | Path | What it is |
 |---|---|
-| `issues.json` | the tracker's data, at the project root — the only file harness adds to git |
-| `.harness/` | per-clone configuration and worker logs; ships its own `.gitignore` with `*`, so it never reaches git and never touches yours |
+| `issues.json` | the tracker's data, at the project root |
+| `.harness/` | configuration, the archives `/harness:compact` writes, and worker logs |
 
-Nothing else: no scripts, no documents, no HTML viewer to keep in sync. A teammate who does
-not use harness sees one JSON file.
+Nothing else: no scripts, no documents, no HTML viewer to keep in sync.
+
+**What of that gets versioned is your call.** Harness writes no `.gitignore` — not yours,
+which it never touches, and none of its own inside `.harness/`. The directory turns up as
+untracked and you decide: commit `config.json` so the team shares one verification gate, or
+keep it per clone; commit `.harness/archive/` so the blocks in `issues.json` still point at
+something after a fresh clone, or accept that they will not. A tool that ignores files on your
+behalf has taken that decision away from you, in a file you never asked for.
 
 ## Slash commands
 

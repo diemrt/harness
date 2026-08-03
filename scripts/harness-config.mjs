@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 // Local harness configuration, shipped inside the plugin.
 //
-// Harness puts no configuration file in the shared repository. What a session needs — the setup
-// command, the verification command that acts as the gate, the external worker, the docs gate
-// globs, the dispatch mode — lives in `.harness/` at the root of the project, a directory that
-// ignores itself:
-// alongside config.json the script writes a `.gitignore` containing `*`, so git never sees the
-// directory and the project's own .gitignore is never touched.
+// What a session needs — the setup command, the verification command that acts as the gate, the
+// external worker, the docs gate globs, the dispatch mode — lives in `.harness/` at the root of
+// the project.
 //
-// Consequence, and it is deliberate: the configuration is per clone, not shared. A colleague who
-// does not use the harness sees nothing at all.
+// What of it gets versioned is the project's call, not this script's. Harness writes no
+// .gitignore at all: not the project's, which stays untouched, and no longer one of its own
+// inside `.harness/`. The directory shows up as untracked and whoever owns the repository
+// decides — commit config.json so the team shares one gate, keep it per clone, ignore the run
+// logs, ignore the lot. A tool that ignores files on your behalf has taken that decision away
+// from you, in a file you never asked for and may never notice.
 //
 // Usage:
 //   node harness-config.mjs --detect [--project-dir <path>]
@@ -19,7 +20,7 @@
 // --detect  inspects the project and proposes setup/verify commands WITHOUT writing anything.
 //           The proposal is meant to be shown to the user and confirmed, never applied silently:
 //           a verification gate nobody agreed to is worse than no gate, because it looks like one.
-// --init    writes .harness/.gitignore and .harness/config.json from the given payload.
+// --init    creates .harness/ if it is missing and writes config.json from the given payload.
 // --get     reads the current configuration.
 //
 // Machine-readable contract, identical to issue-manager.mjs (stdout is always a single line of
@@ -319,8 +320,10 @@ function validateConfigInput(config) {
   }
 }
 
-// Writes .harness/, its self-ignoring .gitignore, and config.json — in that order, so the
-// directory is never visible to git for even a moment.
+// Creates what `.harness/` is missing and nothing more: the directory when absent, config.json
+// when absent — or when --force says to replace it. Whatever else the directory already holds —
+// run logs, archives written by --compact, a .gitignore the project put there itself — is left
+// exactly as found, because none of it belongs to this command.
 function initConfig(dir, config, force) {
   validateConfigInput(config);
 
@@ -334,13 +337,6 @@ function initConfig(dir, config, force) {
   }
 
   mkdirSync(harnessDir, { recursive: true });
-  // The self-ignore comes first and unconditionally: this is what keeps the project's own
-  // .gitignore untouched.
-  writeFileSync(
-    path.join(harnessDir, ".gitignore"),
-    "# Local harness state: never committed, and never a reason to edit the project's .gitignore.\n*\n",
-    "utf8"
-  );
 
   // Defaults are merged field-by-field, not swapped in wholesale, precisely so a partial
   // `docsGate` (or `externalWorker`) can never lose the fields that make it work. Passing
@@ -378,8 +374,8 @@ function showHelp() {
     "node harness-config.mjs --init (--config-data '<json>' | --config-file <path>) [--project-dir <path>] [--force]",
     "node harness-config.mjs --get [--project-dir <path>]",
     "",
-    "The configuration lives in <project>/.harness/config.json, next to a .gitignore containing",
-    "'*' so the directory ignores itself. The project's own .gitignore is never modified.",
+    "The configuration lives in <project>/.harness/config.json. Harness writes no .gitignore at",
+    "all — neither the project's nor one inside .harness/: what to version is the project's call.",
     "",
     "--detect proposes setup/verify commands by inspecting the project. It writes nothing:",
     "         show the proposal to the user and let them confirm before calling --init.",

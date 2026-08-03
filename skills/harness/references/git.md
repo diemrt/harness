@@ -63,7 +63,16 @@ parametri operativi e a volte credenziali.
 Le regole di permesso che autorizzano comandi con bypass (es. la delega a un worker esterno)
 vanno in `.claude/settings.local.json`, non committato — mai in `.claude/settings.json`.
 
-## Cosa harness aggiunge al repository
+## Cosa harness scrive nel progetto
 
-Solo `issues.json`. `.harness/` si auto-ignora tramite un proprio `.gitignore` con `*`: non
-va aggiunta al `.gitignore` del progetto, che resta intatto.
+`issues.json` alla radice e `.harness/` (configurazione, archivi di `--compact`, log dei
+worker).
+
+**Cosa di questo entri in git lo decidi tu.** Harness non scrive nessun `.gitignore`: né il
+tuo, che resta intatto, né uno proprio dentro `.harness/`. La directory compare fra gli
+untracked e la scelta resta una scelta.
+
+Un caso in cui vale la pena farla di proposito: se hai compattato il tracker, ogni blocco in
+`issues.json` porta il path del proprio archivio sotto `.harness/archive/`. `issues.json` è
+condiviso; l'archivio lo è solo se lo versioni. Lasciarlo fuori significa consegnare a chi
+clona otto puntatori verso il nulla.

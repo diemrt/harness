@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-03T08:12:45Z",
+  "last_updated": "2026-08-03T08:42:22Z",
   "rules": {
     "single_active_issue": false
   },
@@ -248,6 +248,20 @@
       },
       "created_at": "2026-08-03T07:33:06Z",
       "updated_at": "2026-08-03T08:12:45Z"
+    },
+    {
+      "id": "63406cce-2d07-4863-9329-0abe5bb10cf5",
+      "title": ".harness/ non si auto-ignora piu': cosa versionare lo decide il progetto",
+      "description": "harness scrive `.harness/.gitignore` con `*` in due punti: `--init` in scripts/harness-config.mjs e la scrittura che precede ogni `--compact` in scripts/issue-manager.mjs. Cosi' decide al posto del progetto cosa vada versionato.\n\nIl costo si vede sull'archivio. `--compact` scrive i blocchi in issues.json, che e' committato, e ogni blocco porta come primo criterio `Archived originals: .harness/archive/<ts>.json` — un file che per costruzione non entrera' mai in git. Chi clona trova puntatori morti al posto delle issue originali.\n\nHarness smette di scrivere quel file: `.harness/` compare fra gli untracked e il developer decide cosa versionare. Resta intatto il divieto di toccare il .gitignore del progetto: e' l'altra meta' della stessa regola.\n\nTolto il .gitignore dalla lista, va ricontrollato cosa `--init` deve ancora creare perche' tutto funzioni: quali file e directory servono davvero, cosa manca su un clone fresco, e che rilanciarlo su una cartella gia' popolata non sovrascriva niente.\n\nDa allineare: README.md, references/config.md, git.md (\"harness aggiunge solo issues.json\") e issues.md.",
+      "status": "done",
+      "tier": "reasoning",
+      "depends_on": [],
+      "validation": {
+        "state": "pass",
+        "criteria": "Riverifica dopo il fix. Il residuo che avevo fatto fallire non c'e' piu': scripts/issue-manager.mjs sopra emptyIssuesData ora legge \"issues.json is the file every clone of the project reads\" (era \"the only file the harness ever puts in a shared repository\"). Il diff vs HEAD del file e' 40 righe contro 36 del giro precedente: +2/-2 sul solo commento, nessuna riga di codice toccata; --stat di tutti gli altri 10 file e' identico riga per riga a quello che avevo gia' verificato, quindi i sei criteri gia' soddisfatti restano tali senza rifare il lavoro.\n\nCriteri non annacquati: confronto byte per byte dei sette validation.criteria attuali contro quelli letti al mio primo --get -> 7/7 stringhe identiche, stesso ordine, nessuna aggiunta o rimozione (script node su issues.json: \"CRITERIA IDENTICAL byte-for-byte\"). status in_review, state unknown al momento della riverifica. git diff issues.json tocca solo last_updated e il record di questa issue.\n\nResidui della stessa famiglia, stessa severita' del giro precedente: grep -i su \"only file|unico file|the harness ever puts|adds to git|aggiunge al progetto|self-ignor|auto-ignor|ignores itself|si auto-ignora|invisibile a git|never reaches git|must never reach\" su tutto il repo (escluso node_modules) -> zero hit in scripts/, skills/, README.md, commands/, agents/. Restano solo: .harness/archive/2026-08-03T07-32-09Z.json e docs/superpowers/specs/ (storia congelata, esenti), i blocchi storici issues.json:162,174, il titolo e i criteri di questa issue stessa, e test/plugin-config.test.mjs:88, che e' il messaggio di un assert che pretende l'ASSENZA del file, non una promessa.\n\nCriteri, uno per uno. [1] PASS: rimossi il writeFileSync di .harness/.gitignore in initConfig e la funzione ensureHarnessDir + la sua chiamata; test riscritti in negativo, non cancellati (plugin-config.test.mjs:78-98, plugin-issue-manager.test.mjs:1915-1925 asseriscono existsSync===false). [2] PASS: plugin-config.test.mjs:115-131 confronta ancora il .gitignore byte per byte e pretende git diff -- .gitignore vuoto; :133-145 invariato. [3] PASS: initConfig fa solo mkdirSync(recursive)+config.json; coperto da plugin-config.test.mjs:147-174 (runs/, archive/ e un .gitignore preesistente restano identici) e :206-218 (CONFIG_EXISTS senza --force). [4] PASS: issue-manager.mjs:866-872, ordine mkdirSync(dirname(archivePath)) -> writeFileSync(archivePath) -> writeIssuesFile(data), invariato. [5] PASS: README.md, SKILL.md, config.md, git.md, issues.md riallineati; nessuna promessa residua. [6] PASS: ls .harness/ -> archive, board.cmd, board.sh, config.json, runs (nessun .gitignore); git ls-files .harness -> .harness/archive/2026-08-03T07-32-09Z.json e .harness/config.json; gli 8 blocchi puntano tutti a quell'archivio. [7] PASS: npm run test -> tests 222, pass 222, fail 0, exit=0.\n\nCollaterali: git status --porcelain -uall elenca esattamente i 13 path dello scope, nessun file nuovo rispetto al giro precedente, nessun segreto nel diff staged."
+      },
+      "created_at": "2026-08-03T08:23:46Z",
+      "updated_at": "2026-08-03T08:42:22Z"
     }
   ]
 }

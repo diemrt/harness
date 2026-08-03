@@ -189,11 +189,14 @@ schema stava leggendo. Il nome del file è il timestamp del giro con i `:` sosti
 (illegali in un nome di file su Windows); due compattazioni nello stesso secondo prendono un
 suffisso numerico invece di sovrascriversi.
 
-`.harness/` è la directory locale che **si auto-ignora** (contiene un `.gitignore` con `*`, come
-già per `config.json`): l'archivio non entra nel repository e il `.gitignore` del progetto non
-viene toccato. La scrittura avviene in quest'ordine — `.gitignore`, archivio, `issues.json` — così
-la directory non è mai visibile a git nemmeno per un istante, e un errore a metà non lascia mai
-il tracker senza la copia.
+L'archivio finisce in `.harness/`, e **se versionarlo lo decide il progetto**: harness non
+scrive nessun `.gitignore`, né qui né altrove ([config.md](config.md)). Vale la pena deciderlo
+invece di ereditarlo, perché `issues.json` è condiviso e ogni blocco porta il path
+dell'archivio che ne contiene gli originali: tenere quel file fuori dal repository significa
+lasciare a chi clona un puntatore verso il nulla.
+
+La scrittura avviene in quest'ordine — archivio, poi `issues.json` — così un errore a metà non
+lascia mai il tracker senza la copia.
 
 **L'archivio non viene mai riletto.** Non è un secondo tracker: `--get`, `--get-all` e il board
 continuano a vedere **solo** `issues.json`. Un `--get` su una issue archiviata risponde

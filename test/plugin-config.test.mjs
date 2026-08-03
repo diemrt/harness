@@ -1,5 +1,6 @@
-// The whole point of .harness/ is that it leaves no trace in the shared repository, so the
-// tests that matter here run against a real git repository and assert on what git sees.
+// What of .harness/ reaches the shared repository is the project's decision, and harness must
+// not pre-empt it by writing a .gitignore nobody asked for. The tests that matter here run
+// against a real git repository and assert on what git is shown.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -71,10 +72,10 @@ function cleanup(dir) {
 const MINIMAL = JSON.stringify({ setup: "npm ci", verify: "npm test" });
 
 // ---------------------------------------------------------------------------
-// the invariant: git must not see the harness
+// the invariant: harness never decides what git sees
 // ---------------------------------------------------------------------------
 
-test("creating the configuration leaves git status clean", () => {
+test("creating the configuration writes no .gitignore, in the project or in .harness/", () => {
   const dir = tempGitProject();
   try {
     assert.equal(git(dir, ["status", "--porcelain"]).stdout, "", "precondition: repo starts clean");
@@ -82,14 +83,29 @@ test("creating the configuration leaves git status clean", () => {
     assertOk(run(dir, ["--init", "--config-data", MINIMAL]));
 
     assert.equal(
-      git(dir, ["status", "--porcelain"]).stdout,
-      "",
-      "the harness directory must be invisible to git"
+      existsSync(path.join(dir, ".harness", ".gitignore")),
+      false,
+      "a self-ignoring directory decides for the project, in a file it never asked for"
     );
     assert.equal(
-      git(dir, ["status", "--porcelain", "--untracked-files=all"]).stdout,
-      "",
-      "not even as an untracked file"
+      existsSync(path.join(dir, ".gitignore")),
+      false,
+      "and the project's own .gitignore is not created either"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("the harness directory is offered to git as untracked, for the project to decide", () => {
+  const dir = tempGitProject();
+  try {
+    assertOk(run(dir, ["--init", "--config-data", MINIMAL]));
+
+    assert.equal(
+      git(dir, ["status", "--porcelain"]).stdout,
+      "?? .harness/\n",
+      "git must see the directory: committing it or ignoring it is the project's call"
     );
   } finally {
     cleanup(dir);
@@ -104,7 +120,11 @@ test("the project's own .gitignore is never touched", () => {
 
     assert.equal(readFileSync(path.join(dir, ".gitignore"), "utf8"), original);
     assert.equal(git(dir, ["diff", "--", ".gitignore"]).stdout, "", "no diff on the shared .gitignore");
-    assert.equal(git(dir, ["status", "--porcelain"]).stdout, "");
+    assert.equal(
+      git(dir, ["status", "--porcelain"]).stdout,
+      "?? .harness/\n",
+      "the new directory is all that shows up: no line of the project's .gitignore was rewritten"
+    );
   } finally {
     cleanup(dir);
   }
@@ -124,12 +144,30 @@ test("a project with no .gitignore does not get one", () => {
   }
 });
 
-test("the harness directory carries its own self-ignoring .gitignore", () => {
-  const dir = tempProject();
+test("--init creates what is missing in .harness/ and leaves the rest exactly as found", () => {
+  const dir = tempProject({
+    ".harness/runs/2026-01-01.log": "a previous run\n",
+    ".harness/archive/2026-01-01T00-00-00Z.json": '{"issues":[]}\n',
+    ".harness/.gitignore": "*\n",
+  });
   try {
     assertOk(run(dir, ["--init", "--config-data", MINIMAL]));
-    const ignore = readFileSync(path.join(dir, ".harness", ".gitignore"), "utf8");
-    assert.match(ignore, /^\*$/m, "the directory must ignore everything inside itself");
+
+    assert.ok(
+      existsSync(path.join(dir, ".harness", "config.json")),
+      "the piece that was missing is the piece that gets created"
+    );
+    assert.equal(readFileSync(path.join(dir, ".harness", "runs", "2026-01-01.log"), "utf8"), "a previous run\n");
+    assert.equal(
+      readFileSync(path.join(dir, ".harness", "archive", "2026-01-01T00-00-00Z.json"), "utf8"),
+      '{"issues":[]}\n',
+      "an archive is the only surviving copy of what it holds: --init never touches it"
+    );
+    assert.equal(
+      readFileSync(path.join(dir, ".harness", ".gitignore"), "utf8"),
+      "*\n",
+      "a .gitignore the project put there itself is the project's, not ours to rewrite or remove"
+    );
   } finally {
     cleanup(dir);
   }

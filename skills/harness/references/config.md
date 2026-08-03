@@ -1,19 +1,23 @@
-# `.harness/` — configurazione locale
+# `.harness/` — configurazione del progetto
 
-Harness non mette file di configurazione nel repository condiviso. Quello che serve per
-lavorare vive in `.harness/` alla radice del progetto, una directory che **ignora sé stessa**:
-contiene un `.gitignore` con `*`, quindi git non la vede e il `.gitignore` del progetto non
-viene mai toccato.
+Quello che serve per lavorare vive in `.harness/` alla radice del progetto.
 
 ```
 .harness/
-  .gitignore        # contiene "*": la cartella si auto-ignora
-  config.json       # comandi e opzioni, per-macchina
+  config.json       # comandi e opzioni
+  archive/          # gli originali che --compact toglie da issues.json
   runs/             # log dei worker esterni
 ```
 
-Conseguenza voluta: la configurazione è **per clone**, non condivisa. Un collega che non usa
-harness non vede niente; tu la ricrei se ricloni.
+**Cosa di tutto questo va versionato lo decide il progetto, non harness.** Lo script non
+scrive nessun `.gitignore`: né quello del progetto, che non tocca mai, né uno proprio dentro
+`.harness/`. La directory compare fra gli untracked e la scelta è di chi possiede il
+repository — committare `config.json` perché la squadra condivida un solo gate di verifica
+oppure tenerlo per clone, committare `archive/` perché i blocchi in `issues.json` continuino a
+puntare a qualcosa dopo un clone fresco oppure no.
+
+Uno strumento che ignora file al posto tuo quella decisione te l'ha tolta, in un file che non
+hai chiesto e che potresti non notare mai.
 
 ## Dove sta la configurazione
 
@@ -151,8 +155,9 @@ Se `.harness/config.json` non esiste:
 2. **proponi i comandi all'utente e aspetta conferma.** Un gate sbagliato è peggio di nessun
    gate: dà l'illusione della verifica. Se `--detect` non riconosce niente, `suggested` è
    `null`: chiedi, non indovinare;
-3. `--init` scrive `.harness/.gitignore` (con `*`) **prima** di `config.json`: la directory
-   non è mai visibile a git nemmeno per un istante.
+3. `--init` crea `.harness/` se manca e ci scrive `config.json`. Crea **solo quello che manca**:
+   log, archivi o un `.gitignore` che il progetto ci ha messo restano come sono, e una
+   `config.json` già presente si sovrascrive solo con `--force`.
 
 `verify` è l'unico campo obbligatorio: senza, non c'è niente da eseguire al gate e la
 verifica indipendente diventa teatro.

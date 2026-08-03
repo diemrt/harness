@@ -119,11 +119,16 @@ const SCHEMA_VERSION = 1;
 // version later than one that upgraded right away. --upgrade applies only the entries whose `to`
 // falls strictly after the file's current version and at most SCHEMA_VERSION — see
 // upgradeTracker() below.
-// Where --compact parks the issues it takes out of issues.json. `.harness/` is the project-local,
-// self-ignoring directory the harness already uses for state that must never reach the shared
-// repository (see scripts/harness-config.mjs), and an archive is exactly that: frozen history for
-// whoever wants to read it back, not a second tracker. Nothing in this script ever reads it —
-// --get, --get-all and the board keep seeing issues.json and nothing else.
+// Where --compact parks the issues it takes out of issues.json. `.harness/` is the project-local
+// directory the harness already uses for its own state (see scripts/harness-config.mjs), and an
+// archive is frozen history for whoever wants to read it back, not a second tracker. Nothing in
+// this script ever reads it — --get, --get-all and the board keep seeing issues.json and nothing
+// else.
+//
+// Whether the archive is committed is the project's decision: harness writes no .gitignore, here
+// or anywhere. It is worth deciding rather than inheriting, because issues.json is shared and
+// every block it holds names the archive that has the originals — leave that file out of the
+// repository and whoever clones finds a pointer to nothing.
 const HARNESS_DIR = ".harness";
 const ARCHIVE_DIR = "archive";
 
@@ -523,8 +528,8 @@ function parseIssueData(issueData) {
   }
 }
 
-// Helper: the shape of a brand new tracker. Deliberately minimal: issues.json is the only file
-// the harness ever puts in a shared repository, so it carries data and nothing decorative.
+// Helper: the shape of a brand new tracker. Deliberately minimal: issues.json is the file every
+// clone of the project reads, so it carries data and nothing decorative.
 function emptyIssuesData() {
   return { last_updated: nowTimestamp(), issues: [] };
 }
@@ -727,25 +732,6 @@ function validateCompactInput(payload) {
   });
 }
 
-// Helper: make sure <project>/.harness exists and ignores itself BEFORE anything is written into
-// it, so the directory is never visible to git for even a moment. Same contract as
-// scripts/harness-config.mjs: a .gitignore containing `*`, which is what keeps the project's own
-// .gitignore untouched. Only written when missing — a copy already on disk (put there by
-// harness-config, or edited by the user) is left exactly as it is.
-function ensureHarnessDir(projectDir) {
-  const harnessDir = path.join(projectDir, HARNESS_DIR);
-  mkdirSync(harnessDir, { recursive: true });
-  const gitignorePath = path.join(harnessDir, ".gitignore");
-  if (!existsSync(gitignorePath)) {
-    writeFileSync(
-      gitignorePath,
-      "# Local harness state: never committed, and never a reason to edit the project's .gitignore.\n*\n",
-      "utf8"
-    );
-  }
-  return harnessDir;
-}
-
 // Helper: pick the file this run's archive goes into. The timestamp is the same one stamped into
 // the record, with ':' swapped for '-' because a colon cannot appear in a filename on Windows.
 // Two compactions inside the same second get a numeric suffix rather than overwriting each other:
@@ -880,7 +866,7 @@ function compactTracker(compactData) {
   // Write order is not arbitrary: the archive first, issues.json second. A failure while writing
   // the archive leaves the tracker exactly as it was and loses nothing; the reverse order would
   // put a window between "the issues are gone" and "the copy exists".
-  ensureHarnessDir(projectDir);
+  // Recursive, so it creates .harness/ too when this is the first thing the project writes there.
   mkdirSync(path.dirname(archivePath), { recursive: true });
   writeFileSync(archivePath, JSON.stringify(archiveRecord, null, 2) + "\n", "utf8");
   writeIssuesFile(data);

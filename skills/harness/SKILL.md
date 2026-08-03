@@ -9,9 +9,11 @@ Harness impone un modo di lavorare, non una libreria: ogni pezzo di lavoro è un
 tracciata, ogni issue viene verificata da un agente **diverso** da chi l'ha svolta, e si
 committa solo dopo quella verifica.
 
-**Cosa harness scrive nel progetto:** `issues.json` alla radice (i dati del tracker, l'unico
-file condiviso) e `.harness/` (configurazione e log locali, che si auto-ignora e non finisce
-mai in git). Nient'altro: script, regole e board vivono in questo plugin.
+**Cosa harness scrive nel progetto:** `issues.json` alla radice (i dati del tracker) e
+`.harness/` (configurazione, archivi di `--compact`, log dei worker). Nient'altro: script,
+regole e board vivono in questo plugin. Cosa di tutto questo entri in git lo decide il
+progetto — harness non scrive nessun `.gitignore`
+([references/config.md](references/config.md)).
 
 Nel resto del documento `$SCRIPTS` sta per `${CLAUDE_PLUGIN_ROOT}/scripts`.
 

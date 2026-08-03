@@ -1912,13 +1912,16 @@ test("the archive is never read back: --get on an archived id is NOT_FOUND and -
   }
 });
 
-test("--compact writes .harness/.gitignore before the archive, so the directory never reaches the repository", () => {
+test("--compact writes no .gitignore: whether the archive is committed is the project's call", () => {
   const { dir } = setupTempProject(compactSeed());
   try {
     // ID_TWO, not ID_ONE: nothing points at ID_TWO, so a single-issue block is enough here.
     assertOk(run(dir, ["--compact", "--issue-data", oneBlock([ID_TWO])]));
-    const gitignore = readFileSync(path.join(dir, ".harness", ".gitignore"), "utf8");
-    assert.match(gitignore, /^\*$/m, "the .harness directory must ignore itself entirely");
+    assert.equal(
+      existsSync(path.join(dir, ".harness", ".gitignore")),
+      false,
+      "issues.json is shared and names the archive: hiding it would leave a pointer to nothing"
+    );
   } finally {
     cleanup(dir);
   }
