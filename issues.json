@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-04T09:59:07Z",
+  "last_updated": "2026-08-04T10:00:35Z",
   "rules": {
     "single_active_issue": false
   },
@@ -418,6 +418,43 @@
       },
       "created_at": "2026-08-04T09:14:42Z",
       "updated_at": "2026-08-04T09:59:07Z"
+    },
+    {
+      "id": "1b7587bf-a25d-4caa-bd63-810dde5fef2e",
+      "title": "Gate documentale dei nove commit di status-cli",
+      "description": "I commit da 3852f8a a c79bf1d hanno introdotto scripts/status-cli.mjs, che docsGate.include intercetta come file di codice. Questa issue e' il promemoria tracciato che il gate impone dopo ogni commit.\n\nLa documentazione del comando e' gia' stata scritta dentro la catena: commands/status.md, la riga nella tabella del README e i due agganci in skills/harness/SKILL.md. Lo spec ha deciso di non aggiungere skills/harness/references/status.md, perche' il contratto sta gia' nel comando.\n\nIl lavoro qui e' quindi un controllo, non una scrittura: confrontare cosa i nove commit hanno cambiato con cosa la documentazione dice oggi, e concludere se manca qualcosa o se non c'e' niente da cambiare.",
+      "status": "backlog",
+      "tier": "economy",
+      "depends_on": [],
+      "validation": {
+        "criteria": [
+          "Il diff da 3852f8a a c79bf1d e' stato confrontato con commands/status.md, README.md e skills/harness/SKILL.md",
+          "Ogni comportamento dello script che un utente puo' osservare (flag, codici d'uscita, icone, casi vuoti, allerte) risulta documentato in almeno uno di quei tre file, oppure e' stato aggiunto",
+          "L'esito e' registrato in un commit, anche quando la conclusione e' che non c'e' niente da cambiare"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-04T10:00:14Z",
+      "updated_at": "2026-08-04T10:00:14Z"
+    },
+    {
+      "id": "aa07fb72-713c-4d65-bba9-6e1399652813",
+      "title": "Stallo e intestazione LAVORABILI: 'N di M' con due denominatori diversi",
+      "description": "Trovato lavorando la issue b6b848b9, e visibile sul tracker reale di questo repository.\n\nQuando il backlog e' fermo, l'output stampa a due righe di distanza:\n\n  ! lavorabili 0 di 2 - ogni issue in backlog attende qualcosa\n  LAVORABILI - 0 di 0\n\nIl primo \"0 di 2\" e' lavorabili su totale del BACKLOG. Il secondo \"0 di 0\" e' righe mostrate su totale delle LAVORABILI. Stessa forma, due denominatori, nessun modo di capirlo dall'output se non leggendo la coda dell'allerta.\n\nNessuna delle due e' sbagliata da sola: sono state verificate e chiuse pass rispettivamente nelle issue 59819a08 e b6b848b9. La collisione e' fra le due, e non era stata vista quando i testi sono stati fissati.\n\nVa deciso quale delle due cambia forma. Cambiare il testo dell'allerta tocca un criterio gia' verificato: se si sceglie quella strada, la motivazione va scritta nella description, non applicata di nascosto.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [],
+      "validation": {
+        "criteria": [
+          "L'output in stato di stallo non presenta piu' due 'N di M' con denominatori diversi a distanza di poche righe",
+          "La forma scelta e' provata da un test che rende esplicito il denominatore di ciascun numero mostrato",
+          "Se il testo dell'allerta cambia, il test corrispondente in test/plugin-status-cli.test.mjs viene aggiornato e la ragione del cambio e' scritta nella description di questa issue",
+          "npm run test resta verde"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-04T10:00:35Z",
+      "updated_at": "2026-08-04T10:00:35Z"
     }
   ]
 }
