@@ -28,11 +28,14 @@ Nel resto del documento `$SCRIPTS` sta per `${CLAUDE_PLUGIN_ROOT}/scripts`.
    **fermati e segnala**: non consumare token su un ambiente rotto.
 4. **Board** — avvia il board delle issue e stampa l'URL una volta sola (vedi
    [references/board.md](references/board.md)). Non aprire il browser da solo.
-5. **Stato del tracker**:
+5. **Stato del tracker** — stampa il riepilogo e ristampalo verbatim in un blocco di codice:
    ```bash
-   node "$SCRIPTS/issue-manager.mjs" --get-all --status in_progress
-   node "$SCRIPTS/issue-manager.mjs" --get-all --status backlog
+   node "$SCRIPTS/status-cli.mjs"
    ```
+   Una schermata sola: conteggi, cosa è in corso, cosa si può prendere adesso, più le allerte
+   su cicli e dipendenze rotte. Serve un dettaglio che il riepilogo non porta (description,
+   `validation.criteria`)? `issue-manager.mjs --get --issue-id <id>` sulla singola issue, non
+   l'elenco intero.
 6. **Scelta del lavoro** — identifica le issue su cui lavorare rispettando la regola 1-WIP
    qui sotto.
 
@@ -243,6 +246,9 @@ controllo lo fai tu, non un hook `post-commit`.
 
 Per ogni issue lavorata: lavoro concluso → `in_review` → verifica indipendente → `pass` →
 commit dedicato. Poi ferma il board server avviato al clock-in.
+
+Chiudi ristampando il riepilogo (`node "$SCRIPTS/status-cli.mjs"`, verbatim in un blocco di
+codice): è il confronto con quello del clock-in, e dice in una schermata cosa si è mosso.
 
 ## Reference
 
