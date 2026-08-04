@@ -90,3 +90,72 @@ test("the icon tables are the ASCII ones the spec fixes", () => {
   });
   assert.deepEqual(TIER_ICON, { economy: "$", standard: "$$", reasoning: "$$$" });
 });
+
+test("an issue with no dependencies is workable", () => {
+  const snapshot = buildSnapshot([issue("aaaaaaaa")]);
+  assert.deepEqual(snapshot.workable.map((i) => i.id), ["aaaaaaaa"]);
+  assert.equal(snapshot.workableTotal, 1);
+});
+
+test("an issue is workable once every dependency is done", () => {
+  const snapshot = buildSnapshot([
+    issue("aaaaaaaa", { status: "done" }),
+    issue("bbbbbbbb", { status: "done" }),
+    issue("cccccccc", { depends_on: ["aaaaaaaa", "bbbbbbbb"] }),
+  ]);
+  assert.deepEqual(snapshot.workable.map((i) => i.id), ["cccccccc"]);
+});
+
+test("one dependency still open is enough to keep an issue out", () => {
+  const snapshot = buildSnapshot([
+    issue("aaaaaaaa", { status: "done" }),
+    issue("bbbbbbbb", { status: "in_progress" }),
+    issue("cccccccc", { depends_on: ["aaaaaaaa", "bbbbbbbb"] }),
+  ]);
+  assert.deepEqual(snapshot.workable, []);
+  assert.equal(snapshot.workableTotal, 0);
+});
+
+test("only backlog issues are workable: in flight ones are already taken", () => {
+  const snapshot = buildSnapshot([issue("aaaaaaaa", { status: "in_progress" })]);
+  assert.deepEqual(snapshot.workable, []);
+});
+
+test("a dependency that does not exist makes the issue not workable", () => {
+  // Conservative on purpose: we do not know what is missing, and calling an issue that depends on
+  // nothing workable is how the wrong work gets started.
+  const snapshot = buildSnapshot([issue("cccccccc", { depends_on: ["ffffffff"] })]);
+  assert.deepEqual(snapshot.workable, []);
+  assert.equal(snapshot.workableTotal, 0);
+});
+
+test("workable issues come out oldest first", () => {
+  const snapshot = buildSnapshot([
+    issue("aaaaaaaa", { created_at: "2026-03-01T00:00:00Z" }),
+    issue("bbbbbbbb", { created_at: "2026-01-01T00:00:00Z" }),
+    issue("cccccccc", { created_at: "2026-02-01T00:00:00Z" }),
+  ]);
+  assert.deepEqual(
+    snapshot.workable.map((i) => i.id),
+    ["bbbbbbbb", "cccccccc", "aaaaaaaa"]
+  );
+});
+
+test("workable is cut to three, and the total says how many there really are", () => {
+  const many = Array.from({ length: 7 }, (_, n) =>
+    issue(`${n}`.padStart(8, "0"), { created_at: `2026-01-0${n + 1}T00:00:00Z` })
+  );
+  const snapshot = buildSnapshot(many);
+  assert.equal(snapshot.workable.length, 3);
+  assert.equal(snapshot.workableTotal, 7);
+  assert.deepEqual(
+    snapshot.workable.map((i) => i.id),
+    ["00000000", "00000001", "00000002"]
+  );
+});
+
+test("a missing depends_on field reads as no dependencies", () => {
+  const bare = issue("aaaaaaaa");
+  delete bare.depends_on;
+  assert.deepEqual(buildSnapshot([bare]).workable.map((i) => i.id), ["aaaaaaaa"]);
+});

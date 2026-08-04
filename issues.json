@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-04T09:24:14Z",
+  "last_updated": "2026-08-04T09:27:21Z",
   "rules": {
     "single_active_issue": false
   },
@@ -295,25 +295,17 @@
       "id": "0fe39c8a-a84b-466b-9e39-b3d7912dcaf5",
       "title": "status-cli: issue lavorabili e dipendenze fantasma",
       "description": "buildSnapshot guadagna workable e workableTotal.\n\nLavorabile significa stato backlog e ogni id in depends_on che risolve a una issue esistente in stato done. Un id che non corrisponde a nessuna issue del tracker rende la issue NON lavorabile: non si sa cosa manchi, e dichiarare lavorabile qualcosa che dipende dal nulla e' il modo di far partire il lavoro sbagliato.\n\nworkable e' gia' tagliato a WORKABLE_SHOWN (tre), ordinato per created_at crescente; workableTotal dice quante sono davvero.\n\nCodice e test in Task 2 di docs/superpowers/plans/2026-08-04-status-cli.md.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
         "6a53d9c8-f41e-44f0-9536-279de693e938"
       ],
       "validation": {
-        "criteria": [
-          "Una issue backlog senza depends_on risulta lavorabile",
-          "Una issue backlog con tutte le dipendenze done risulta lavorabile; basta una dipendenza aperta perche' non lo sia",
-          "Una issue con un id in depends_on che non esiste nel tracker NON risulta lavorabile",
-          "Solo le issue in stato backlog possono essere lavorabili",
-          "workable e' ordinato per created_at crescente e tagliato a tre elementi; workableTotal riporta il totale prima del taglio",
-          "Un campo depends_on assente si legge come nessuna dipendenza, senza eccezioni",
-          "node --test test/plugin-status-cli.test.mjs passa con almeno 14 test e npm run test resta verde"
-        ],
-        "state": "unknown"
+        "criteria": "npm run test: 236/236 pass (14 in test/plugin-status-cli.test.mjs, >= 14 richiesti). Codice in scripts/status-cli.mjs verificato riga per riga: isWorkable (righe 54-59) ritorna false quando deps.some(id => !byId.has(id)) e' vero, prima di controllare lo stato done, quindi un id inesistente rende l'issue NON lavorabile (coperto da test riga 124-130 'a dependency that does not exist makes the issue not workable'). buildSnapshot (righe 79-87) calcola workableAll con filter+sort, poi workable = workableAll.slice(0, WORKABLE_SHOWN) e workableTotal = workableAll.length, quindi workableTotal e' il totale prima del taglio a tre (coperto da test riga 144-155). Tutti gli altri criteri (nessuna dipendenza -> lavorabile, una dipendenza aperta -> non lavorabile, solo backlog lavorabile, ordinamento per created_at crescente e taglio a tre, depends_on assente letto come nessuna dipendenza) hanno test dedicati che passano. git status --short mostra solo issues.json (transizione di stato di questa issue) e i due file di scope (scripts/status-cli.mjs, test/plugin-status-cli.test.mjs); nessun danno collaterale. Osservazione fuori scope, non bloccante: la funzione danglingDeps (status-cli.mjs riga 50) e' definita ma mai chiamata (isWorkable duplica la stessa logica inline) - dead code, non tocca nessun criterio di validazione.",
+        "state": "pass"
       },
       "created_at": "2026-08-04T09:14:41Z",
-      "updated_at": "2026-08-04T09:14:41Z"
+      "updated_at": "2026-08-04T09:27:21Z"
     },
     {
       "id": "59819a08-06da-481c-9a4f-ba948c5432ec",

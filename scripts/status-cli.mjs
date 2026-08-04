@@ -40,6 +40,24 @@ function emptyCounts() {
   return { backlog: 0, in_progress: 0, in_review: 0, blocked: 0, done: 0 };
 }
 
+function dependsOn(issue) {
+  return Array.isArray(issue.depends_on) ? issue.depends_on : [];
+}
+
+// A dangling id — one that matches no issue in the tracker — leaves the issue unworkable. It
+// happens after a hand edit of issues.json, and after an archive that took away something still
+// referenced. Either way we do not know what is missing, so we do not clear the issue for work.
+function danglingDeps(issue, byId) {
+  return dependsOn(issue).filter((id) => !byId.has(id));
+}
+
+function isWorkable(issue, byId) {
+  if (issue.status !== "backlog") return false;
+  const deps = dependsOn(issue);
+  if (deps.some((id) => !byId.has(id))) return false;
+  return deps.every((id) => byId.get(id).status === "done");
+}
+
 export function buildSnapshot(issues) {
   const counts = emptyCounts();
   for (const issue of issues) {
@@ -56,5 +74,17 @@ export function buildSnapshot(issues) {
         String(b.updated_at ?? "").localeCompare(String(a.updated_at ?? ""))
     );
 
-  return { counts, inFlight, workable: [], workableTotal: 0, alerts: [] };
+  const byId = new Map(issues.map((issue) => [issue.id, issue]));
+
+  const workableAll = issues
+    .filter((issue) => isWorkable(issue, byId))
+    .sort((a, b) => String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")));
+
+  return {
+    counts,
+    inFlight,
+    workable: workableAll.slice(0, WORKABLE_SHOWN),
+    workableTotal: workableAll.length,
+    alerts: [],
+  };
 }
