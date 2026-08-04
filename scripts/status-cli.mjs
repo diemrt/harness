@@ -54,8 +54,65 @@ function danglingDeps(issue, byId) {
 function isWorkable(issue, byId) {
   if (issue.status !== "backlog") return false;
   const deps = dependsOn(issue);
-  if (deps.some((id) => !byId.has(id))) return false;
+  if (danglingDeps(issue, byId).length > 0) return false;
   return deps.every((id) => byId.get(id).status === "done");
+}
+
+export function shortId(id) {
+  return String(id ?? "").slice(0, 8);
+}
+
+// Depth-first search restricted to open issues. A cycle among closed ones is a fact of history:
+// nothing is waiting on it any more, and reporting it every time would train the reader to skip
+// the alert line.
+function findCycle(issues, byId) {
+  const openIds = new Set(issues.filter((i) => i.status !== "done").map((i) => i.id));
+  const state = new Map(); // id -> "visiting" | "settled"
+  const stack = [];
+  let cycle = null;
+
+  function visit(id) {
+    if (cycle || state.get(id) === "settled") return;
+    if (state.get(id) === "visiting") {
+      cycle = stack.slice(stack.indexOf(id));
+      return;
+    }
+    state.set(id, "visiting");
+    stack.push(id);
+    for (const dep of dependsOn(byId.get(id))) {
+      if (openIds.has(dep)) visit(dep);
+    }
+    stack.pop();
+    state.set(id, "settled");
+  }
+
+  for (const id of openIds) visit(id);
+  return cycle;
+}
+
+function buildAlerts(issues, byId, counts, workableTotal) {
+  const alerts = [];
+
+  const cycle = findCycle(issues, byId);
+  if (cycle) {
+    alerts.push(`ciclo nei depends_on: ${cycle.map(shortId).join(" ")}`);
+  }
+
+  const broken = issues.filter((issue) => danglingDeps(issue, byId).length > 0);
+  if (broken.length > 0) {
+    const missing = [...new Set(broken.flatMap((issue) => danglingDeps(issue, byId)))]
+      .map(shortId)
+      .join(" ");
+    const verb =
+      broken.length === 1 ? "issue dipende da id inesistente" : "issue dipendono da id inesistenti";
+    alerts.push(`${broken.length} ${verb}: ${missing}`);
+  }
+
+  if (counts.backlog > 0 && workableTotal === 0) {
+    alerts.push(`lavorabili 0 di ${counts.backlog} — ogni issue in backlog attende qualcosa`);
+  }
+
+  return alerts;
 }
 
 export function buildSnapshot(issues) {
@@ -85,6 +142,6 @@ export function buildSnapshot(issues) {
     inFlight,
     workable: workableAll.slice(0, WORKABLE_SHOWN),
     workableTotal: workableAll.length,
-    alerts: [],
+    alerts: buildAlerts(issues, byId, counts, workableAll.length),
   };
 }

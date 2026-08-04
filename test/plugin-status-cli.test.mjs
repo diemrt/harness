@@ -159,3 +159,80 @@ test("a missing depends_on field reads as no dependencies", () => {
   delete bare.depends_on;
   assert.deepEqual(buildSnapshot([bare]).workable.map((i) => i.id), ["aaaaaaaa"]);
 });
+
+test("no alerts on a healthy tracker", () => {
+  const snapshot = buildSnapshot([
+    issue("aaaaaaaa", { status: "done" }),
+    issue("bbbbbbbb", { depends_on: ["aaaaaaaa"] }),
+  ]);
+  assert.deepEqual(snapshot.alerts, []);
+});
+
+test("a cycle among open issues is reported with every id involved", () => {
+  const snapshot = buildSnapshot([
+    issue("aaaaaaaa", { depends_on: ["bbbbbbbb"] }),
+    issue("bbbbbbbb", { depends_on: ["aaaaaaaa"] }),
+  ]);
+  // Two issues waiting on each other are also two issues nobody can take, so the standstill alert
+  // fires alongside the cycle. Both are true and neither implies the other: a standstill can come
+  // from a plain chain, and a cycle can sit next to workable issues elsewhere.
+  const cycle = snapshot.alerts.find((a) => a.startsWith("ciclo nei depends_on: "));
+  assert.ok(cycle, `no cycle alert among ${JSON.stringify(snapshot.alerts)}`);
+  assert.match(cycle, /aaaaaaaa/);
+  assert.match(cycle, /bbbbbbbb/);
+  assert.equal(snapshot.alerts[0], cycle, "the cycle explains the rest and must come first");
+});
+
+test("a cycle among done issues is history, not an alert", () => {
+  const snapshot = buildSnapshot([
+    issue("aaaaaaaa", { status: "done", depends_on: ["bbbbbbbb"] }),
+    issue("bbbbbbbb", { status: "done", depends_on: ["aaaaaaaa"] }),
+  ]);
+  assert.deepEqual(snapshot.alerts, []);
+});
+
+test("a cycle does not stop the rest of the snapshot", () => {
+  const snapshot = buildSnapshot([
+    issue("aaaaaaaa", { depends_on: ["bbbbbbbb"] }),
+    issue("bbbbbbbb", { depends_on: ["aaaaaaaa"] }),
+    issue("cccccccc", { status: "in_progress" }),
+  ]);
+  assert.equal(snapshot.counts.in_progress, 1);
+  assert.deepEqual(snapshot.inFlight.map((i) => i.id), ["cccccccc"]);
+});
+
+test("dangling dependencies are counted and their missing ids named", () => {
+  const snapshot = buildSnapshot([
+    issue("aaaaaaaa", { depends_on: ["ffffffff"] }),
+    issue("bbbbbbbb", { depends_on: ["ffffffff"] }),
+  ]);
+  const alert = snapshot.alerts.find((a) => a.includes("id inesistenti"));
+  assert.match(alert, /^2 issue dipendono da id inesistenti: ffffffff$/);
+});
+
+test("one dangling dependency reads in the singular", () => {
+  const snapshot = buildSnapshot([issue("aaaaaaaa", { depends_on: ["ffffffff"] })]);
+  const alert = snapshot.alerts.find((a) => a.includes("id inesistente"));
+  assert.match(alert, /^1 issue dipende da id inesistente: ffffffff$/);
+});
+
+test("a full backlog with nothing workable is a standstill", () => {
+  const snapshot = buildSnapshot([
+    issue("aaaaaaaa", { status: "in_progress" }),
+    issue("bbbbbbbb", { depends_on: ["aaaaaaaa"] }),
+    issue("cccccccc", { depends_on: ["aaaaaaaa"] }),
+  ]);
+  const alert = snapshot.alerts.find((a) => a.startsWith("lavorabili 0"));
+  assert.equal(alert, "lavorabili 0 di 2 — ogni issue in backlog attende qualcosa");
+});
+
+test("an empty backlog is not a standstill", () => {
+  const snapshot = buildSnapshot([issue("aaaaaaaa", { status: "done" })]);
+  assert.deepEqual(snapshot.alerts, []);
+});
+
+test("blocked issues raise no alert: they are already in the in-flight section", () => {
+  const snapshot = buildSnapshot([issue("aaaaaaaa", { status: "blocked" })]);
+  assert.deepEqual(snapshot.alerts, []);
+  assert.deepEqual(snapshot.inFlight.map((i) => i.id), ["aaaaaaaa"]);
+});

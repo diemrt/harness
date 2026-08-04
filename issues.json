@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-04T09:27:21Z",
+  "last_updated": "2026-08-04T09:32:27Z",
   "rules": {
     "single_active_issue": false
   },
@@ -311,25 +311,17 @@
       "id": "59819a08-06da-481c-9a4f-ba948c5432ec",
       "title": "status-cli: allerte su cicli, dipendenze fantasma e stallo",
       "description": "buildSnapshot guadagna alerts: un array di stringhe senza il punto esclamativo davanti, che aggiunge il renderer.\n\nTre allerte, in quest'ordine: ciclo nei depends_on (visita in profondita' limitata alle issue non done, perche' un ciclo fra issue chiuse e' storia), dipendenze che puntano a id inesistenti (con singolare e plurale corretti), stallo quando il backlog non e' vuoto e non c'e' nessuna lavorabile.\n\nLe issue blocked non generano allerta: compaiono gia' in inFlight con la loro icona. Un ciclo non interrompe il resto dello snapshot.\n\nCodice e test in Task 3 di docs/superpowers/plans/2026-08-04-status-cli.md.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
         "0fe39c8a-a84b-466b-9e39-b3d7912dcaf5"
       ],
       "validation": {
-        "criteria": [
-          "Un tracker sano restituisce alerts vuoto",
-          "Un ciclo fra issue aperte produce un'allerta che inizia con 'ciclo nei depends_on: ' e nomina tutti gli id coinvolti",
-          "Un ciclo fra sole issue done NON produce allerta",
-          "Con un ciclo presente, counts e inFlight restano corretti per le issue non coinvolte",
-          "Le dipendenze fantasma producono '<n> issue dipendono da id inesistenti: <ids>', al singolare con una sola issue",
-          "Backlog non vuoto e zero lavorabili producono 'lavorabili 0 di <n> - ogni issue in backlog attende qualcosa'; una issue blocked da sola non produce nessuna allerta",
-          "node --test test/plugin-status-cli.test.mjs passa con almeno 23 test e npm run test resta verde"
-        ],
-        "state": "unknown"
+        "criteria": "npm run test: 245/245 pass, incluso node --test test/plugin-status-cli.test.mjs (23/23, tutti in scope). Ogni criterio verificato contro scripts/status-cli.mjs: (1) 'no alerts on a healthy tracker' -> alerts:[] su tracker sano; (2) 'a cycle among open issues...' -> alert 'ciclo nei depends_on: aaaaaaaa bbbbbbbb' con entrambi gli id, alerts[0]; (3) 'a cycle among done issues is history, not an alert' -> alerts:[] invariato e ancora strict (deepEqual), non indebolito; (4) 'a cycle does not stop the rest of the snapshot' -> counts/inFlight corretti per issue non coinvolta; (5) dangling deps singolare/plurale -> due test dedicati con regex esatta; (6) standstill 'lavorabili 0 di 2 - ...' e blocked-da-sola senza alert -> verificati. Il test riscritto su 'a cycle among open issues' e' legittimo: due backlog che si depends_on a vicenda hanno counts.backlog=2 e workableTotal=0, quindi buildAlerts (scripts/status-cli.mjs righe 93-116) genera SIA l'alert di ciclo SIA quello di stallo, coerentemente con la logica indipendente descritta nella issue ('tre allerte' come controlli separati, 'un ciclo non interrompe il resto dello snapshot'); asserire alerts.length===1 era quindi errato rispetto al comportamento reale, non l'implementazione ad essere sbagliata. Il nuovo test resta rigoroso: usa .find + assert.ok per l'esistenza, assert.match per entrambi gli id, e verifica esplicitamente l'ordine (cycle deve essere alerts[0]). git diff test/plugin-status-cli.test.mjs mostra solo aggiunte in coda (righe 159+), nessun test preesistente modificato o ammorbidito. git status --short: solo issues.json, scripts/status-cli.mjs, test/plugin-status-cli.test.mjs toccati, tutti in scope; nessun danno collaterale. Nessun file modificato da me oltre alla chiusura della issue.",
+        "state": "pass"
       },
       "created_at": "2026-08-04T09:14:41Z",
-      "updated_at": "2026-08-04T09:14:41Z"
+      "updated_at": "2026-08-04T09:32:27Z"
     },
     {
       "id": "9c45bfd7-977f-4e00-84b6-9c42545ae0c1",
