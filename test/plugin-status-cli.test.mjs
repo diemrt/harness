@@ -11,6 +11,7 @@ import {
   TIER_ICON,
   WIDTH,
   BAR_INNER,
+  TITLE_MAX,
 } from "../scripts/status-cli.mjs";
 
 function issue(id, overrides = {}) {
@@ -315,6 +316,95 @@ test("no line is wider than eighty columns, even with three-digit counts", () =>
     issue(`${n}`.padStart(8, "0"), { status: EVERY_STATUS[n % 5] })
   );
   for (const line of lines(render(issues))) {
+    assert.ok(line.length <= WIDTH, `line is ${line.length} columns: ${JSON.stringify(line)}`);
+  }
+});
+
+test("an in-flight row carries icon, short id, status word, tier and title", () => {
+  const out = render([
+    issue("aaaaaaaa-1111-2222-3333-444444444444", {
+      status: "in_progress",
+      tier: "standard",
+      title: "vista albero delle catene",
+    }),
+  ]);
+  const row = lines(out).find((l) => l.includes("vista albero"));
+  assert.equal(row, "  + aaaaaaaa  in_progress  $$   vista albero delle catene");
+});
+
+test("a workable row drops the status word: every one of them is backlog", () => {
+  const out = render([issue("bbbbbbbb", { tier: "economy", title: "drawer con focus trap" })]);
+  const row = lines(out).find((l) => l.includes("drawer con"));
+  assert.equal(row, "  o bbbbbbbb  $    drawer con focus trap");
+});
+
+test("every tier gets its icon, and an undeclared tier gets a dash", () => {
+  const out = render([
+    issue("aaaaaaaa", { tier: "economy", title: "eco" }),
+    issue("bbbbbbbb", { tier: "standard", title: "std" }),
+    issue("cccccccc", { tier: "reasoning", title: "rsn" }),
+  ]);
+  assert.match(lines(out).find((l) => l.endsWith("eco")), /\$ {4}eco$/);
+  assert.match(lines(out).find((l) => l.endsWith("std")), /\$\$ {3}std$/);
+  assert.match(lines(out).find((l) => l.endsWith("rsn")), /\$\$\$ {2}rsn$/);
+
+  const bare = render([issue("dddddddd", { tier: null, title: "senza tier" })]);
+  assert.match(lines(bare).find((l) => l.includes("senza tier")), /- {4}senza tier$/);
+});
+
+test("a long title is cut to the limit with three ASCII dots", () => {
+  const long = "filtri per tier nel board, con scorciatoie e tema a tre stati";
+  const out = render([issue("aaaaaaaa", { status: "in_progress", title: long })]);
+  const row = lines(out).find((l) => l.includes("filtri per tier"));
+  const title = row.slice(row.indexOf("filtri"));
+  assert.equal(title.length, TITLE_MAX);
+  assert.ok(title.endsWith("..."), "the ellipsis must be three ASCII dots, never a single glyph");
+  assert.ok(!title.includes("…"));
+});
+
+test("a title exactly at the limit is left alone", () => {
+  const exact = "x".repeat(TITLE_MAX);
+  const out = render([issue("aaaaaaaa", { status: "in_progress", title: exact })]);
+  assert.ok(out.includes(exact));
+  assert.ok(!out.includes("..."));
+});
+
+test("newlines inside a title cannot break the table", () => {
+  const out = render([issue("aaaaaaaa", { status: "in_progress", title: "prima\nseconda" })]);
+  assert.ok(out.includes("prima seconda"));
+  for (const line of lines(out)) {
+    assert.ok(line.length <= WIDTH);
+  }
+});
+
+test("the workable heading always declares the real total", () => {
+  const many = Array.from({ length: 7 }, (_, n) =>
+    issue(`${n}`.padStart(8, "0"), { created_at: `2026-01-0${n + 1}T00:00:00Z` })
+  );
+  assert.ok(render(many).includes("LAVORABILI · 3 di 7"));
+});
+
+test("the tier legend closes the output", () => {
+  const out = render([issue("aaaaaaaa")]);
+  assert.match(
+    lines(out).at(-1),
+    /^ tier {2}\$ economy {3}\$\$ standard {3}\$\$\$ reasoning {3}- non dichiarato$/
+  );
+});
+
+test("the section headings are the agreed words", () => {
+  const out = render([issue("aaaaaaaa", { status: "in_progress" }), issue("bbbbbbbb")]);
+  assert.ok(out.includes(" IN CORSO"), "the heading is IN CORSO, not IN VOLO");
+  assert.ok(!out.includes("IN VOLO"));
+  assert.ok(out.includes(" LAVORABILI · 1 di 1"));
+});
+
+test("no line is wider than eighty columns with the longest legal title", () => {
+  const out = render([
+    issue("aaaaaaaa", { status: "in_progress", tier: "reasoning", title: "x".repeat(80) }),
+    issue("bbbbbbbb", { tier: "reasoning", title: "y".repeat(80) }),
+  ]);
+  for (const line of lines(out)) {
     assert.ok(line.length <= WIDTH, `line is ${line.length} columns: ${JSON.stringify(line)}`);
   }
 });

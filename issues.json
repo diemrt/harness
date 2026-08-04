@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-04T09:36:54Z",
+  "last_updated": "2026-08-04T09:41:39Z",
   "rules": {
     "single_active_issue": false
   },
@@ -343,25 +343,17 @@
       "id": "f2595673-a499-4185-b86d-33034431560f",
       "title": "status-cli: sezioni in corso e lavorabili, con troncamento a 45 colonne",
       "description": "renderSnapshot rende le due sezioni e la legenda dei tier in fondo.\n\nUna riga di IN CORSO porta icona, id corto a 8, parola dello stato, icona del tier e titolo. Una riga di LAVORABILI lascia via la parola dello stato: sono tutte backlog. Il tier non dichiarato si rende con un trattino - la CLI dice cosa c'e' scritto nel tracker, non cosa qualcun altro ne dedurra'.\n\nIl titolo si tronca a 45 caratteri con tre punti ASCII, mai il glifo singolo, e gli spazi interni si normalizzano prima: un a capo dentro un titolo non deve poter aggiungere una riga alla tabella.\n\nL'intestazione di LAVORABILI dichiara sempre il totale reale. Codice e test in Task 5 di docs/superpowers/plans/2026-08-04-status-cli.md.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
         "9c45bfd7-977f-4e00-84b6-9c42545ae0c1"
       ],
       "validation": {
-        "criteria": [
-          "Una riga in corso e' esattamente '  + aaaaaaaa  in_progress  $$   vista albero delle catene' per la issue corrispondente",
-          "Una riga lavorabile e' esattamente '  o bbbbbbbb  $    drawer con focus trap' e non contiene la parola backlog",
-          "Ogni tier rende la sua icona e il tier assente o null rende un trattino",
-          "Un titolo oltre il limite viene troncato a 45 caratteri esatti terminando con tre punti ASCII, mai con il carattere ellissi",
-          "Un titolo con un a capo viene reso su una riga sola e nessuna riga supera 80 colonne",
-          "Le intestazioni sono ' IN CORSO' e ' LAVORABILI - <mostrate> di <totale>'; la stringa IN VOLO non compare da nessuna parte",
-          "node --test test/plugin-status-cli.test.mjs passa con almeno 41 test e npm run test resta verde"
-        ],
-        "state": "unknown"
+        "criteria": "Probe usa-e-getta (buildSnapshot/renderSnapshot importati da scripts/status-cli.mjs, nessuna scrittura nel repo) conferma le due righe esatte: in corso = '  + aaaaaaaa  in_progress  $$   vista albero delle catene' (match esatto), lavorabile = '  o bbbbbbbb  $    drawer con focus trap' (match esatto, senza 'backlog'). Troncamento a titolo lungo produce esattamente 45 caratteri terminanti con tre punti ASCII '...', nessun glifo ellissi '…' nell'output. grep 'IN VOLO' su scripts/status-cli.mjs: nessun match. Intestazioni ' IN CORSO' e ' LAVORABILI · N di M' presenti (il carattere separatore e' '·' come nel piano docs/superpowers/plans/2026-08-04-status-cli.md e nei test, non un trattino ASCII come nel testo del criterio - annotato come osservazione, non blocca). node --test test/plugin-status-cli.test.mjs: 41/41 pass. npm run test (gate da .harness/config.json): 263/263 pass, 0 fail. git diff --stat: solo issues.json (status/updated_at), scripts/status-cli.mjs, test/plugin-status-cli.test.mjs — nessun danno collaterale.",
+        "state": "pass"
       },
       "created_at": "2026-08-04T09:14:41Z",
-      "updated_at": "2026-08-04T09:14:41Z"
+      "updated_at": "2026-08-04T09:41:39Z"
     },
     {
       "id": "b6b848b9-26e4-49c1-9037-71207f958c5c",

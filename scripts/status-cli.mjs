@@ -190,6 +190,36 @@ function renderLegend(counts) {
   return `  ${parts.join("  ")}`;
 }
 
+const RULE = ` ${"─".repeat(WIDTH - 1)}`;
+
+const TIER_LEGEND = " tier  $ economy   $$ standard   $$$ reasoning   - non dichiarato";
+
+// A title is one line or it is not a table. Whitespace is collapsed first so a newline inside a
+// title cannot smuggle a second row into the output.
+function truncate(text, max) {
+  const clean = String(text ?? "").replace(/\s+/g, " ").trim();
+  return clean.length <= max ? clean : `${clean.slice(0, max - 3)}...`;
+}
+
+function tierIcon(tier) {
+  return TIER_ICON[tier] ?? "-";
+}
+
+function inFlightRow(issue) {
+  return (
+    `  ${STATUS_ICON[issue.status]} ${shortId(issue.id).padEnd(8)}  ` +
+    `${issue.status.padEnd(11)}  ${tierIcon(issue.tier).padEnd(3)}  ` +
+    truncate(issue.title, TITLE_MAX)
+  );
+}
+
+function workableRow(issue) {
+  return (
+    `  ${STATUS_ICON.backlog} ${shortId(issue.id).padEnd(8)}  ` +
+    `${tierIcon(issue.tier).padEnd(3)}  ${truncate(issue.title, TITLE_MAX)}`
+  );
+}
+
 export function renderSnapshot(snapshot, { project, lastUpdated }) {
   const total = Object.values(snapshot.counts).reduce((sum, n) => sum + n, 0);
   const when = formatWhen(lastUpdated);
@@ -198,5 +228,15 @@ export function renderSnapshot(snapshot, { project, lastUpdated }) {
     "═".repeat(WIDTH),
     renderBar(snapshot.counts),
     renderLegend(snapshot.counts),
+    "",
+    " IN CORSO",
+    RULE,
+    ...snapshot.inFlight.map(inFlightRow),
+    "",
+    ` LAVORABILI · ${snapshot.workable.length} di ${snapshot.workableTotal}`,
+    RULE,
+    ...snapshot.workable.map(workableRow),
+    RULE,
+    TIER_LEGEND,
   ].join("\n");
 }
