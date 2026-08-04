@@ -13,6 +13,11 @@
 // a pipe to the agent and a colour branch would never run. Alignment and ASCII icons carry the
 // distinctions instead, and they survive a markdown code block.
 
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { parseArgs } from "node:util";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
 export const STATUS_ICON = {
   backlog: "o",
   in_progress: "+",
@@ -266,4 +271,86 @@ export function renderSnapshot(snapshot, { project, lastUpdated }) {
     RULE,
     TIER_LEGEND,
   ].join("\n");
+}
+
+const USAGE = [
+  "Usage:",
+  "  node status-cli.mjs [--project-dir <path>] [--help]",
+  "",
+  "Prints one screen of tracker status: counts, what is in flight, what can be taken now.",
+  "Output is text, not JSON, and nothing is ever written to stderr.",
+  "",
+  "--project-dir  directory holding issues.json (default: the current directory).",
+  "               A project without issues.json reads as an empty tracker, not an error.",
+  "",
+  "Exit codes: 0 on success and on an empty tracker; 1 on a missing project directory, an",
+  "unreadable issues.json, or an unknown flag.",
+  "",
+].join("\n");
+
+function fail(message) {
+  process.stdout.write(`${message}\n`);
+  process.exit(1);
+}
+
+function resolveProjectDir(projectDir) {
+  const dir = path.resolve(projectDir ?? process.cwd());
+  if (!existsSync(dir) || !statSync(dir).isDirectory()) {
+    fail(`La directory di progetto '${dir}' non esiste.`);
+  }
+  return dir;
+}
+
+function main() {
+  let values;
+  try {
+    ({ values } = parseArgs({
+      args: process.argv.slice(2),
+      strict: true,
+      options: {
+        "project-dir": { type: "string" },
+        help: { type: "boolean", default: false },
+      },
+    }));
+  } catch (error) {
+    // strict on purpose: an invented flag must stop here. A summary that looks right but answers
+    // a different question is worse than no summary.
+    fail(
+      `${error.message.replace(/\.?$/, ".")} status-cli.mjs accetta solo --project-dir e --help.`
+    );
+  }
+
+  if (values.help) {
+    process.stdout.write(USAGE);
+    return;
+  }
+
+  const projectDir = resolveProjectDir(values["project-dir"]);
+  const fallbackName = path.basename(projectDir);
+  const trackerPath = path.join(projectDir, "issues.json");
+
+  if (!existsSync(trackerPath)) {
+    process.stdout.write(` ${fallbackName} · tracker vuoto\n`);
+    return;
+  }
+
+  let data;
+  try {
+    data = JSON.parse(readFileSync(trackerPath, "utf8"));
+  } catch {
+    fail(`'${trackerPath}' non è un JSON valido: il tracker non è leggibile.`);
+  }
+
+  const issues = Array.isArray(data.issues) ? data.issues : [];
+  const project = typeof data.project === "string" && data.project ? data.project : fallbackName;
+  const rendered = renderSnapshot(buildSnapshot(issues), {
+    project,
+    lastUpdated: data.last_updated ?? null,
+  });
+  process.stdout.write(`${rendered}\n`);
+}
+
+// The two pure functions above are imported by the tests; main() must not run then.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
 }

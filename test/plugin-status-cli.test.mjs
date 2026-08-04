@@ -13,6 +13,28 @@ import {
   BAR_INNER,
   TITLE_MAX,
 } from "../scripts/status-cli.mjs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const SCRIPT = path.join(__dirname, "..", "scripts", "status-cli.mjs");
+
+function runIn(projectDir, args = []) {
+  return spawnSync(process.execPath, [SCRIPT, "--project-dir", projectDir, ...args], {
+    encoding: "utf8",
+  });
+}
+
+function tempProject(tracker) {
+  const dir = mkdtempSync(path.join(tmpdir(), "harness-status-"));
+  if (tracker !== undefined) {
+    writeFileSync(path.join(dir, "issues.json"), tracker);
+  }
+  return dir;
+}
 
 function issue(id, overrides = {}) {
   return {
@@ -466,4 +488,90 @@ test("a full backlog with nothing workable shows the standstill alert and the em
   // rows out of the WORKABLE ones — which is zero here, hence "0 di 0".
   assert.ok(out.includes(" ! lavorabili 0 di 1 — ogni issue in backlog attende qualcosa"));
   assert.ok(out.includes(" LAVORABILI · 0 di 0"));
+});
+
+test("a valid tracker prints the snapshot and exits zero", () => {
+  const dir = tempProject(
+    JSON.stringify({
+      last_updated: "2026-08-04T09:12:00Z",
+      issues: [issue("aaaaaaaa", { status: "in_progress", title: "prima issue" })],
+    })
+  );
+  try {
+    const run = runIn(dir);
+    assert.equal(run.status, 0);
+    assert.equal(run.stderr, "", "nothing goes to stderr, ever");
+    assert.match(run.stdout, /IN CORSO/);
+    assert.match(run.stdout, /prima issue/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the project name falls back to the directory when the tracker does not carry one", () => {
+  const dir = tempProject(JSON.stringify({ last_updated: null, issues: [issue("aaaaaaaa")] }));
+  try {
+    assert.ok(runIn(dir).stdout.startsWith(` ${path.basename(dir)} · 1 issue`));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a project with no issues.json is an empty tracker, not an error", () => {
+  const dir = tempProject(undefined);
+  try {
+    const run = runIn(dir);
+    assert.equal(run.status, 0);
+    assert.match(run.stdout, /tracker vuoto/);
+    assert.equal(run.stderr, "");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a corrupt issues.json fails loudly instead of printing a plausible screen", () => {
+  const dir = tempProject("{ not json");
+  try {
+    const run = runIn(dir);
+    assert.equal(run.status, 1);
+    assert.match(run.stdout, /non è un JSON valido/);
+    assert.equal(run.stderr, "");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a project directory that does not exist fails", () => {
+  const run = runIn(path.join(tmpdir(), "harness-status-does-not-exist"));
+  assert.equal(run.status, 1);
+  assert.match(run.stdout, /non esiste/);
+  assert.equal(run.stderr, "");
+});
+
+test("an invented flag fails instead of printing a summary that looks right", () => {
+  const dir = tempProject(JSON.stringify({ last_updated: null, issues: [] }));
+  try {
+    const run = runIn(dir, ["--watch"]);
+    assert.equal(run.status, 1);
+    assert.match(run.stdout, /--project-dir/);
+    assert.equal(run.stderr, "");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--help explains the usage and exits zero", () => {
+  const run = spawnSync(process.execPath, [SCRIPT, "--help"], { encoding: "utf8" });
+  assert.equal(run.status, 0);
+  assert.match(run.stdout, /status-cli\.mjs/);
+  assert.equal(run.stderr, "");
+});
+
+test("stdout is text, not the one-line JSON the other scripts print", () => {
+  const dir = tempProject(JSON.stringify({ last_updated: null, issues: [issue("aaaaaaaa")] }));
+  try {
+    assert.throws(() => JSON.parse(runIn(dir).stdout.split("\n")[0]));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
