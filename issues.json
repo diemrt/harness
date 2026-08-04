@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-04T11:13:07Z",
+  "last_updated": "2026-08-04T11:20:59Z",
   "rules": {
     "single_active_issue": false
   },
@@ -436,21 +436,16 @@
     {
       "id": "aa07fb72-713c-4d65-bba9-6e1399652813",
       "title": "Stallo e intestazione LAVORABILI: 'N di M' con due denominatori diversi",
-      "description": "Trovato lavorando la issue b6b848b9, e visibile sul tracker reale di questo repository.\n\nQuando il backlog e' fermo, l'output stampa a due righe di distanza:\n\n  ! lavorabili 0 di 2 - ogni issue in backlog attende qualcosa\n  LAVORABILI - 0 di 0\n\nIl primo \"0 di 2\" e' lavorabili su totale del BACKLOG. Il secondo \"0 di 0\" e' righe mostrate su totale delle LAVORABILI. Stessa forma, due denominatori, nessun modo di capirlo dall'output se non leggendo la coda dell'allerta.\n\nNessuna delle due e' sbagliata da sola: sono state verificate e chiuse pass rispettivamente nelle issue 59819a08 e b6b848b9. La collisione e' fra le due, e non era stata vista quando i testi sono stati fissati.\n\nVa deciso quale delle due cambia forma. Cambiare il testo dell'allerta tocca un criterio gia' verificato: se si sceglie quella strada, la motivazione va scritta nella description, non applicata di nascosto.",
-      "status": "backlog",
+      "description": "Trovato lavorando b6b848b9. In stallo l'output stampava a due righe di distanza:\n\n  ! lavorabili 0 di 2 - ogni issue in backlog attende qualcosa\n  LAVORABILI - 0 di 0\n\nIl primo \"0 di 2\" era lavorabili sul totale del BACKLOG. Il secondo \"0 di 0\" e' righe mostrate sul totale delle LAVORABILI. Stessa forma, due denominatori, indistinguibili a schermo.\n\nDECISIONE: cambia l'allerta, non l'intestazione. \"mostrate di totale\" e' la convenzione normale di un elenco e l'intestazione compare sempre; l'allerta prendeva in prestito quella forma per dire un'altra cosa, e compare solo in stallo. Raggio minore, e a cedere e' l'uso improprio.\n\nL'allerta abbandona la forma N di M: da 'lavorabili 0 di <n> - ogni issue in backlog attende qualcosa' a 'backlog fermo: <n> issue, nessuna lavorabile - tutte attendono qualcosa'. Nomina cosa conta invece di lasciarlo dedurre.\n\nIl testo precedente era stato verificato pass nella issue 59819a08: il cambio tocca un criterio gia' chiuso, ed e' questa la ragione che il terzo criterio chiede di scrivere. Aggiornati i due test che lo asserivano, piu' due nuovi che fissano il denominatore di ogni numero mostrato, e la sezione allerte di references/status.md.",
+      "status": "done",
       "tier": "standard",
       "depends_on": [],
       "validation": {
-        "criteria": [
-          "L'output in stato di stallo non presenta piu' due 'N di M' con denominatori diversi a distanza di poche righe",
-          "La forma scelta e' provata da un test che rende esplicito il denominatore di ciascun numero mostrato",
-          "Se il testo dell'allerta cambia, il test corrispondente in test/plugin-status-cli.test.mjs viene aggiornato e la ragione del cambio e' scritta nella description di questa issue",
-          "npm run test resta verde"
-        ],
-        "state": "unknown"
+        "criteria": "Verificato con probe reali (temp dir con --project-dir, non issues.json del repo). (1) Stallo: node scripts/status-cli.mjs --project-dir <tmp> su tracker con 1 in_progress + 2 backlog dipendenti dalla in_progress produce ' ! backlog fermo: 2 issue, nessuna lavorabile - tutte attendono qualcosa' seguito poche righe dopo da ' LAVORABILI - 0 di 0': un solo numero nella forma N di M vicino all'alert, non piu' due denominatori diversi. Caso con lavorabili presenti (1 done + 1 backlog sbloccata): nessuna riga con punto esclamativo in output, intestazione ' LAVORABILI - 1 di 1' (mostrate su lavorabili). (2) git diff test/plugin-status-cli.test.mjs mostra due nuovi test che fissano esplicitamente entrambi i denominatori: 'the standstill alert names the backlog...' asserisce counts.backlog=4, workableTotal=0, testo alert con '4 issue', un assert.ok che verifica che l'alert non riusi la forma N di M dell'intestazione, e intestazione 'LAVORABILI - 0 di 0'; 'with workable issues...' asserisce counts.backlog=8, workableTotal=7, nessun alert 'backlog fermo', intestazione 'LAVORABILI - 3 di 7'. (3) git diff scripts/status-cli.mjs mostra solo il cambio della riga alert (da 'lavorabili 0 di n - ...' a 'backlog fermo: n issue, nessuna lavorabile - ...') piu' un commento che spiega perche'; i due test preesistenti che asserivano il testo vecchio sono stati aggiornati al nuovo testo, non rimossi ne' indeboliti. La description della issue riporta esplicitamente che il testo precedente era stato verificato pass nella issue 59819a08 e che il cambio tocca un criterio gia' chiuso: entrambe le condizioni del criterio 3 soddisfatte. skills/harness/references/status.md aggiornato con il nuovo testo dell'allerta e la spiegazione del perche' non usa la forma N di M (righe 164-168), nessun residuo del testo vecchio nella reference. git diff --stat limitato a issues.json, scripts/status-cli.mjs, skills/harness/references/status.md, test/plugin-status-cli.test.mjs: nessun danno collaterale, nessun altro comportamento alterato. (4) npm run test: 280/280 pass, 0 fail (gate .harness/config.json verify=npm run test). Osservazione fuori scope: docs/superpowers/plans/2026-08-04-status-cli.md e docs/superpowers/specs/2026-08-04-status-cli-design.md contengono ancora il testo vecchio 'lavorabili 0 di n' nei blocchi di codice storici del piano/spec originali; non fanno parte dei criteri di questa issue (solo status.md e il test sono citati) e non sono stati toccati dal lavoro, quindi non blocca. Nessun file modificato da me oltre alla chiusura di questa issue; probe eseguiti solo su directory temporanee con --project-dir esplicito.",
+        "state": "pass"
       },
       "created_at": "2026-08-04T10:00:35Z",
-      "updated_at": "2026-08-04T10:00:35Z"
+      "updated_at": "2026-08-04T11:20:59Z"
     }
   ]
 }

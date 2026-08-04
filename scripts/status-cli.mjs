@@ -113,8 +113,11 @@ function buildAlerts(issues, byId, counts, workableTotal) {
     alerts.push(`${broken.length} ${verb}: ${missing}`);
   }
 
+  // Deliberately NOT "lavorabili 0 di <n>". That reads two lines above "LAVORABILI · 0 di 0",
+  // and the two "N di M" count different things — backlog here, workable there. Same shape, two
+  // denominators, no way to tell them apart on screen. The alert gives up the shape instead.
   if (counts.backlog > 0 && workableTotal === 0) {
-    alerts.push(`lavorabili 0 di ${counts.backlog} — ogni issue in backlog attende qualcosa`);
+    alerts.push(`backlog fermo: ${counts.backlog} issue, nessuna lavorabile — tutte attendono qualcosa`);
   }
 
   return alerts;

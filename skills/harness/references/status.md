@@ -161,10 +161,11 @@ cose che le sezioni non possono mostrare da sé:
 - `<n> issue dipendono da id inesistenti: <id> ...` — `depends_on` che puntano al nulla.
   Succede dopo una modifica a mano di `issues.json`, o dopo un archivio che ha portato via
   qualcosa ancora referenziato.
-- `lavorabili 0 di <n> — ogni issue in backlog attende qualcosa` — stallo: il backlog non è
-  vuoto e nessuna delle sue issue è prendibile. Qui `<n>` è il **totale del backlog**, non il
-  totale delle lavorabili come nell'intestazione della sezione: è la coda della riga a dire
-  quale dei due stai leggendo.
+- `backlog fermo: <n> issue, nessuna lavorabile — tutte attendono qualcosa` — stallo: il
+  backlog non è vuoto e nessuna delle sue issue è prendibile. `<n>` è il **totale del backlog**.
+  Questa riga non usa la forma `N di M` apposta: la userebbe due righe sopra `LAVORABILI · 0 di
+  0`, dove gli stessi due numeri contano le lavorabili e non il backlog, e sullo schermo non ci
+  sarebbe modo di distinguerle.
 
 Un'allerta più lunga di 80 colonne **va a capo** su righe di continuazione indentate, non viene
 troncata: troncare nasconderebbe proprio l'id che serve.

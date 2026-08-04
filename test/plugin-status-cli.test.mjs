@@ -252,8 +252,50 @@ test("a full backlog with nothing workable is a standstill", () => {
     issue("bbbbbbbb", { depends_on: ["aaaaaaaa"] }),
     issue("cccccccc", { depends_on: ["aaaaaaaa"] }),
   ]);
-  const alert = snapshot.alerts.find((a) => a.startsWith("lavorabili 0"));
-  assert.equal(alert, "lavorabili 0 di 2 — ogni issue in backlog attende qualcosa");
+  const alert = snapshot.alerts.find((a) => a.startsWith("backlog fermo"));
+  assert.equal(alert, "backlog fermo: 2 issue, nessuna lavorabile — tutte attendono qualcosa");
+});
+
+test("the standstill alert names the backlog, never in the 'N di M' shape of the heading", () => {
+  // The two numbers on screen count different things: the alert counts the BACKLOG, the heading
+  // counts the WORKABLE ones. They used to share the "N di M" shape two lines apart, which is
+  // what made them unreadable together. The alert dropped the shape; this test pins both.
+  const snapshot = buildSnapshot([
+    issue("aaaaaaaa", { status: "in_progress" }),
+    issue("bbbbbbbb", { depends_on: ["aaaaaaaa"] }),
+    issue("cccccccc", { depends_on: ["aaaaaaaa"] }),
+    issue("dddddddd", { depends_on: ["aaaaaaaa"] }),
+    issue("eeeeeeee", { depends_on: ["aaaaaaaa"] }),
+  ]);
+  assert.equal(snapshot.counts.backlog, 4, "four issues sit in backlog");
+  assert.equal(snapshot.workableTotal, 0, "none of them is workable");
+
+  const alert = snapshot.alerts.find((a) => a.startsWith("backlog fermo"));
+  assert.equal(alert, "backlog fermo: 4 issue, nessuna lavorabile — tutte attendono qualcosa");
+  assert.ok(!/\bdi \d/.test(alert), "the alert must not reuse the heading's 'N di M' shape");
+
+  const out = renderSnapshot(snapshot, { project: "harness", lastUpdated: null });
+  assert.ok(out.includes(" LAVORABILI · 0 di 0"), "the heading counts workable, not backlog");
+});
+
+test("with workable issues the heading shows shown-of-workable and no standstill fires", () => {
+  const issues = [
+    issue("aaaaaaaa", { status: "done" }),
+    ...Array.from({ length: 7 }, (_, n) =>
+      issue(`${n}`.padStart(8, "0"), {
+        depends_on: ["aaaaaaaa"],
+        created_at: `2026-01-0${n + 1}T00:00:00Z`,
+      })
+    ),
+    issue("ffffffff", { depends_on: ["nonesiste"] }),
+  ];
+  const snapshot = buildSnapshot(issues);
+  assert.equal(snapshot.counts.backlog, 8, "eight in backlog");
+  assert.equal(snapshot.workableTotal, 7, "one of them depends on a missing id");
+  assert.ok(!snapshot.alerts.some((a) => a.startsWith("backlog fermo")));
+
+  const out = renderSnapshot(snapshot, { project: "harness", lastUpdated: null });
+  assert.ok(out.includes(" LAVORABILI · 3 di 7"), "three shown out of seven workable, not eight");
 });
 
 test("an empty backlog is not a standstill", () => {
@@ -483,10 +525,7 @@ test("a full backlog with nothing workable shows the standstill alert and the em
     issue("aaaaaaaa", { status: "in_progress" }),
     issue("bbbbbbbb", { depends_on: ["aaaaaaaa"] }),
   ]);
-  // The two "N di M" read differently on purpose, and the alert's trailing clause is what keeps
-  // them apart: the alert counts workable issues out of the BACKLOG, the heading counts shown
-  // rows out of the WORKABLE ones — which is zero here, hence "0 di 0".
-  assert.ok(out.includes(" ! lavorabili 0 di 1 — ogni issue in backlog attende qualcosa"));
+  assert.ok(out.includes(" ! backlog fermo: 1 issue, nessuna lavorabile — tutte attendono qualcosa"));
   assert.ok(out.includes(" LAVORABILI · 0 di 0"));
 });
 
