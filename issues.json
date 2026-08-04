@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-04T09:14:42Z",
+  "last_updated": "2026-08-04T09:24:14Z",
   "rules": {
     "single_active_issue": false
   },
@@ -281,22 +281,15 @@
       "id": "6a53d9c8-f41e-44f0-9536-279de693e938",
       "title": "status-cli: costanti, conteggi e sezione delle issue in corso",
       "description": "Primo pezzo di scripts/status-cli.mjs: le costanti condivise (icone di stato e tier, ordini di lettura, larghezze) e buildSnapshot(issues) limitata a counts e inFlight.\n\ncounts porta sempre tutte e cinque le chiavi, anche a zero. inFlight raccoglie in_progress, in_review e blocked in quest'ordine, e dentro ogni stato ordina per updated_at decrescente. Non si tronca mai: dodici issue aperte sono un problema di WIP da vedere, non da riassumere.\n\nCodice e test in Task 1 di docs/superpowers/plans/2026-08-04-status-cli.md.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [],
       "validation": {
-        "criteria": [
-          "scripts/status-cli.mjs esporta STATUS_ICON, TIER_ICON, IN_FLIGHT_ORDER, BAR_ORDER, WIDTH, BAR_INNER, TITLE_MAX, WORKABLE_SHOWN e buildSnapshot",
-          "STATUS_ICON vale {backlog:'o', in_progress:'+', in_review:'~', blocked:'!', done:'#'} e TIER_ICON vale {economy:'$', standard:'$$', reasoning:'$$$'}",
-          "buildSnapshot([]) restituisce counts con tutte e cinque le chiavi a zero, non un oggetto vuoto",
-          "inFlight ordina per stato (in_progress, in_review, blocked) e dentro ogni stato per updated_at decrescente",
-          "buildSnapshot su dodici issue in_progress restituisce dodici elementi in inFlight, senza troncamento",
-          "node --test test/plugin-status-cli.test.mjs passa con almeno 6 test e npm run test resta verde"
-        ],
-        "state": "unknown"
+        "criteria": "scripts/status-cli.mjs esporta STATUS_ICON, TIER_ICON, IN_FLIGHT_ORDER, BAR_ORDER, WIDTH, BAR_INNER, TITLE_MAX, WORKABLE_SHOWN, buildSnapshot (righe 16-43); STATUS_ICON/TIER_ICON matchano lo spec esatto (righe 16-24), confermato dal test 'the icon tables are the ASCII ones the spec fixes'; buildSnapshot([]) restituisce counts con le 5 chiavi a zero via emptyCounts() (righe 39-41, 44), confermato dal test 'an empty tracker counts zero everywhere instead of missing keys'; inFlight ordina per IN_FLIGHT_ORDER.indexOf(status) poi updated_at decrescente (righe 51-57), confermato dai test 'in flight is in_progress, in_review and blocked, in that order' e 'inside one status the most recently touched issue comes first'; 12 issue in_progress producono 12 elementi inFlight senza troncamento, confermato dal test omonimo. node --test test/plugin-status-cli.test.mjs: 6/6 pass. npm run test (gate da .harness/config.json): 228/228 pass, 0 fail. git status --short mostra solo i due file nuovi attesi (scripts/status-cli.mjs, test/plugin-status-cli.test.mjs) e issues.json (transizione backlog->in_review del worker), nessun danno collaterale fuori scope.",
+        "state": "pass"
       },
       "created_at": "2026-08-04T09:14:41Z",
-      "updated_at": "2026-08-04T09:14:41Z"
+      "updated_at": "2026-08-04T09:24:14Z"
     },
     {
       "id": "0fe39c8a-a84b-466b-9e39-b3d7912dcaf5",
