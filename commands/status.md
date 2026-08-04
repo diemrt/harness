@@ -4,10 +4,10 @@ argument-hint: "[--project-dir <path>]"
 allowed-tools: Bash
 ---
 
-Istantanea del tracker del progetto corrente, in una schermata sola. Il contratto del tracker
-che questo comando legge — schema, stati, `depends_on` — è in
-`${CLAUDE_PLUGIN_ROOT}/skills/harness/references/issues.md`: qui non serve, il comando non
-scrive niente.
+Istantanea del tracker del progetto corrente, in una schermata sola. Il contratto completo —
+come si legge ogni riga, icone, ordinamenti, casi vuoti, allerte, canali e codici d'uscita — è
+in `${CLAUDE_PLUGIN_ROOT}/skills/harness/references/status.md`: leggilo quando l'output non ti
+torna, non prima.
 
 Argomenti: `$ARGUMENTS` (nessun argomento = progetto corrente).
 
@@ -19,7 +19,8 @@ Argomenti: `$ARGUMENTS` (nessun argomento = progetto corrente).
    node "${CLAUDE_PLUGIN_ROOT}/scripts/status-cli.mjs" [--project-dir <path>]
    ```
 
-   `--project-dir` serve solo se la cwd non è la radice del progetto.
+   `--project-dir` serve solo se la cwd non è la radice del progetto; `--help` stampa l'uso.
+   Non ci sono altri flag e non ci sono sottocomandi.
 
 2. **Ristampa l'output verbatim, dentro un blocco di codice**, e basta.
 
@@ -30,20 +31,14 @@ Argomenti: `$ARGUMENTS` (nessun argomento = progetto corrente).
 3. Aggiungi al massimo **una riga** tua, e solo se dice qualcosa che l'output non dice già —
    per esempio quale issue proponi di prendere fra le lavorabili. Il riepilogo parla da sé.
 
-## Come si legge
-
-Le icone della barra sono le stesse delle righe: `#` done, `+` in_progress, `~` in_review,
-`!` blocked, `o` backlog. Il tier è `$` economy, `$$` standard, `$$$` reasoning, `-` non
-dichiarato, e la legenda è in fondo all'output.
-
-Le righe che iniziano con `!`, sopra la barra, sono le sole cose che le sezioni non possono
-mostrare da sé: un ciclo nei `depends_on`, dipendenze che puntano a id inesistenti, un backlog
-in cui nessuna issue è lavorabile. Le issue `blocked` non stanno lì: stanno in `IN CORSO`.
-
 ## Uscita diversa da zero
 
-Lo script esce 1 e stampa una riga sola quando la directory di progetto non esiste, quando
-`issues.json` non è un JSON valido, o quando un flag non esiste. Riporta quella riga così com'è
-e fermati: non ritentare con flag inventati, lo script dichiara solo `--project-dir` e `--help`.
+Lo script esce 1 quando la directory di progetto non esiste, quando `issues.json` non è un JSON
+valido, o quando un flag non esiste. Riporta la riga che stampa così com'è e fermati: non
+ritentare con flag inventati.
 
-Un progetto senza `issues.json` **non** è un errore: esce 0 e stampa `tracker vuoto`.
+**Tutto esce su stdout, errori compresi: su stderr non finisce mai niente**, e l'output è testo,
+mai JSON. Chi guarda solo stderr non trova nulla e crede che il comando sia rimasto muto.
+
+Un tracker vuoto **non** è un errore: esce 0 e stampa `tracker vuoto`. Vale sia quando
+`issues.json` manca sia quando esiste senza issue dentro.
