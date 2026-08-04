@@ -4,7 +4,14 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildSnapshot, STATUS_ICON, TIER_ICON } from "../scripts/status-cli.mjs";
+import {
+  buildSnapshot,
+  renderSnapshot,
+  STATUS_ICON,
+  TIER_ICON,
+  WIDTH,
+  BAR_INNER,
+} from "../scripts/status-cli.mjs";
 
 function issue(id, overrides = {}) {
   return {
@@ -235,4 +242,79 @@ test("blocked issues raise no alert: they are already in the in-flight section",
   const snapshot = buildSnapshot([issue("aaaaaaaa", { status: "blocked" })]);
   assert.deepEqual(snapshot.alerts, []);
   assert.deepEqual(snapshot.inFlight.map((i) => i.id), ["aaaaaaaa"]);
+});
+
+function render(issues, opts = {}) {
+  return renderSnapshot(buildSnapshot(issues), {
+    project: "harness",
+    lastUpdated: "2026-08-04T09:12:00Z",
+    ...opts,
+  });
+}
+
+function lines(text) {
+  return text.split("\n");
+}
+
+const EVERY_STATUS = ["done", "in_progress", "in_review", "blocked", "backlog"];
+
+test("the header names the project and the tracker size", () => {
+  const first = lines(render([issue("aaaaaaaa")]))[0];
+  assert.match(first, /^ harness · 1 issue · aggiornato /);
+});
+
+test("the header counts done issues too: it is the tracker, not the open work", () => {
+  const first = lines(render([issue("aaaaaaaa", { status: "done" }), issue("bbbbbbbb")]))[0];
+  assert.match(first, /^ harness · 2 issue/);
+});
+
+test("a tracker with no last_updated stops the header at the count", () => {
+  const first = lines(render([issue("aaaaaaaa")], { lastUpdated: null }))[0];
+  assert.equal(first, " harness · 1 issue");
+});
+
+test("an unparseable last_updated is dropped rather than printed raw", () => {
+  const first = lines(render([issue("aaaaaaaa")], { lastUpdated: "not a date" }))[0];
+  assert.equal(first, " harness · 1 issue");
+});
+
+test("the bar segments always add up to the exact bar width", () => {
+  const cases = [
+    [issue("aaaaaaaa")],
+    [issue("aaaaaaaa", { status: "done" }), issue("bbbbbbbb")],
+    Array.from({ length: 97 }, (_, n) =>
+      issue(`${n}`.padStart(8, "0"), { status: n === 0 ? "blocked" : "done" })
+    ),
+  ];
+  for (const issues of cases) {
+    const bar = lines(render(issues)).find((l) => l.trim().startsWith("["));
+    const inner = bar.trim().slice(1, -1);
+    assert.equal(inner.length, BAR_INNER, `bar was ${inner.length} wide for ${issues.length} issues`);
+  }
+});
+
+test("a status with at least one issue never vanishes from the bar", () => {
+  const issues = Array.from({ length: 200 }, (_, n) =>
+    issue(`${n}`.padStart(8, "0"), { status: n === 0 ? "blocked" : "done" })
+  );
+  const bar = lines(render(issues)).find((l) => l.trim().startsWith("["));
+  assert.ok(bar.includes(STATUS_ICON.blocked), "one blocked issue in two hundred still gets a column");
+});
+
+test("the legend lists only the statuses that are actually there", () => {
+  const legend = lines(render([issue("aaaaaaaa", { status: "done" }), issue("bbbbbbbb")])).find(
+    (l) => l.includes("done")
+  );
+  assert.match(legend, /# done 1/);
+  assert.match(legend, /o backlog 1/);
+  assert.ok(!legend.includes("blocked"), "an empty status in the legend explains an absent icon");
+});
+
+test("no line is wider than eighty columns, even with three-digit counts", () => {
+  const issues = Array.from({ length: 999 }, (_, n) =>
+    issue(`${n}`.padStart(8, "0"), { status: EVERY_STATUS[n % 5] })
+  );
+  for (const line of lines(render(issues))) {
+    assert.ok(line.length <= WIDTH, `line is ${line.length} columns: ${JSON.stringify(line)}`);
+  }
 });

@@ -145,3 +145,58 @@ export function buildSnapshot(issues) {
     alerts: buildAlerts(issues, byId, counts, workableAll.length),
   };
 }
+
+// Local time, minute precision: this is read by a person who wants to know whether the tracker
+// moved since they last looked, not by anything that parses it.
+function formatWhen(lastUpdated) {
+  if (!lastUpdated) return null;
+  const when = new Date(lastUpdated);
+  if (Number.isNaN(when.getTime())) return null;
+  const pad = (n) => String(n).padStart(2, "0");
+  return (
+    `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())} ` +
+    `${pad(when.getHours())}:${pad(when.getMinutes())}`
+  );
+}
+
+// Segments are proportional, but a status holding at least one issue always gets a column: a
+// single blocked issue among two hundred is exactly the thing worth seeing. The rounding error
+// that leaves behind is absorbed by the widest segment, which is always big enough to take it.
+function barSegments(counts) {
+  const present = BAR_ORDER.filter((status) => counts[status] > 0);
+  if (present.length === 0) return [];
+  const total = present.reduce((sum, status) => sum + counts[status], 0);
+  const segments = present.map((status) => ({
+    status,
+    width: Math.max(1, Math.floor((counts[status] / total) * BAR_INNER)),
+  }));
+  const drift = BAR_INNER - segments.reduce((sum, segment) => sum + segment.width, 0);
+  const widest = segments.reduce((a, b) => (b.width > a.width ? b : a));
+  widest.width += drift;
+  return segments;
+}
+
+function renderBar(counts) {
+  const inner = barSegments(counts)
+    .map((segment) => STATUS_ICON[segment.status].repeat(segment.width))
+    .join("");
+  return ` [${inner}]`;
+}
+
+function renderLegend(counts) {
+  const parts = BAR_ORDER.filter((status) => counts[status] > 0).map(
+    (status) => `${STATUS_ICON[status]} ${status} ${counts[status]}`
+  );
+  return `  ${parts.join("  ")}`;
+}
+
+export function renderSnapshot(snapshot, { project, lastUpdated }) {
+  const total = Object.values(snapshot.counts).reduce((sum, n) => sum + n, 0);
+  const when = formatWhen(lastUpdated);
+  return [
+    ` ${project} · ${total} issue${when ? ` · aggiornato ${when}` : ""}`,
+    "═".repeat(WIDTH),
+    renderBar(snapshot.counts),
+    renderLegend(snapshot.counts),
+  ].join("\n");
+}
