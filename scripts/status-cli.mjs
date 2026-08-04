@@ -220,22 +220,49 @@ function workableRow(issue) {
   );
 }
 
+// An alert is data, and data must not run off the row. Wrapping keeps the ids readable where
+// truncation would hide exactly the one you need.
+function alertLines(alerts) {
+  const rows = [];
+  for (const alert of alerts) {
+    let current = " !";
+    for (const word of `${alert}`.split(" ")) {
+      if (current.length + 1 + word.length > WIDTH) {
+        rows.push(current);
+        current = `   ${word}`;
+      } else {
+        current += ` ${word}`;
+      }
+    }
+    rows.push(current);
+  }
+  return rows;
+}
+
 export function renderSnapshot(snapshot, { project, lastUpdated }) {
   const total = Object.values(snapshot.counts).reduce((sum, n) => sum + n, 0);
+  if (total === 0) {
+    // Not an error and not a failure to read: a project that has not opened an issue yet.
+    return ` ${project} · tracker vuoto`;
+  }
+
   const when = formatWhen(lastUpdated);
   return [
     ` ${project} · ${total} issue${when ? ` · aggiornato ${when}` : ""}`,
+    ...alertLines(snapshot.alerts),
     "═".repeat(WIDTH),
     renderBar(snapshot.counts),
     renderLegend(snapshot.counts),
     "",
     " IN CORSO",
     RULE,
-    ...snapshot.inFlight.map(inFlightRow),
+    ...(snapshot.inFlight.length > 0
+      ? snapshot.inFlight.map(inFlightRow)
+      : ["  nessuna issue aperta"]),
     "",
     ` LAVORABILI · ${snapshot.workable.length} di ${snapshot.workableTotal}`,
     RULE,
-    ...snapshot.workable.map(workableRow),
+    ...(snapshot.workable.length > 0 ? snapshot.workable.map(workableRow) : ["  niente in backlog"]),
     RULE,
     TIER_LEGEND,
   ].join("\n");

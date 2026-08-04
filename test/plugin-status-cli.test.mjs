@@ -408,3 +408,62 @@ test("no line is wider than eighty columns with the longest legal title", () => 
     assert.ok(line.length <= WIDTH, `line is ${line.length} columns: ${JSON.stringify(line)}`);
   }
 });
+
+test("alerts sit above the bar, each behind an exclamation mark", () => {
+  const out = render([
+    issue("aaaaaaaa", { depends_on: ["bbbbbbbb"] }),
+    issue("bbbbbbbb", { depends_on: ["aaaaaaaa"] }),
+  ]);
+  const rows = lines(out);
+  const alertAt = rows.findIndex((l) => l.startsWith(" ! "));
+  const barAt = rows.findIndex((l) => l.trim().startsWith("["));
+  assert.ok(alertAt >= 0, "the cycle must reach the output");
+  assert.ok(alertAt < barAt, "an alert below the bar is an alert nobody reads first");
+  assert.match(rows[alertAt], /^ ! ciclo nei depends_on: /);
+});
+
+test("a healthy tracker prints no exclamation line", () => {
+  const out = render([issue("aaaaaaaa", { status: "done" })]);
+  assert.ok(!lines(out).some((l) => l.startsWith(" ! ")));
+});
+
+test("an alert line is wrapped, never allowed past eighty columns", () => {
+  const many = Array.from({ length: 40 }, (_, n) => `${n}`.padStart(8, "0"));
+  const issues = many.map((id, n) => issue(id, { depends_on: [many[(n + 1) % many.length]] }));
+  for (const line of lines(render(issues))) {
+    assert.ok(line.length <= WIDTH, `line is ${line.length} columns: ${JSON.stringify(line)}`);
+  }
+});
+
+test("an empty tracker says so and prints nothing else", () => {
+  const out = renderSnapshot(buildSnapshot([]), { project: "harness", lastUpdated: null });
+  assert.equal(out, " harness · tracker vuoto");
+});
+
+test("nothing in flight is itself the answer, so the section stays", () => {
+  const out = render([issue("aaaaaaaa")]);
+  const rows = lines(out);
+  const at = rows.indexOf(" IN CORSO");
+  assert.ok(at >= 0);
+  assert.equal(rows[at + 2], "  nessuna issue aperta");
+});
+
+test("an empty backlog says there is nothing to take", () => {
+  const out = render([issue("aaaaaaaa", { status: "in_progress" })]);
+  const rows = lines(out);
+  const at = rows.indexOf(" LAVORABILI · 0 di 0");
+  assert.ok(at >= 0);
+  assert.equal(rows[at + 2], "  niente in backlog");
+});
+
+test("a full backlog with nothing workable shows the standstill alert and the empty section", () => {
+  const out = render([
+    issue("aaaaaaaa", { status: "in_progress" }),
+    issue("bbbbbbbb", { depends_on: ["aaaaaaaa"] }),
+  ]);
+  // The two "N di M" read differently on purpose, and the alert's trailing clause is what keeps
+  // them apart: the alert counts workable issues out of the BACKLOG, the heading counts shown
+  // rows out of the WORKABLE ones — which is zero here, hence "0 di 0".
+  assert.ok(out.includes(" ! lavorabili 0 di 1 — ogni issue in backlog attende qualcosa"));
+  assert.ok(out.includes(" LAVORABILI · 0 di 0"));
+});
