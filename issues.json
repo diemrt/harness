@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-04T09:52:08Z",
+  "last_updated": "2026-08-04T09:56:18Z",
   "rules": {
     "single_active_issue": false
   },
@@ -391,24 +391,17 @@
       "id": "8718f44a-2a45-40f5-9735-7ee3501cccf4",
       "title": "Slash command /harness:status",
       "description": "commands/status.md, e status aggiunto alla lista COMMANDS di test/plugin-commands.test.mjs.\n\nIl comando istruisce a lanciare lo script e a ristampare l'output verbatim dentro un blocco di codice, senza riformattarlo, senza convertirlo in tabella markdown, senza riordinare le sezioni. L'allineamento e' gia' fatto a 80 colonne: rifarlo consuma contesto e rende ogni invocazione diversa dalla precedente.\n\nIl file deve rispettare i cinque vincoli che plugin-commands.test.mjs impone gia' agli altri comandi. Nessuna references/status.md: il contratto sta nel comando.\n\nContenuto in Task 8 di docs/superpowers/plans/2026-08-04-status-cli.md.",
-      "status": "backlog",
+      "status": "done",
       "tier": "economy",
       "depends_on": [
         "74d2b630-f4de-4b94-99da-741562328fbe"
       ],
       "validation": {
-        "criteria": [
-          "commands/status.md esiste, ha frontmatter con description di oltre 40 caratteri contenente 'senza argomenti', argument-hint, allowed-tools, e nessun campo name",
-          "Il corpo tratta esplicitamente il caso senza argomenti",
-          "Ogni invocazione node nel file passa da ${CLAUDE_PLUGIN_ROOT} e ogni path ${CLAUDE_PLUGIN_ROOT}/... nominato esiste davvero nel plugin",
-          "Il corpo linka un file sotto skills/harness/references/ e resta sotto i 4000 caratteri",
-          "Il corpo impone di ristampare l'output verbatim in un blocco di codice e vieta di riformattarlo",
-          "COMMANDS in test/plugin-commands.test.mjs include status e node --test test/plugin-commands.test.mjs passa"
-        ],
-        "state": "unknown"
+        "criteria": "commands/status.md esiste (2208 char, body 1991 char <4000); frontmatter con description di 138 char contenente 'Senza argomenti', argument-hint '[--project-dir <path>]', allowed-tools: Bash, nessun campo name. Corpo tratta il caso senza argomenti (riga 12: 'nessun argomento = progetto corrente'). Unica invocazione node usa ${CLAUDE_PLUGIN_ROOT}/scripts/status-cli.mjs (esiste); unico path ${CLAUDE_PLUGIN_ROOT}/... nominato e' skills/harness/references/issues.md (esiste). Corpo impone 'Ristampa l'output verbatim, dentro un blocco di codice' e vieta riformattarlo/tabellarlo/riordinarlo (righe 24-28). test/plugin-commands.test.mjs: COMMANDS include 'status' (riga 16). 'npm run test' -> 278/278 pass, 0 fail (node --test include test/plugin-commands.test.mjs). Verificato inoltre il claim sul README: il test 'the README documents the commands under the names the plugin ships' (test/plugin-commands.test.mjs:209-223) itera su COMMANDS e fallisce se /harness:status non e' menzionato nel README quando aggiunto a COMMANDS -- conferma che il confine del piano era sbagliato e la riga appartiene a questa issue. git diff README.md mostra una sola riga aggiunta (tabella comandi, riga 93), nessun'altra modifica. git status --short mostra solo README.md, issues.json (stato tracker), test/plugin-commands.test.mjs modificati e commands/status.md nuovo: nessun danno collaterale fuori scope.",
+        "state": "pass"
       },
       "created_at": "2026-08-04T09:14:42Z",
-      "updated_at": "2026-08-04T09:14:42Z"
+      "updated_at": "2026-08-04T09:56:18Z"
     },
     {
       "id": "90048eaf-d5bc-42d5-a7d9-f41dc3c40a56",

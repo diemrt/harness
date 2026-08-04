@@ -13,7 +13,7 @@ const rootDir = path.resolve(__dirname, "..");
 const commandsDir = path.join(rootDir, "commands");
 
 // The names are part of the contract: they are what the user types and what the README documents.
-const COMMANDS = ["board", "compact", "issue", "verify"];
+const COMMANDS = ["board", "compact", "issue", "status", "verify"];
 
 function commandFiles() {
   return readdirSync(commandsDir).filter((f) => f.endsWith(".md"));
