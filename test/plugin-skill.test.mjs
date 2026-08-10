@@ -110,3 +110,33 @@ test("the tracker is always invoked through the plugin root, never as a project 
     }
   }
 });
+
+test("the skill says which work becomes an issue at all", () => {
+  const content = readSkill();
+
+  assert.match(
+    content,
+    /^## Cosa diventa una issue$/m,
+    "the compass needs its own chapter: a rule folded into another one is a rule nobody finds"
+  );
+  assert.match(
+    content,
+    /costoso e invisibile/,
+    "the compass must state both halves; either one alone opens issues that are not worth an agent"
+  );
+
+  // The old premise contradicted the compass outright, and a reader who stops at the opening
+  // paragraph would follow the premise.
+  assert.ok(
+    !content.includes("ogni pezzo di lavoro è una issue tracciata"),
+    "the opening still claims every piece of work is an issue"
+  );
+
+  // Order matters: "does this enter the tracker" comes before "how much ceremony does it get".
+  const compass = content.indexOf("## Cosa diventa una issue");
+  const light = content.indexOf("## Verifica leggera");
+  assert.ok(
+    compass < light,
+    "the compass must precede the light-verification chapter, which presupposes an issue already decided"
+  );
+});

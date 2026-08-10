@@ -5,9 +5,10 @@ description: Usa quando lavori allo sviluppo di un progetto con il workflow harn
 
 # Harness
 
-Harness impone un modo di lavorare, non una libreria: ogni pezzo di lavoro è una issue
-tracciata, ogni issue viene verificata da un agente **diverso** da chi l'ha svolta, e si
-committa solo dopo quella verifica.
+Harness impone un modo di lavorare, non una libreria: il lavoro che vale la pena far guardare a
+qualcun altro è una issue tracciata — quale sia, lo dice il capitolo «Cosa diventa una issue» —,
+ogni issue viene verificata da un agente **diverso** da chi l'ha svolta, e si committa solo dopo
+quella verifica.
 
 **Cosa harness scrive nel progetto:** `issues.json` alla radice (i dati del tracker) e
 `.harness/` (configurazione, archivi di `--compact`, log dei worker). Nient'altro: script,
@@ -174,7 +175,51 @@ Il tier è un **hint**, non un vincolo: se lo scope cambia, il tier scritto rest
 (`--update` con il nuovo valore, o `null` per azzerarlo) invece di lasciare un dato che
 contraddice la realtà.
 
+## Cosa diventa una issue
+
+Non tutto il lavoro è una issue. La domanda è una sola:
+
+> Se qui venisse commesso un errore, sarebbe **costoso e invisibile**?
+
+Servono entrambe le cose. Un errore costoso ma **rumoroso** non ha bisogno di uno sguardo
+indipendente: il comando `verify` lo urla al primo tentativo. Un errore invisibile ma innocuo non
+vale il prezzo. È l'intersezione a giustificare una issue.
+
+**Il prezzo, detto in numeri.** Una issue è un giro di verificatore, cioè un agente intero. È
+l'unità di costo di harness, ed è ciò che rende la domanda decidibile invece che filosofica: una
+issue per ogni passo di un piano vuol dire che il controllo costa più della cosa controllata, e
+si vede contando gli agenti.
+
+**Sotto il tracker c'è un livello a grana fine**, fatto di passi da pochi minuti, ognuno con la
+propria verifica svolta *inline dallo stesso agente che lavora* — e che costa quasi niente
+proprio perché non cambia agente. Harness **non prescrive come lo produci**: un piano scritto,
+una lista di todo, o niente di scritto. Prescrive una cosa sola, che il tracker non è quel
+livello e non deve inseguirlo. La corrispondenza fra issue e passi non è uno a uno, e non deve
+esserlo.
+
+**Per il lavoro che emerge a metà**, nell'ordine:
+
+1. rientra in qualcosa di già previsto → è un passo in più lì dentro, nessuna issue;
+2. è nuovo, ma il suo errore sarebbe **rumoroso** → è un passo nuovo, nessuna issue;
+3. il suo errore sarebbe **costoso e invisibile** → è una issue, **e serve un criterio eseguibile
+   che renda visibile il fallimento**. Se non riesci a scriverlo, il problema non è la issue: è
+   che non sai ancora come si riconosce il fallimento, e va capito prima;
+4. cambia una decisione già presa e scritta → prima il documento, poi la issue.
+
+Il punto 3 è il più utile dei quattro, perché trasforma un giudizio in una prova di scrittura: la
+bussola chiede di stimare quanto un errore sarebbe invisibile, il criterio chiede di renderlo
+visibile. Se il secondo non si scrive, la stima era ottimistica.
+
+**Cosa questa regola non dice.** Non dice quanto lavoro sta dentro una issue. Una issue larga è
+una finestra più larga fra due verifiche: se il tratto va storto a metà, se ne accorge il
+verificatore alla fine e non prima. È un rischio che si accetta guardandolo — mitigato dalle
+verifiche del livello sotto, che restano — non un difetto da correggere spezzettando, che
+riporterebbe a una issue per passo.
+
 ## Verifica leggera: issue che nascono senza criteri
+
+Quanto segue si applica **dopo** che la bussola qui sopra ha detto sì: sono issue vere, che
+meritavano di entrare nel tracker.
 
 Su una issue banale i criteri di accettazione sono rumore: inventarne tre per rispettare una
 regola non aggiunge nessun controllo. Per questi casi `validation` può essere `null` alla

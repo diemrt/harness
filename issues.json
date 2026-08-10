@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-10T14:05:46Z",
+  "last_updated": "2026-08-10T14:09:56Z",
   "rules": {
     "single_active_issue": false
   },
@@ -451,23 +451,15 @@
       "id": "5a1636cd-6379-4c14-b14f-fd75fd5becaa",
       "title": "La bussola: harness dice quale lavoro diventa una issue",
       "description": "Harness apre dicendo «ogni pezzo di lavoro è una issue tracciata», e non dice mai quale lavoro lo diventi davvero. Il primo consumer esterno ha dovuto ricavarsi la regola da sé, dopo un primo tentativo da 21 issue su un piano da 15 passi: 21 giri di verificatore su criteri che il livello sotto già controllava inline.\n\nEntra in SKILL.md la bussola «costoso e invisibile», la premessa si riscrive, e il capitolo si colloca prima di «Verifica leggera»: sono la stessa domanda a due stadi — questo lavoro entra nel tracker, e poi quanta cerimonia gli serve.\n\nModifica solo documentale: nessuno script, nessun campo di schema.\n\nSpec: docs/superpowers/specs/2026-08-10-harness-regole-e-default-design.md §1\nPiano: docs/superpowers/plans/2026-08-10-harness-regole-e-default.md, Task 1",
-      "status": "in_progress",
+      "status": "done",
       "tier": "reasoning",
       "depends_on": [],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "SKILL.md contiene un capitolo di titolo esatto '## Cosa diventa una issue', collocato fra il capitolo 'Tier' e il capitolo 'Verifica leggera'.",
-          "La premessa di SKILL.md non contiene piu' la stringa 'ogni pezzo di lavoro e' una issue tracciata'.",
-          "Il capitolo enuncia entrambe le meta' della bussola (costoso E invisibile) e i quattro passi per il lavoro che emerge a meta'.",
-          "Il capitolo dichiara che sotto il tracker c'e' un livello a grana fine, e che harness non prescrive come produrlo.",
-          "Il capitolo 'Verifica leggera' porta una riga che lo lega alla bussola, e il resto del capitolo e' invariato.",
-          "test/plugin-skill.test.mjs contiene un test nuovo che asserisce i criteri 1 e 2 e l'ordine dei due capitoli.",
-          "npm run test esce 0."
-        ]
+        "state": "pass",
+        "criteria": "Verifica indipendente, 7/7 criteri soddisfatti. (1) skills/harness/SKILL.md:178 porta '## Cosa diventa una issue'; l'elenco degli heading e' Tier -> Cosa diventa una issue -> Verifica leggera (indexOf: compass < light). (2) grep della vecchia clausola 'ogni pezzo di lavoro e' una issue tracciata' su SKILL.md: nessuna occorrenza; la premessa e' quella nuova del piano. (3)(4) I tre blocchi markdown del Task 1 del piano (premessa nuova, capitolo, raccordo) sono presenti VERBATIM in SKILL.md (confronto programmatico blocco-per-blocco: true/true/true; il blocco della vecchia premessa: assente, come atteso): il capitolo enuncia 'costoso e invisibile' con entrambe le meta', i quattro passi numerati per il lavoro che emerge a meta', e il paragrafo 'Sotto il tracker c'e' un livello a grana fine ... Harness non prescrive come lo produci'. (5) Diff del solo capitolo 'Verifica leggera' fra HEAD e working tree: rimuovendo le due righe di raccordo il testo e' byte-identico a HEAD (28 -> 31 righe, nessuna riga riscritta o mangiata). (6) test/plugin-skill.test.mjs: test nuovo 'the skill says which work becomes an issue at all' aggiunto in fondo, verbatim rispetto al piano, nessun test esistente modificato (git diff: solo 30 righe aggiunte in coda). (7) Gate: npm run test -> exit 0, 282 tests / 282 pass / 0 fail; il test nuovo passa. Nessun file modificato dal verificatore; git status --short: solo issues.json, skills/harness/SKILL.md, test/plugin-skill.test.mjs. Fuori scope (non bloccante): il working tree di issues.json contiene anche la issue nuova 7619689e (gate documentale del commit board 06a2576), estranea a questo Task 1."
       },
       "created_at": "2026-08-10T13:43:55Z",
-      "updated_at": "2026-08-10T13:49:19Z"
+      "updated_at": "2026-08-10T14:09:56Z"
     },
     {
       "id": "5b994254-c97b-425f-bef3-76c72154c037",
@@ -528,6 +520,27 @@
       },
       "created_at": "2026-08-10T13:56:55Z",
       "updated_at": "2026-08-10T14:05:46Z"
+    },
+    {
+      "id": "7619689e-c007-4f0a-a94a-d253da55bcea",
+      "title": "board.md non dice che il server canonicalizza la directory del progetto",
+      "description": "Gate documentale del commit \"fix: canonicalise the board's project dir before watching it\", che ha toccato `scripts/board-server.mjs`.\n\nDa quel commit `resolveProjectDir()` normalizza la directory con `realpathSync.native()`, quindi il `projectDir` della riga di avvio non e' piu' il path passato in `--project-dir` ma la sua forma canonica. `references/board.md` e il comando `/harness:board` continuano a descrivere il controllo su `projectDir` come un confronto con quello che si e' passato: chi passa un path 8.3 vede tornare una stringa diversa da quella che ha scritto e non trova scritto da nessuna parte che e' voluto.\n\nC'e' anche un fatto nuovo da registrare: `fs.watch()` su una directory in forma 8.3 non fallisce, fa abortire il processo da libuv (`!_wcsnicmp(filename, dir, dirlen)`, `src\\win\\fs-event.c`). E' un candidato concreto come causa dell'instabilita' che la sezione \"Perche' non parte da solo\" documenta, e va scritto li' vicino invece di restare in un messaggio di commit.\n\nDipende dalla issue che riscrive board.md: toccano lo stesso file e non vanno lavorate in parallelo.",
+      "status": "backlog",
+      "tier": "economy",
+      "depends_on": [
+        "11e3060d-6efa-45b0-8b43-f0057015c46d"
+      ],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "references/board.md dice che il server canonicalizza la directory ricevuta e che il projectDir annunciato puo' quindi differire da quello passato in --project-dir.",
+          "Il punto della sezione 'Perche' non parte da solo' che elenca le morti del processo cita l'abort di libuv su path 8.3 come causa nota, senza dichiararla l'unica.",
+          "Il testo non contraddice il comando /harness:board, che chiede di controllare projectDir prima di stampare l'URL: resta un controllo, su un valore canonico.",
+          "npm run test esce 0."
+        ]
+      },
+      "created_at": "2026-08-10T14:06:55Z",
+      "updated_at": "2026-08-10T14:06:55Z"
     }
   ]
 }
