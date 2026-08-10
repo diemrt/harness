@@ -49,8 +49,8 @@ occupata, l'avvio fallisce con `PORT_IN_USE` invece di restare a metà.
 
 ## Ciclo di vita
 
-- **Avvio** — al clock-in, automaticamente. Il server ascolta su `127.0.0.1` su una porta
-  libera scelta a runtime.
+- **Avvio** — **su richiesta, mai di iniziativa propria** (vedi «Perché non parte da solo» più
+  sotto). Il server ascolta su `127.0.0.1` su una porta libera scelta a runtime.
 - **URL** — stampalo **una volta sola**, quando parte, come URL nudo su una riga propria e
   senza decorazioni — niente code-span, niente link markdown, niente blocco di codice:
 
@@ -61,7 +61,7 @@ occupata, l'avvio fallisce con `PORT_IN_USE` invece di restare a metà.
   Non aprire il browser da solo: rubare il focus a ogni sessione è più fastidioso di un click.
 - **Aggiornamento** — il server osserva `issues.json` e spinge il refresh al browser. Nessun
   reload manuale, nessun polling da parte tua.
-- **Stop** — al clock-out. Non lasciare processi orfani a fine sessione.
+- **Stop** — a fine sessione, se l'hai avviato. Non lasciare processi orfani.
 
 ### Il doppio click che resta
 
@@ -100,6 +100,26 @@ comunque tenere":
 **Il problema non è risolto**: il doppio click resta, ed è fuori dal controllo di harness. Se
 càpita, chiudi la scheda in più, oppure copia l'URL a mano dalla riga stampata invece di
 cliccarci sopra.
+
+## Perché non parte da solo
+
+Fino al 2026-08-10 il clock-in prescriveva di avviarlo. Il primo progetto che ha usato harness
+per un lavoro lungo ha fatto l'opposto, per iscritto, e con una misura.
+
+In una sessione il processo del board è morto **tre volte** — dopo circa 50, 25 e 16 minuti.
+Durate diverse, quindi non un timeout da configurare. Ogni volta ha lasciato in piedi un URL
+annunciato come attivo e già morto. In una sessione successiva ha retto 55 minuti, fermato
+deliberatamente al clock-out: **l'instabilità non è sistematica**, il che è la cosa peggiore,
+perché non se ne può diffidare sempre.
+
+Da cui le due regole che restano:
+
+- **non avviarlo di iniziativa propria.** Se qualcuno lo chiede, avvialo e dillo.
+- **non annunciare come attivo un URL che non sai vivo.** Un URL morto spacciato per vivo è
+  peggio di nessun board: manda a sbattere chi si fida.
+
+Il riepilogo testuale (`status-cli.mjs`, [status.md](status.md)) resta la fonte che non dipende
+da nessun processo, ed è per questo che è lui, e non il board, il passo del clock-in.
 
 ## Cosa non fa
 

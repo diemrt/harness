@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-10T14:16:44Z",
+  "last_updated": "2026-08-10T14:20:49Z",
   "rules": {
     "single_active_issue": false
   },
@@ -479,25 +479,17 @@
       "id": "11e3060d-6efa-45b0-8b43-f0057015c46d",
       "title": "Il board esce dal clock-in: si avvia su richiesta, non da solo",
       "description": "Il passo 4 di 'Clock in' impone di avviare il board. Il primo consumer esterno ha fatto l'opposto, per iscritto, e con una misura: in una sessione il processo e' morto tre volte, dopo circa 50, 25 e 16 minuti — durate diverse, quindi non un timeout da configurare — lasciando ogni volta un URL annunciato come attivo e gia' morto. In una sessione successiva ha retto 55 minuti. L'instabilita' non e' sistematica, il che e' la cosa peggiore.\n\nIl board resta e non viene deprecato: smette di essere un passo obbligatorio. Il riepilogo di status-cli diventa l'unico passo di visibilita' del clock-in, perche' e' testo e non dipende da un processo che deve sopravvivere fra i turni.\n\nDipende dalla issue della bussola: tocca lo stesso SKILL.md, e le due non vanno lavorate in parallelo.\n\nSpec: docs/superpowers/specs/2026-08-10-harness-regole-e-default-design.md §3\nPiano: docs/superpowers/plans/2026-08-10-harness-regole-e-default.md, Task 3",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
         "5a1636cd-6379-4c14-b14f-fd75fd5becaa"
       ],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "Il capitolo 'Clock in' di SKILL.md non nomina il board in nessun passo, e i passi sono rinumerati senza buchi.",
-          "Il passo dello stato del tracker resta e dichiara di essere l'unico passo di visibilita' del clock-in.",
-          "Il capitolo 'Clock out' di SKILL.md cita il board in forma condizionale, non come passo dovuto.",
-          "references/board.md non contiene piu' 'al clock-in, automaticamente', e la voce Stop del ciclo di vita e' condizionale.",
-          "references/board.md contiene la sezione '## Perche' non parte da solo' con le durate misurate: 50, 25, 16 minuti, e i 55 della sessione che ha retto.",
-          "SKILL.md continua a linkare references/board.md dal capitolo Reference, e il test della reference orfana resta verde.",
-          "test/plugin-skill.test.mjs asserisce l'assenza del board dal capitolo Clock in; npm run test esce 0."
-        ]
+        "state": "pass",
+        "criteria": "npm run test: 284/284 pass, incluso 'the board is a tool you ask for, not a clock-in step' e i test di reference esistenti ('every reference link in SKILL.md resolves to a file that exists', 'every reference file is reachable from SKILL.md', ancora verdi con board.md linkato dal capitolo Reference a SKILL.md:310). SKILL.md: passo 4 'Board' rimosso da Clock in, passi 5/6 rinumerati 4/5 senza buchi (righe 29-40), passo 4 'Stato del tracker' aggiunge la frase attesa sull'essere l'unico passo di visibilita'. Clock out reso condizionale (righe 292-293). board.md: rimossa 'al clock-in, automaticamente' dal ciclo di vita, Avvio e Stop resi condizionali, aggiunta sezione '## Perche non parte da solo' (righe 104-123) con le durate 50/25/16/55 minuti, testo verbatim uguale al piano/spec §3. Diff confrontato riga per riga con Task 3 del piano 2026-08-10-harness-regole-e-default.md e con la spec §3: nessuna divergenza. Capitolo 'Cosa diventa una issue' (righe 178-218, fra Tier e Verifica leggera) confermato non toccato dal diff. git diff limitato a skills/harness/SKILL.md, skills/harness/references/board.md, test/plugin-skill.test.mjs, issues.json (solo transizione di stato via issue-manager)."
       },
       "created_at": "2026-08-10T13:44:30Z",
-      "updated_at": "2026-08-10T13:44:30Z"
+      "updated_at": "2026-08-10T14:20:49Z"
     },
     {
       "id": "ac6892cb-b314-4fa1-93c0-25066808d550",

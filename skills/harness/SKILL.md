@@ -27,9 +27,7 @@ Nel resto del documento `$SCRIPTS` sta per `${CLAUDE_PLUGIN_ROOT}/scripts`.
    all'utente e confermata, mai indovinata in silenzio.
 3. **Ambiente** — esegui il comando di setup dichiarato in configurazione. Se fallisce,
    **fermati e segnala**: non consumare token su un ambiente rotto.
-4. **Board** — avvia il board delle issue e stampa l'URL una volta sola (vedi
-   [references/board.md](references/board.md)). Non aprire il browser da solo.
-5. **Stato del tracker** — stampa il riepilogo e ristampalo verbatim in un blocco di codice:
+4. **Stato del tracker** — stampa il riepilogo e ristampalo verbatim in un blocco di codice:
    ```bash
    node "$SCRIPTS/status-cli.mjs"
    ```
@@ -37,7 +35,9 @@ Nel resto del documento `$SCRIPTS` sta per `${CLAUDE_PLUGIN_ROOT}/scripts`.
    su cicli e dipendenze rotte. Serve un dettaglio che il riepilogo non porta (description,
    `validation.criteria`)? `issue-manager.mjs --get --issue-id <id>` sulla singola issue, non
    l'elenco intero.
-6. **Scelta del lavoro** — identifica le issue su cui lavorare rispettando la regola 1-WIP
+   È l'unico passo di visibilità del clock-in: è testo, sta nella sessione, e non dipende da un
+   processo che deve sopravvivere fra un turno e l'altro.
+5. **Scelta del lavoro** — identifica le issue su cui lavorare rispettando la regola 1-WIP
    qui sotto.
 
 Leggi solo la documentazione necessaria alla richiesta: contesto in più costa token e non
@@ -290,7 +290,8 @@ controllo lo fai tu, non un hook `post-commit`.
 ## Clock out (fine sessione)
 
 Per ogni issue lavorata: lavoro concluso → `in_review` → verifica indipendente → `pass` →
-commit dedicato. Poi ferma il board server avviato al clock-in.
+commit dedicato. Se durante la sessione hai avviato il board, fermalo adesso col `pid` della
+riga di avvio.
 
 Chiudi ristampando il riepilogo (`node "$SCRIPTS/status-cli.mjs"`, verbatim in un blocco di
 codice): è il confronto con quello del clock-in, e dice in una schermata cosa si è mosso.
