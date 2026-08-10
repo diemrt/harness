@@ -4,7 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, writeFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, realpathSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,6 +37,32 @@ function tempProject(content) {
     writeFileSync(path.join(dir, "issues.json"), content, "utf8");
   }
   return dir;
+}
+
+// The server canonicalises the directory it is handed, so a test comparing the path it reports
+// has to canonicalise too: on Windows tmpdir() can already be an 8.3 short path.
+function canonical(dir) {
+  return realpathSync.native(dir);
+}
+
+// A path that reaches the same directory without being its canonical form — an 8.3 short path on
+// Windows. Null when there is none to be had: 8.3 generation can be disabled per volume, and no
+// other platform has the concept.
+function shortPath(dir) {
+  if (process.platform !== "win32") {
+    return null;
+  }
+  // %TEMP% is itself often already short, in which case mkdtemp handed us the short path to begin
+  // with and there is nothing to ask cmd for.
+  if (canonical(dir) !== dir) {
+    return dir;
+  }
+  const result = spawnSync("cmd", ["/c", `for %I in ("${dir}") do @echo %~sI`], { encoding: "utf8" });
+  const short = (result.stdout ?? "").trim();
+  if (!short || short === dir || !existsSync(short)) {
+    return null;
+  }
+  return short;
 }
 
 // Starts the server and resolves with its startup line, so tests never guess a port.
@@ -119,7 +145,7 @@ test("the board serves the page and the project's issues", async () => {
     const data = await api.json();
     assert.equal(data.issues.length, 1);
     assert.equal(data.issues[0].id, "11111111-1111-1111-1111-111111111111");
-    assert.equal(data.projectDir, dir);
+    assert.equal(data.projectDir, canonical(dir));
     assert.ok(port > 0, "the OS must hand out a real port");
   } finally {
     stop(child);
@@ -155,7 +181,7 @@ test("the board falls back to the directory basename when issues.json has no pro
   try {
     const data = await (await fetch(`${url}api/issues`)).json();
     assert.equal(data.project, null, "the field must stay absent/null, not fabricated");
-    assert.equal(data.projectDir, dir, "the client falls back to this for the title");
+    assert.equal(data.projectDir, canonical(dir), "the client falls back to this for the title");
   } finally {
     stop(child);
     rmSync(dir, { recursive: true, force: true });
@@ -210,6 +236,45 @@ test("a change to issues.json is pushed to the browser", async () => {
 
     const data = await (await fetch(`${url}api/issues`)).json();
     assert.equal(data.issues.length, 2, "and serve the new content afterwards");
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a project directory given as an 8.3 short path does not kill the board", async (t) => {
+  const dir = tempProject(seed([issue("11111111-1111-1111-1111-111111111111")]));
+  const short = shortPath(dir);
+  if (!short) {
+    rmSync(dir, { recursive: true, force: true });
+    t.skip("no 8.3 short path to be had on this platform or volume");
+    return;
+  }
+
+  const { child, url } = await startServer(short);
+  try {
+    const data = await (await fetch(`${url}api/issues`)).json();
+    assert.equal(data.projectDir, canonical(dir), "the announced path must be the canonical one");
+
+    // watch() on a short path does not return an error: libuv aborts the process outright
+    // (`!_wcsnicmp(filename, dir, dirlen)`, src\win\fs-event.c). The board would be dead by the
+    // time the first change arrived, with its URL already announced as live.
+    const pushed = await waitForEvent(url, async () => {
+      spawnSync(
+        process.execPath,
+        [
+          ISSUE_MANAGER,
+          "--insert",
+          "--project-dir",
+          short,
+          "--issue-data",
+          JSON.stringify({ title: "New", description: "New issue", status: "backlog" }),
+        ],
+        { encoding: "utf8" }
+      );
+    });
+    assert.equal(pushed, true, "a server started on a short path must still push");
+    assert.equal(child.exitCode, null, "and must still be running: the libuv abort exits with 9");
   } finally {
     stop(child);
     rmSync(dir, { recursive: true, force: true });
@@ -602,7 +667,7 @@ test("the flags the board does declare keep working", async () => {
   const dir = tempProject(seed([issue("11111111-1111-1111-1111-111111111111")]));
   const started = await startServer(dir); // --project-dir, plus no --port at all
   try {
-    assert.equal(started.projectDir, dir);
+    assert.equal(started.projectDir, canonical(dir));
     assert.ok(started.port > 0, "an omitted --port still means: let the OS choose");
   } finally {
     stop(started.child);

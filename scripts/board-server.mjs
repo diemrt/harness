@@ -21,7 +21,7 @@
 // Error codes: UNKNOWN_ARGUMENT, INVALID_ARGUMENT_VALUE, FILE_NOT_FOUND, PORT_IN_USE, ERROR.
 
 import { createServer } from "node:http";
-import { existsSync, readFileSync, statSync, watch } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync, watch } from "node:fs";
 import { parseArgs } from "node:util";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -43,7 +43,19 @@ function resolveProjectDir(projectDir) {
   if (!existsSync(dir) || !statSync(dir).isDirectory()) {
     writeFail(`Project directory '${dir}' does not exist.`, "FILE_NOT_FOUND");
   }
-  return dir;
+  // Windows still hands out 8.3 short paths — `C:\Users\DIEGO_~1\...` — through %TEMP%, through a
+  // shortcut, through an old tool. watch() on one of them does not fail: it aborts the whole
+  // process from inside libuv (`!_wcsnicmp(filename, dir, dirlen)`, src\win\fs-event.c), so the
+  // board would die on the first change with an URL already announced as live. Canonicalise once,
+  // here, and everything derived from it agrees: the file read, the directory watched, and the
+  // projectDir printed at startup, which is what the caller checks it is serving the right project.
+  try {
+    return realpathSync.native(dir);
+  } catch {
+    // A directory that just passed statSync should always resolve. If it somehow does not, a short
+    // path is the smaller problem: keep serving instead of refusing to start.
+    return dir;
+  }
 }
 
 // A project with no issues.json is not an error: the board shows an empty tracker, exactly like

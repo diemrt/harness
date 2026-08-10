@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-10T13:44:30Z",
+  "last_updated": "2026-08-10T14:05:46Z",
   "rules": {
     "single_active_issue": false
   },
@@ -451,7 +451,7 @@
       "id": "5a1636cd-6379-4c14-b14f-fd75fd5becaa",
       "title": "La bussola: harness dice quale lavoro diventa una issue",
       "description": "Harness apre dicendo «ogni pezzo di lavoro è una issue tracciata», e non dice mai quale lavoro lo diventi davvero. Il primo consumer esterno ha dovuto ricavarsi la regola da sé, dopo un primo tentativo da 21 issue su un piano da 15 passi: 21 giri di verificatore su criteri che il livello sotto già controllava inline.\n\nEntra in SKILL.md la bussola «costoso e invisibile», la premessa si riscrive, e il capitolo si colloca prima di «Verifica leggera»: sono la stessa domanda a due stadi — questo lavoro entra nel tracker, e poi quanta cerimonia gli serve.\n\nModifica solo documentale: nessuno script, nessun campo di schema.\n\nSpec: docs/superpowers/specs/2026-08-10-harness-regole-e-default-design.md §1\nPiano: docs/superpowers/plans/2026-08-10-harness-regole-e-default.md, Task 1",
-      "status": "backlog",
+      "status": "in_progress",
       "tier": "reasoning",
       "depends_on": [],
       "validation": {
@@ -467,7 +467,7 @@
         ]
       },
       "created_at": "2026-08-10T13:43:55Z",
-      "updated_at": "2026-08-10T13:43:55Z"
+      "updated_at": "2026-08-10T13:49:19Z"
     },
     {
       "id": "5b994254-c97b-425f-bef3-76c72154c037",
@@ -514,6 +514,20 @@
       },
       "created_at": "2026-08-10T13:44:30Z",
       "updated_at": "2026-08-10T13:44:30Z"
+    },
+    {
+      "id": "ac6892cb-b314-4fa1-93c0-25066808d550",
+      "title": "Il board muore se la directory del progetto e' un path 8.3",
+      "description": "Il gate `npm run test` e' rosso su HEAD: `test/plugin-board.test.mjs` -> \"a change to issues.json is pushed to the browser\" fallisce, e non per un evento mancato. Il server viene abortito da libuv.\n\nIl test crea il progetto temporaneo con `os.tmpdir()`, che su Windows puo' tornare la forma 8.3 (`C:\\Users\\DIEGO_~1\\...`). `fs.watch()` su una directory in forma corta fa abortire il processo: `Assertion failed: !_wcsnicmp(filename, dir, dirlen), file src\\win\\fs-event.c, line 72`, exit 9. Sullo stesso scenario con path lungo il watcher emette gli eventi e il processo esce 0.\n\nNon e' un difetto del test: e' il board che muore. Un progetto che vive sotto un path corto oggi ottiene un URL annunciato vivo e un server gia' morto — lo stesso sintomo che la issue del board fuori dal clock-in documenta.\n\nFix: `resolveProjectDir` in `scripts/board-server.mjs` normalizza la directory con `realpathSync.native()` dopo il controllo di esistenza, cosi' il watcher riceve sempre la forma lunga. Chi scrive puo' continuare a usare il path corto: provato, gli eventi arrivano lo stesso.",
+      "status": "done",
+      "tier": "standard",
+      "depends_on": [],
+      "validation": {
+        "state": "pass",
+        "criteria": "1) scripts/board-server.mjs:41-60 resolveProjectDir() ritorna realpathSync.native(dir) dopo existsSync/statSync, dentro un try/catch che ricade sul dir dato (normalizzazione non fatale); quel valore e' l'unico usato da watch(projectDir) alla riga 165, da issuesFilePath alla riga 117 e dalla riga di avvio alla riga 194. 2+3) Probe manuale su path 8.3 reale (qui os.tmpdir() e' gia' corto: C:/Users/DIEGO_~1/AppData/Local/Temp). Server avviato con --project-dir sulla forma corta .../DIEGO_~1/.../probe-board-V3s91v: la riga JSON di avvio riporta projectDir = C:/Users/diego_martignoni/AppData/Local/Temp/probe-board-V3s91v (forma lunga); dopo una scrittura su issues.json arriva l'evento SSE 'event: issues' (true) e il processo resta vivo (exitCode null). Stesso probe contro il board-server.mjs di HEAD (pre-fix): 'Assertion failed: !_wcsnicmp(filename, dir, dirlen), file src/win/fs-event.c, line 72', nessun evento, exitCode 3221226505 (0xC0000409). 4) test/plugin-board.test.mjs:245 \"a project directory given as an 8.3 short path does not kill the board\" gira davvero su questa macchina, non e' skipped: node --test --test-name-pattern -> tests 1, pass 1, skipped 0. Contro il sorgente pre-fix (copia del repo in tmp con scripts/board-server.mjs preso da git show HEAD:) fallisce: fail 1, AssertionError 'the announced path must be the canonical one', actual C:/Users/DIEGO_~1/AppData/Local/Temp/harness-board-e6kywr vs expected la forma lunga. 5) Gate `npm run test`: tests 281, pass 281, fail 0, cancelled 0, skipped 0, todo 0, duration_ms 17147, exit 0. Collaterali: git status --short elenca solo issues.json, scripts/board-server.mjs, test/plugin-board.test.mjs; nessun file untracked; nessun segreto nel diff. Verificatore: nessun file modificato oltre questa chiusura."
+      },
+      "created_at": "2026-08-10T13:56:55Z",
+      "updated_at": "2026-08-10T14:05:46Z"
     }
   ]
 }
