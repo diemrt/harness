@@ -73,8 +73,13 @@ lavorando, e la rimanda. Funziona finché qualcuno rilegge. A fine progetto ness
 Harness guadagna un modo di **accorgersi** che il gate documentale è saltato, e un modo di
 **setacciare** i documenti per ciò che hanno scoperto e non tracciato.
 
-Un file nuovo (`scripts/docs-gate.mjs`), un campo nuovo nello schema (`covers`), due comandi
-nuovi (`/harness:docs-gate`, `/harness:sweep`), e un capitolo riscritto in `SKILL.md`.
+Un file nuovo (`scripts/docs-gate.mjs`), un campo nuovo nello schema (`covers`), **due reference
+nuove** che ne possiedono i contratti (`references/docs-gate.md`, `references/sweep.md`), due
+comandi nuovi che vi rimandano (`/harness:docs-gate`, `/harness:sweep`), e un capitolo riscritto
+in `SKILL.md`.
+
+La collocazione dei contratti non è un dettaglio editoriale: §5 spiega perché un procedimento
+scritto dentro un comando, per metà dei suoi lettori, non esiste.
 
 ## 1. `scripts/docs-gate.mjs`
 
@@ -168,10 +173,16 @@ Un tracker a `schema_version: 1` continua a funzionare senza `--upgrade`: la chi
 `[]` in lettura, e il primo `--update` la materializza. Il gate su un tracker non migrato vede
 zero revisioni dichiarate e chiede `--since`, che è il comportamento corretto.
 
-## 3. `/harness:docs-gate`
+## 3. `references/docs-gate.md` e il comando che ci rimanda
 
-Lancia lo script e ne ristampa l'output **verbatim in un blocco di codice**, come fa
-`/harness:status`. Accetta `--since` e `--project-dir`. Nient'altro, nessun sottocomando.
+**Il contratto sta nella reference**, non nel comando: come si legge l'output, la finestra e il
+suo autocalibrarsi, la risoluzione dei riferimenti, cosa conta come coperto, canali e codici
+d'uscita — cioè tutto quanto scritto in §1. È la stessa divisione che `references/status.md` ha
+già con `/harness:status`, ed è l'unica che raggiunge anche i lettori che non sono l'utente (§5).
+
+`commands/docs-gate.md` resta sottile: lancia lo script, ne ristampa l'output **verbatim in un
+blocco di codice**, e rimanda alla reference. Accetta `--since` e `--project-dir`. Nient'altro,
+nessun sottocomando.
 
 **Cosa questa scelta compra e cosa no.** Un comando dedicato non difende dal dimenticarsene: è la
 stessa forma dell'istruzione che è già fallita. Quello che lo rende comunque utile è la
@@ -179,11 +190,18 @@ cumulatività di §1.1 — chi se ne ricorda una volta a fine giornata recupera 
 commit, non l'ultimo. **Il costo del dimenticarsene diventa un ritardo, non una perdita**, ed è
 questo, non la puntualità, il difetto che si stava riparando.
 
-## 4. `/harness:sweep`: il setaccio dei documenti
+## 4. `references/sweep.md`: il setaccio dei documenti
 
-**Nessuno script.** È un comando puro, della stessa forma di `/harness:compact`: raccoglie,
-propone, chiede conferma esplicita, e solo dopo scrive. Usa `--get-all` e `--insert`, che
-esistono già; non serve nessuna primitiva nuova.
+**Nessuno script.** Il setaccio è tutto giudizio: raccoglie, propone, chiede conferma esplicita,
+e solo dopo scrive. Usa `--get-all` e `--insert`, che esistono già; non serve nessuna primitiva
+nuova.
+
+Ma **il procedimento vive nella reference**, non in `commands/sweep.md`. Quest'ultimo diventa un
+guscio di poche righe: come si lancia, e il rimando. Il perché è in §5, e non è un gusto
+editoriale: un procedimento scritto dentro un comando è invisibile a metà di chi dovrebbe
+seguirlo.
+
+Il contratto che la reference possiede:
 
 - **Cosa legge.** I percorsi passati come argomento. Se non ce ne sono, propone quelli che trova
   e li fa confermare: harness non sa come un progetto organizza i propri documenti e non lo
@@ -200,15 +218,74 @@ esistono già; non serve nessuna primitiva nuova.
   corpus che il **setaccio successivo** legge — quindi niente si perde e harness non allarga la
   propria superficie.
 
-## 5. Cosa cambia in `SKILL.md`
+## 5. Perché i contratti stanno nelle reference, e cosa cambia in `SKILL.md`
 
-Il capitolo «Dopo il commit: gate documentale» descrive oggi un controllo a occhio. Diventa due
-cose:
+### 5.1 Il fatto strutturale
 
-1. la issue docs si apre **dichiarando in `covers` la revisione che copre**;
-2. `/harness:docs-gate` è come ci si accorge che è saltato, e come si recupera.
+**I comandi slash sono una superficie dell'utente, non dell'agente.** Un subagent, o un agente
+che carica la skill `harness` da fuori, non ha `/harness:sweep` fra le cose che può invocare:
+legge `SKILL.md`, e da lì segue i link alle `references/`. Un procedimento che vive solo dentro
+`commands/sweep.md`, per quel lettore, non esiste.
 
-Più una riga sul setaccio fra gli strumenti disponibili, senza prescrivere quando lanciarlo.
+Il caso più netto è già in piedi oggi. Un agente che deve aprire una issue arriva a
+`references/issues.md` — il contratto della CLI — e chiama `--insert` direttamente. Qualunque
+criterio di qualità stia scritto in `commands/issue.md` non lo attraversa mai.
+
+Verificato sul repository:
+
+| fatto | esito |
+|---|---|
+| `SKILL.md` nomina un comando slash | **mai**, zero occorrenze |
+| reference che nominano un comando | due: `status.md` (`/harness:status`), `issues.md` (`/harness:compact`) |
+| script CLI nominati dalla reference che li possiede | **tutti e cinque** |
+| script nominati direttamente in `SKILL.md` | due: `status-cli.mjs`, `issue-manager.mjs` |
+
+La convenzione quindi **esiste già ed è rispettata al 100%**: il contratto sta nella reference,
+il comando è un guscio che ci rimanda, e `SKILL.md` nomina direttamente solo gli script che i
+suoi capitoli prescrivono di lanciare.
+
+### 5.2 Ed è già difesa da un test
+
+`test/plugin-commands.test.mjs:110`, *«commands point at the skill instead of restating it»*,
+impone a ogni comando di linkare una `skills/harness/references/*.md` e ne cappa il corpo a 4000
+caratteri, con la motivazione: *«is long enough to be a second copy of the workflow; the skill is
+the source»*.
+
+Una prima stesura di questa spec metteva il procedimento del setaccio dentro il comando.
+**Avrebbe fatto fallire quel test**, perché non ci sarebbe stata nessuna reference da linkare.
+Non era una convenzione nuova da introdurre: era quella in vigore, violata.
+
+L'asimmetria che invece **manca davvero** è la direzione opposta.
+`test/plugin-skill.test.mjs` impedisce la reference orfana — *«exists but SKILL.md never links
+it, so it will never be read»* — ma niente impedisce lo **script orfano**: nulla obbligherebbe
+`docs-gate.mjs` a essere nominato da qualche parte. Che oggi lo siano tutti e cinque è una
+disciplina, non un invariante. Questa spec la rende un invariante (§7).
+
+### 5.3 Cosa cambia in `SKILL.md`
+
+- Il capitolo «Dopo il commit: gate documentale» descrive oggi un controllo a occhio. Diventa
+  due cose: la issue docs si apre **dichiarando in `covers` la revisione che copre**, e
+  `docs-gate.mjs` è come ci si accorge che è saltato. Lo script si nomina **direttamente**, come
+  `status-cli.mjs`, perché è un capitolo che prescrive di lanciarlo.
+- Una riga sul setaccio fra gli strumenti disponibili, senza prescrivere quando lanciarlo.
+- L'indice delle reference guadagna le due voci nuove — che è anche ciò che le rende non orfane
+  per il test esistente.
+
+### 5.4 Il retrofit dei due comandi che hanno il difetto oggi
+
+`/harness:issue` e `/harness:compact` soffrono dello stesso difetto **adesso**, non in futuro:
+il giudizio che sta sopra le primitive — i criteri di qualità di una issue, il raggruppamento in
+blocchi da far confermare — vive nei comandi, e un agente che arriva dalla skill impara
+l'esistenza della primitiva senza quella del giudizio.
+
+`references/issues.md:215` lo dice già a metà: «il giro che `--compact` non fa — leggere le
+`done`, proporre i blocchi, farli confermare — è il comando `/harness:compact`». Nomina il giro e
+non lo descrive.
+
+Il retrofit è **in scope per questa spec**, perché la correzione è la stessa e farla due volte a
+distanza di tempo costa il doppio: il contenuto di giudizio dei due comandi si sposta nelle
+reference che già ne possiedono le primitive, e i comandi si accorciano. Il test dei 4000
+caratteri li tiene onesti da qui in avanti.
 
 ## 6. Cosa non è qui
 
@@ -234,8 +311,22 @@ in uso nel repository:
   autocalibrata, `--since` esplicito, uno SHA corto che risolve, un riferimento che non risolve,
   `docsGate.enabled: false`, i codici d'uscita.
 
-`test/plugin-skill.test.mjs` e `test/plugin-commands.test.mjs` coprono già la struttura dei due
-comandi nuovi senza modifiche.
+Sulla struttura, i test esistenti fanno quasi tutto da soli, purché i file nuovi rispettino la
+convenzione di §5:
+
+- `plugin-commands.test.mjs` copre i due comandi nuovi appena entrano nella lista `COMMANDS`:
+  frontmatter, `argument-hint`, caso senza argomenti, invocazione via `CLAUDE_PLUGIN_ROOT`,
+  percorsi che risolvono, rimando a una reference e tetto dei 4000 caratteri;
+- `plugin-skill.test.mjs` copre le due reference nuove col test della reference orfana, e i loro
+  link incrociati.
+
+Va aggiunto **un test che oggi non esiste**, quello dell'asimmetria di §5.2: ogni script CLI
+sotto `scripts/` dev'essere nominato da `SKILL.md` o da una reference linkata. Oggi passerebbe
+già su tutti e cinque — è una disciplina rispettata che diventa un invariante, e impedisce che
+`docs-gate.mjs` finisca invisibile a chi legge la skill.
+
+Il retrofit di §5.4 non ha bisogno di test nuovi: i due comandi accorciati restano coperti dal
+test dei 4000 caratteri, e il contenuto spostato entra in reference già sotto controllo.
 
 **Nota sul gate documentale di questo repository.** Questa spec introduce script e quindi i suoi
 commit di implementazione ricadranno sotto `docsGate` di harness stesso: sono i primi commit che
@@ -283,6 +374,12 @@ un'eccezione per un comando invocato di proposito resta un'eccezione a un princi
 retto senza. Il compito spetta alle skill di documentazione già presenti nell'ambiente, e il loro
 esito rientra comunque nel corpus del setaccio successivo.
 
+**Il procedimento del setaccio scritto dentro `commands/sweep.md`, senza reference.** Era la
+prima stesura di questa spec. Scartata perché sbagliata su due piani: rende il procedimento
+invisibile a ogni lettore che non sia l'utente che digita il comando (§5.1), e fa fallire un test
+che il repository ha già (§5.2). Vale la pena tenerne memoria proprio perché sembrava la scelta
+economica — un file invece di due.
+
 **Le non promosse entrano nel tracker come issue di backlog.** Nessun file nuovo e nessuna
 eccezione al principio. Scartata perché contraddice direttamente la bussola di P1 — non sono
 costose-e-invisibili — e riempirebbe il riepilogo di righe che nessuno prenderà: esattamente il
@@ -298,3 +395,7 @@ difetto contro cui la bussola esiste.
   motivo per cui non la si tocca.
 - `skills/harness/references/issues.md` — lo schema, `depends_on` come precedente di `covers`, il
   meccanismo di `--upgrade`.
+- `skills/harness/references/status.md` — la divisione fra reference che possiede il contratto e
+  comando che ci rimanda, cioè il modello che §3 e §4 copiano.
+- `test/plugin-commands.test.mjs` e `test/plugin-skill.test.mjs` — i test che quella divisione
+  già difende, e quello che §7 aggiunge per lo script orfano.
