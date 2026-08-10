@@ -27,6 +27,13 @@ del processo**, `--project-dir` come override esplicito quando non controlli la 
 ometti partendo dalla cartella sbagliata ottieni un board vuoto del progetto sbagliato, senza
 nessun errore: il campo `projectDir` nella riga di avvio è lì per accorgertene subito.
 
+**Il server canonicalizza la directory che riceve** (`realpathSync.native`), quindi `projectDir`
+non è necessariamente la stringa che hai passato: un path 8.3 come `C:\Users\DIEGO_~1\...` torna
+nella sua forma lunga, e un link simbolico nella sua destinazione. Il controllo resta quello —
+guardare `projectDir` prima di annunciare l'URL — solo che si fa su un valore canonico: due
+grafie dello stesso progetto danno la stessa risposta, ed è il punto. Se la normalizzazione non
+riesce, il server parte lo stesso con il path che gli hai dato invece di rifiutarsi.
+
 Il processo resta in esecuzione: avvialo **in background**. All'avvio stampa una riga JSON e
 poi tace:
 
@@ -111,6 +118,13 @@ Durate diverse, quindi non un timeout da configurare. Ogni volta ha lasciato in 
 annunciato come attivo e già morto. In una sessione successiva ha retto 55 minuti, fermato
 deliberatamente al clock-out: **l'instabilità non è sistematica**, il che è la cosa peggiore,
 perché non se ne può diffidare sempre.
+
+Una causa di morte è nota e chiusa: `fs.watch()` su una directory in forma 8.3 non fallisce, fa
+**abortire il processo** da dentro libuv (`!_wcsnicmp(filename, dir, dirlen)`,
+`src\win\fs-event.c`). Dal 2026-08-10 il server canonicalizza la directory prima di osservarla e
+quel modo di morire non c'è più. **Non spiega le tre morti qui sopra**, però: quell'abort scatta
+alla prima scrittura su `issues.json`, non dopo 50 minuti di board funzionante. Resta quindi
+almeno una causa non identificata, ed è quella che tiene in piedi le due regole.
 
 Da cui le due regole che restano:
 

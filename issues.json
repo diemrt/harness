@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-10T14:20:49Z",
+  "last_updated": "2026-08-10T14:25:25Z",
   "rules": {
     "single_active_issue": false
   },
@@ -509,22 +509,17 @@
       "id": "7619689e-c007-4f0a-a94a-d253da55bcea",
       "title": "board.md non dice che il server canonicalizza la directory del progetto",
       "description": "Gate documentale del commit \"fix: canonicalise the board's project dir before watching it\", che ha toccato `scripts/board-server.mjs`.\n\nDa quel commit `resolveProjectDir()` normalizza la directory con `realpathSync.native()`, quindi il `projectDir` della riga di avvio non e' piu' il path passato in `--project-dir` ma la sua forma canonica. `references/board.md` e il comando `/harness:board` continuano a descrivere il controllo su `projectDir` come un confronto con quello che si e' passato: chi passa un path 8.3 vede tornare una stringa diversa da quella che ha scritto e non trova scritto da nessuna parte che e' voluto.\n\nC'e' anche un fatto nuovo da registrare: `fs.watch()` su una directory in forma 8.3 non fallisce, fa abortire il processo da libuv (`!_wcsnicmp(filename, dir, dirlen)`, `src\\win\\fs-event.c`). E' un candidato concreto come causa dell'instabilita' che la sezione \"Perche' non parte da solo\" documenta, e va scritto li' vicino invece di restare in un messaggio di commit.\n\nDipende dalla issue che riscrive board.md: toccano lo stesso file e non vanno lavorate in parallelo.",
-      "status": "backlog",
+      "status": "done",
       "tier": "economy",
       "depends_on": [
         "11e3060d-6efa-45b0-8b43-f0057015c46d"
       ],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "references/board.md dice che il server canonicalizza la directory ricevuta e che il projectDir annunciato puo' quindi differire da quello passato in --project-dir.",
-          "Il punto della sezione 'Perche' non parte da solo' che elenca le morti del processo cita l'abort di libuv su path 8.3 come causa nota, senza dichiararla l'unica.",
-          "Il testo non contraddice il comando /harness:board, che chiede di controllare projectDir prima di stampare l'URL: resta un controllo, su un valore canonico.",
-          "npm run test esce 0."
-        ]
+        "state": "pass",
+        "criteria": "Criterio 1 (canonicalizzazione): board.md dichiara esplicitamente che il server canonicalizza la directory ricevuta e che projectDir puo' differire da quanto passato in --project-dir. Esempi dati: path 8.3 torna in forma lunga, link simbolici nella destinazione. Verificato nelle righe 30-35.\n\nCriterio 2 (abort libuv): la sezione 'Perche' non parte da solo' cita l'abort di libuv su path 8.3 come causa nota e chiusa, senza dichiararla l'unica. Il testo spiega che NON spiega le tre morti elencate (50, 25, 16 minuti) perche' l'abort scatta alla prima scrittura su issues.json, non dopo 50 minuti. Afferma che resta almeno una causa non identificata. Verificato nelle righe 122-127.\n\nCriterio 3 (controllo projectDir): il testo non contraddice il comando /harness:board. Dichiara esplicitamente 'Il controllo resta quello — guardare projectDir prima di annunciare l'URL — solo che si fa su un valore canonico'. Verificato nella riga 32-33.\n\nCriterio 4 (gate): npm run test eseguito. 284 test passati, exit code 0. Output completo: 'ℹ tests 284 / ℹ pass 284 / ℹ fail 0'.\n\nTutti i criteri soddisfatti. Nessuna modifica fuori scope del lavoro documentale."
       },
       "created_at": "2026-08-10T14:06:55Z",
-      "updated_at": "2026-08-10T14:06:55Z"
+      "updated_at": "2026-08-10T14:25:25Z"
     }
   ]
 }
