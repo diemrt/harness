@@ -348,6 +348,11 @@ secondo correggendo la forma del payload.
 - la `description` va in paragrafi separati da riga vuota, non un blocco unico di testo;
 - ogni criterio è una cosa verificabile da un altro agente che non ha visto la conversazione:
   "funziona bene" non lo è, "il comando X esce 0 e stampa Y" sì;
+- e dev'essere controllabile **con gli accessi che il verificatore ha**: il suo ambiente è quello
+  del worker, non di più. Un criterio che chiede di guardare un server irraggiungibile, una
+  console web o un ambiente in linea non è verificabile — ed è un criterio scritto male, non un
+  verificatore limitato. Si riformula su un artefatto che entra nel repository:
+  [verification.md](verification.md);
 - per produrre il documento a cui la issue rimanda si possono usare le skill di spec presenti
   nell'ambiente (`superpowers:brainstorming`, `core-dev-toolkit:spec` e simili). **Harness non
   le invoca e non crea documenti da sé**: non semina file nel progetto, e non dipende da nessun

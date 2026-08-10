@@ -140,3 +140,43 @@ test("the skill says which work becomes an issue at all", () => {
     "the compass must precede the light-verification chapter, which presupposes an issue already decided"
   );
 });
+
+test("a criterion must be checkable with the verifier's own access", () => {
+  const issues = readFileSync(path.join(referencesDir, "issues.md"), "utf8");
+  const verification = readFileSync(path.join(referencesDir, "verification.md"), "utf8");
+
+  // "verifiable by another agent" was never the whole rule: that agent has the worker's
+  // environment and nothing more.
+  assert.match(
+    issues,
+    /accessi che il verificatore ha/,
+    "issues.md must tie a criterion's verifiability to the verifier's access, not only to its wording"
+  );
+
+  assert.match(
+    verification,
+    /^## Quando la prova sta fuori dalla portata dell'agent$/m,
+    "verification.md must say what happens when the proof cannot be collected at all"
+  );
+
+  // All four are mandatory: dropping "what we proceed on meanwhile" is what turns a request
+  // into a stall, and dropping "why not from here" is what turns it into lazy delegation.
+  for (const voice of [
+    "Cosa lanciare",
+    "Cosa serve indietro",
+    "Su cosa si prosegue intanto",
+    "Perché non si può fare da qui",
+  ]) {
+    assert.ok(
+      verification.includes(voice),
+      `the out-of-reach request must ask "${voice}"`
+    );
+  }
+
+  // The escape hatch exists, and its whole point is who holds the pen.
+  assert.match(
+    verification,
+    /firma il committente/,
+    "verification.md must say the reformulation is signed by the committente, never by the worker"
+  );
+});

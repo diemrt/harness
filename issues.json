@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-10T14:09:56Z",
+  "last_updated": "2026-08-10T14:16:44Z",
   "rules": {
     "single_active_issue": false
   },
@@ -465,23 +465,15 @@
       "id": "5b994254-c97b-425f-bef3-76c72154c037",
       "title": "Un criterio dev'essere controllabile con gli accessi del verificatore",
       "description": "references/issues.md chiede che ogni criterio sia «verificabile da un altro agente che non ha visto la conversazione». Non dice che quell'agente ha l'ambiente del worker e non di piu'.\n\nSu quel vuoto si e' rotta la issue [F2.3] del primo consumer: un criterio chiedeva di ispezionare un agent Jenkins irraggiungibile, il verificatore ha bloccato correttamente, e la issue si e' sbloccata solo con una riformulazione firmata dal committente. Un ciclo di blocked piu' una firma, senza niente che impedisse al caso di ripresentarsi al criterio successivo.\n\nEntrano la regola in issues.md e il protocollo in verification.md: l'artefatto committato che dichiara la propria revisione, le quattro voci della richiesta a chi puo' eseguirla, e chi firma la riformulazione.\n\nModifica solo documentale.\n\nSpec: docs/superpowers/specs/2026-08-10-harness-regole-e-default-design.md §2\nPiano: docs/superpowers/plans/2026-08-10-harness-regole-e-default.md, Task 2",
-      "status": "backlog",
+      "status": "done",
       "tier": "reasoning",
       "depends_on": [],
       "validation": {
-        "state": "unknown",
-        "criteria": [
-          "references/issues.md lega la verificabilita' di un criterio agli accessi del verificatore, e rimanda a verification.md con un link relativo che risolve.",
-          "verification.md contiene il capitolo di titolo esatto '## Quando la prova sta fuori dalla portata dell'agent'.",
-          "Il capitolo distingue la prova impossibile da quella soltanto scomoda, e dice che se e' scomoda si fa.",
-          "Il capitolo elenca le tre proprieta' dell'artefatto: committato, dichiara la revisione misurata, righe decisive verbatim piu' un puntatore alla fonte.",
-          "Il capitolo elenca tutte e quattro le voci obbligatorie della richiesta, comprese 'su cosa si prosegue intanto' e 'perche' non si puo' fare da qui'.",
-          "Il capitolo dice che la riformulazione la firma il committente e mai il worker, e la dichiara eccezione al divieto di declassare i criteri.",
-          "test/plugin-skill.test.mjs asserisce i criteri 1, 2, 5 e 6; npm run test esce 0."
-        ]
+        "state": "pass",
+        "criteria": "PASS su tutti e 7 i criteri. (1) skills/harness/references/issues.md:351-355 aggiunge il bullet «e dev'essere controllabile **con gli accessi che il verificatore ha**: il suo ambiente e' quello del worker, non di piu'... Si riformula su un artefatto che entra nel repository: [verification.md](verification.md);». Il link risolve: skills/harness/references/verification.md esiste su disco, e il test 'cross-links between reference files resolve too' (test/plugin-skill.test.mjs:59-69, che estrae i link .md relativi e ne fa existsSync) lo copre ed e' verde. (2) verification.md:76 ha l'heading esatto '## Quando la prova sta fuori dalla portata dell'agent'; i soli '## ' del file mostrano che il capitolo sta fra 'Cosa rende una verifica reale' (68) e 'Perche' non c'e' piu' un hook' (122), la posizione chiesta dal piano. (3) verification.md:78-81: «La prova e' *impossibile* da raccogliere dall'ambiente di lavoro - non soltanto scomoda. Se e' scomoda, si fa.» (4) verification.md:90-94, tabella con le tre proprieta': committato / dichiara su quale revisione e' stato misurato / porta le righe decisive verbatim, piu' un puntatore alla fonte. (5) verification.md:96-104, elenco numerato introdotto da 'ha quattro voci, tutte obbligatorie' con Cosa lanciare, Cosa serve indietro, Su cosa si prosegue intanto, Perche' non si puo' fare da qui. (6) verification.md:115-120: «La riformulazione la **firma il committente**, mai il worker a cui gioverebbe» e «E' l'**eccezione disciplinata** al divieto - scritto in [SKILL.md](../SKILL.md) - di declassare a posteriori i criteri»; il divieto referenziato esiste davvero (skills/harness/SKILL.md:241) e ../SKILL.md risolve. (7) test/plugin-skill.test.mjs:144-182 aggiunge 'a criterion must be checkable with the verifier's own access' che asserisce i criteri 1, 2, 5 e 6; nel run e' verde. GATE: npm run test -> EXIT=0, tests 283, pass 283, fail 0. FEDELTA' AL PIANO: i tre blocchi inseriti (bullet di issues.md, capitolo di verification.md, test) combaciano VERBATIM col testo atteso in docs/superpowers/plans/2026-08-10-harness-regole-e-default.md Task 2: confronto programmatico dei fenced block del piano contro i file, EXACT MATCH su tutti e tre. NIENTE TESTO MANGIATO: git diff --numstat da 5/0, 46/0, 40/0 sui tre file, sole aggiunte e zero righe rimosse. COLLATERALI: git status --short elenca solo issues.json piu' i tre file in scope; il diff di issues.json e' unicamente la transizione backlog->in_review e i timestamp. Il verificatore non ha modificato nessun file."
       },
       "created_at": "2026-08-10T13:43:55Z",
-      "updated_at": "2026-08-10T13:43:55Z"
+      "updated_at": "2026-08-10T14:16:44Z"
     },
     {
       "id": "11e3060d-6efa-45b0-8b43-f0057015c46d",

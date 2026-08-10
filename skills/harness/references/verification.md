@@ -73,6 +73,52 @@ Nessuno dei tre invarianti cambia: verifica indipendente su ogni issue, commit s
 - controllo che il lavoro non abbia rotto altro: la suite intera, non solo i test nuovi;
 - disponibilità a dire **fail**. Un verificatore che passa tutto non sta verificando.
 
+## Quando la prova sta fuori dalla portata dell'agent
+
+**Quando scatta.** La prova è *impossibile* da raccogliere dall'ambiente di lavoro — non
+soltanto scomoda. Se è scomoda, si fa. La distinzione va tenuta ferma: è l'unica cosa che
+impedisce a questa regola di diventare una scorciatoia per delegare a una persona lavoro che
+l'agente poteva svolgere.
+
+**In scrittura: il criterio nomina l'artefatto, non l'azione.** Non «il job X esce verde», ma
+«esiste `<path>` con esito verde su …, per la revisione `<sha>`». Chi verifica legge un file che
+ha già in mano, e non gli serve nessun accesso che non ha.
+
+Harness non prescrive né il formato dell'artefatto né la cartella dove vive: quelle le decide il
+progetto. Prescrive tre proprietà:
+
+| proprietà | perché |
+|---|---|
+| **committato** | un artefatto fuori dal repository non è raggiungibile dal verificatore più della cosa che sostituisce |
+| **dichiara su quale revisione è stato misurato** | una misura fatta altrove misura ciò che era stato spinto, non ciò che sta nel working tree; senza la revisione l'artefatto non dice se ha misurato la cosa che si crede |
+| **porta le righe decisive verbatim, più un puntatore alla fonte** | il log intero è rumore, ma senza le righe e senza la fonte l'artefatto è il racconto di qualcuno |
+
+**La richiesta a chi può eseguirla ha quattro voci, tutte obbligatorie:**
+
+1. **Cosa lanciare** — comandi esatti e copiabili, o nome del job e parametri.
+2. **Cosa serve indietro** — quale output, e quanto: tutto, o da un certo punto in poi.
+3. **Su cosa si prosegue intanto** — l'assunzione con cui il lavoro continua mentre la risposta
+   non c'è, scritta, così che un esito contrario dica subito che cosa cade.
+4. **Perché non si può fare da qui** — una riga. Se non è scrivibile, la richiesta non va fatta:
+   significa che era eseguibile senza disturbare nessuno.
+
+**Il lavoro non si ferma ad aspettare.** Si chiede appena la necessità è nota e si prosegue su
+tutto ciò che non ne dipende. L'eccezione è una sola: quando l'assunzione è così portante che
+proseguire significherebbe rifare tutto in caso di esito contrario.
+
+**La valvola, per i criteri fuori portata già scritti.** La regola qui sopra previene; questa
+gestisce i casi in cui non ha funzionato.
+
+- Il worker dichiara l'impossibilità e si ferma. **Non riformula il criterio.**
+- Il verificatore **blocca** la issue. È la condotta giusta, non un incidente: un verificatore
+  che passa oltre un criterio che non ha potuto controllare è un verificatore che non serve.
+- La riformulazione la **firma il committente**, mai il worker a cui gioverebbe, e la firma resta
+  nella `description` della issue.
+
+È l'**eccezione disciplinata** al divieto — scritto in [SKILL.md](../SKILL.md) — di declassare a
+posteriori i criteri, non una contraddizione: stessa logica e stesso motivo, cioè che chi trae
+vantaggio da un criterio più debole non è chi può indebolirlo. Cambia solo chi tiene la penna.
+
 ## Perché non c'è più un hook
 
 Nel modello plugin non esiste l'hook `pre-commit` che bloccava i commit del ruolo worker: gli
