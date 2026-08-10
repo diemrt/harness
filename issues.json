@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-04T11:20:59Z",
+  "last_updated": "2026-08-10T13:44:30Z",
   "rules": {
     "single_active_issue": false
   },
@@ -446,6 +446,74 @@
       },
       "created_at": "2026-08-04T10:00:35Z",
       "updated_at": "2026-08-04T11:20:59Z"
+    },
+    {
+      "id": "5a1636cd-6379-4c14-b14f-fd75fd5becaa",
+      "title": "La bussola: harness dice quale lavoro diventa una issue",
+      "description": "Harness apre dicendo «ogni pezzo di lavoro è una issue tracciata», e non dice mai quale lavoro lo diventi davvero. Il primo consumer esterno ha dovuto ricavarsi la regola da sé, dopo un primo tentativo da 21 issue su un piano da 15 passi: 21 giri di verificatore su criteri che il livello sotto già controllava inline.\n\nEntra in SKILL.md la bussola «costoso e invisibile», la premessa si riscrive, e il capitolo si colloca prima di «Verifica leggera»: sono la stessa domanda a due stadi — questo lavoro entra nel tracker, e poi quanta cerimonia gli serve.\n\nModifica solo documentale: nessuno script, nessun campo di schema.\n\nSpec: docs/superpowers/specs/2026-08-10-harness-regole-e-default-design.md §1\nPiano: docs/superpowers/plans/2026-08-10-harness-regole-e-default.md, Task 1",
+      "status": "backlog",
+      "tier": "reasoning",
+      "depends_on": [],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "SKILL.md contiene un capitolo di titolo esatto '## Cosa diventa una issue', collocato fra il capitolo 'Tier' e il capitolo 'Verifica leggera'.",
+          "La premessa di SKILL.md non contiene piu' la stringa 'ogni pezzo di lavoro e' una issue tracciata'.",
+          "Il capitolo enuncia entrambe le meta' della bussola (costoso E invisibile) e i quattro passi per il lavoro che emerge a meta'.",
+          "Il capitolo dichiara che sotto il tracker c'e' un livello a grana fine, e che harness non prescrive come produrlo.",
+          "Il capitolo 'Verifica leggera' porta una riga che lo lega alla bussola, e il resto del capitolo e' invariato.",
+          "test/plugin-skill.test.mjs contiene un test nuovo che asserisce i criteri 1 e 2 e l'ordine dei due capitoli.",
+          "npm run test esce 0."
+        ]
+      },
+      "created_at": "2026-08-10T13:43:55Z",
+      "updated_at": "2026-08-10T13:43:55Z"
+    },
+    {
+      "id": "5b994254-c97b-425f-bef3-76c72154c037",
+      "title": "Un criterio dev'essere controllabile con gli accessi del verificatore",
+      "description": "references/issues.md chiede che ogni criterio sia «verificabile da un altro agente che non ha visto la conversazione». Non dice che quell'agente ha l'ambiente del worker e non di piu'.\n\nSu quel vuoto si e' rotta la issue [F2.3] del primo consumer: un criterio chiedeva di ispezionare un agent Jenkins irraggiungibile, il verificatore ha bloccato correttamente, e la issue si e' sbloccata solo con una riformulazione firmata dal committente. Un ciclo di blocked piu' una firma, senza niente che impedisse al caso di ripresentarsi al criterio successivo.\n\nEntrano la regola in issues.md e il protocollo in verification.md: l'artefatto committato che dichiara la propria revisione, le quattro voci della richiesta a chi puo' eseguirla, e chi firma la riformulazione.\n\nModifica solo documentale.\n\nSpec: docs/superpowers/specs/2026-08-10-harness-regole-e-default-design.md §2\nPiano: docs/superpowers/plans/2026-08-10-harness-regole-e-default.md, Task 2",
+      "status": "backlog",
+      "tier": "reasoning",
+      "depends_on": [],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "references/issues.md lega la verificabilita' di un criterio agli accessi del verificatore, e rimanda a verification.md con un link relativo che risolve.",
+          "verification.md contiene il capitolo di titolo esatto '## Quando la prova sta fuori dalla portata dell'agent'.",
+          "Il capitolo distingue la prova impossibile da quella soltanto scomoda, e dice che se e' scomoda si fa.",
+          "Il capitolo elenca le tre proprieta' dell'artefatto: committato, dichiara la revisione misurata, righe decisive verbatim piu' un puntatore alla fonte.",
+          "Il capitolo elenca tutte e quattro le voci obbligatorie della richiesta, comprese 'su cosa si prosegue intanto' e 'perche' non si puo' fare da qui'.",
+          "Il capitolo dice che la riformulazione la firma il committente e mai il worker, e la dichiara eccezione al divieto di declassare i criteri.",
+          "test/plugin-skill.test.mjs asserisce i criteri 1, 2, 5 e 6; npm run test esce 0."
+        ]
+      },
+      "created_at": "2026-08-10T13:43:55Z",
+      "updated_at": "2026-08-10T13:43:55Z"
+    },
+    {
+      "id": "11e3060d-6efa-45b0-8b43-f0057015c46d",
+      "title": "Il board esce dal clock-in: si avvia su richiesta, non da solo",
+      "description": "Il passo 4 di 'Clock in' impone di avviare il board. Il primo consumer esterno ha fatto l'opposto, per iscritto, e con una misura: in una sessione il processo e' morto tre volte, dopo circa 50, 25 e 16 minuti — durate diverse, quindi non un timeout da configurare — lasciando ogni volta un URL annunciato come attivo e gia' morto. In una sessione successiva ha retto 55 minuti. L'instabilita' non e' sistematica, il che e' la cosa peggiore.\n\nIl board resta e non viene deprecato: smette di essere un passo obbligatorio. Il riepilogo di status-cli diventa l'unico passo di visibilita' del clock-in, perche' e' testo e non dipende da un processo che deve sopravvivere fra i turni.\n\nDipende dalla issue della bussola: tocca lo stesso SKILL.md, e le due non vanno lavorate in parallelo.\n\nSpec: docs/superpowers/specs/2026-08-10-harness-regole-e-default-design.md §3\nPiano: docs/superpowers/plans/2026-08-10-harness-regole-e-default.md, Task 3",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [
+        "5a1636cd-6379-4c14-b14f-fd75fd5becaa"
+      ],
+      "validation": {
+        "state": "unknown",
+        "criteria": [
+          "Il capitolo 'Clock in' di SKILL.md non nomina il board in nessun passo, e i passi sono rinumerati senza buchi.",
+          "Il passo dello stato del tracker resta e dichiara di essere l'unico passo di visibilita' del clock-in.",
+          "Il capitolo 'Clock out' di SKILL.md cita il board in forma condizionale, non come passo dovuto.",
+          "references/board.md non contiene piu' 'al clock-in, automaticamente', e la voce Stop del ciclo di vita e' condizionale.",
+          "references/board.md contiene la sezione '## Perche' non parte da solo' con le durate misurate: 50, 25, 16 minuti, e i 55 della sessione che ha retto.",
+          "SKILL.md continua a linkare references/board.md dal capitolo Reference, e il test della reference orfana resta verde.",
+          "test/plugin-skill.test.mjs asserisce l'assenza del board dal capitolo Clock in; npm run test esce 0."
+        ]
+      },
+      "created_at": "2026-08-10T13:44:30Z",
+      "updated_at": "2026-08-10T13:44:30Z"
     }
   ]
 }
