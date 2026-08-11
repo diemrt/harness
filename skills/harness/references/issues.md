@@ -305,11 +305,6 @@ con dipendenze aperte: l'unico guard di processo resta quello anti-self-validati
 (`FORBIDDEN_ROLE`). Che si rispetti l'ordine della catena è una regola di workflow, e vive in
 [SKILL.md](../SKILL.md) come ci vive il tier.
 
-> **Attenzione al rimando.** Il testo qui sotto nomina il gate **senza link markdown**, ed è
-> deliberato: `references/docs-gate.md` nasce in Task 4, e un link a un file che non esiste
-> ancora farebbe fallire il test `cross-links between reference files resolve too`. Task 4 Step 5
-> lo trasforma nel link vero. Non anticiparlo.
-
 **`covers`** dichiara quali revisioni git quella issue copre. È **generale, non specifico della
 documentazione**: qualunque issue può dichiarare di coprire una revisione, e il gate documentale
 ([docs-gate.md](docs-gate.md)) chiede soltanto che *qualcuno* la nomini. È sempre un array —
