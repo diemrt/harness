@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-10T14:25:25Z",
+  "last_updated": "2026-08-11T14:53:29Z",
   "rules": {
     "single_active_issue": false
   },
@@ -520,6 +520,167 @@
       },
       "created_at": "2026-08-10T14:06:55Z",
       "updated_at": "2026-08-10T14:25:25Z"
+    },
+    {
+      "id": "aa9a07bf-0611-400e-b22a-fd0a9ff6cb40",
+      "title": "covers nello schema della issue, e la migrazione 1 -> 2",
+      "description": "Aggiunge alla issue il campo covers: array di riferimenti git che quella issue dichiara di coprire. E' il dato su cui il gate documentale decide, e senza di lui il gate non ha niente da leggere.\n\nGenerale e non specifico delle docs: qualunque issue puo' dichiarare una revisione, e il gate chiede solo che qualcuno la nomini. Assente vale [], null non e' ammesso, validazione volutamente lasca (stringhe non vuote, niente duplicati): harness non e' una libreria git, e un riferimento sbagliato viene riportato come irrisolto invece che rifiutato.\n\nSCHEMA_VERSION passa da 1 a 2 con la migrazione che materializza covers: [] dove la chiave manca, come la 0 -> 1 ha fatto con depends_on.\n\nTask 1 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md, che porta il codice esatto, i test e le tre aspettative esistenti da aggiornare.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [],
+      "validation": {
+        "criteria": [
+          "npm run test esce 0",
+          "--insert con covers ['a1b2c3d'] risponde ok:true e .data.covers vale ['a1b2c3d']",
+          "--insert senza covers risponde .data.covers uguale a []",
+          "--insert con covers:null risponde ok:false con code INVALID_INPUT",
+          "SCHEMA_VERSION vale 2 in scripts/issue-manager.mjs, e --upgrade su un tracker senza schema_version risponde to:2",
+          "references/issues.md documenta covers nello schema e nella tabella dei campi accettati in input",
+          "il rimando al gate in issues.md non e' un link markdown: docs-gate.md non esiste ancora"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-11T14:53:29Z",
+      "updated_at": "2026-08-11T14:53:29Z"
+    },
+    {
+      "id": "3c56866d-6515-49f5-b13f-2b3152409067",
+      "title": "La parte che decide di docs-gate.mjs",
+      "description": "Il cuore del gate documentale, come funzione dei soli dati in memoria: quali file contano come codice (matching dei glob di docsGate), quali revisioni il tracker dichiara, quali commit restano scoperti, e come si stampa il report a 80 colonne.\n\nNessun git, nessun filesystem, nessun processo: la stessa separazione che status-cli.mjs ha gia' fra buildSnapshot e main(). A fine issue il file non e' ancora lanciabile - e' un modulo di funzioni pure con i suoi test, e il guscio arriva dopo.\n\nTask 2 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md. Il codice del piano e' stato eseguito in una cartella temporanea prima di essere scritto: i test passano cosi' come sono.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [
+        "aa9a07bf-0611-400e-b22a-fd0a9ff6cb40"
+      ],
+      "validation": {
+        "criteria": [
+          "npm run test esce 0",
+          "test/plugin-docs-gate.test.mjs esiste e i suoi test passano",
+          "globToRegExp('**/*.mjs') matcha sia index.mjs sia scripts/a/b.mjs, e globToRegExp('issues.json') non matcha issuesXjson",
+          "isCodeFile applica exclude sopra include: test/x.mjs non e' codice con i default di docsGate",
+          "declaredRefs raccoglie covers da issue di ogni stato e legge la chiave assente come []",
+          "renderGateReport non produce nessuna riga oltre 80 colonne col nome di progetto e l'etichetta di finestra reali",
+          "la riga dei conteggi concorda al singolare: '1 tocca codice', '1 non coperto'"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-11T14:53:29Z",
+      "updated_at": "2026-08-11T14:53:29Z"
+    },
+    {
+      "id": "76e83448-44df-4cd6-a655-c0503f4c92d7",
+      "title": "Il guscio di docs-gate.mjs: config, git, finestra, uscite",
+      "description": "Quello che la parte pura non poteva provare senza un repository: la lettura di .harness/config.json, la risoluzione dei riferimenti con git rev-parse, la finestra che si autocalibra sulla piu' vecchia revisione dichiarata, e i codici d'uscita.\n\nDue casi che la spec non fissa e che il piano decide: nessuna revisione dichiarata e nessun --since esce 1 (lo script non ha risposto, come un flag sconosciuto), e un config.json mancante esce 1 invece di indovinare i glob.\n\nAttenzione al guard verificato a mano: git log --no-walk senza revisioni ripiega su HEAD in silenzio, quindi oldestCommit([]) deve uscire prima di chiamarlo.\n\nTask 3 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [
+        "3c56866d-6515-49f5-b13f-2b3152409067"
+      ],
+      "validation": {
+        "criteria": [
+          "npm run test esce 0",
+          "su un repo git temporaneo la finestra parte dalla piu' vecchia revisione dichiarata in covers",
+          "uno sha corto in covers copre lo stesso commit dello sha lungo",
+          "un riferimento che non risolve compare in un'allerta e l'uscita resta 0",
+          "trovare commit scoperti esce 0; nessuna revisione dichiarata senza --since esce 1 chiedendo --since",
+          "docsGate.enabled false stampa una riga ed esce 0; config.json mancante o directory non git escono 1",
+          "stderr resta vuoto in ogni caso, anche quando git fallisce"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-11T14:53:29Z",
+      "updated_at": "2026-08-11T14:53:29Z"
+    },
+    {
+      "id": "c8cce222-371d-4a3b-9e3e-a23627f5ced0",
+      "title": "references/docs-gate.md e il comando che ci rimanda",
+      "description": "Il contratto del gate va nella reference, non nel comando: e' la stessa divisione che references/status.md ha gia' con /harness:status, ed e' l'unica che raggiunge i lettori che non sono l'utente. Un subagent non ha /harness:docs-gate fra le cose che puo' invocare: legge SKILL.md e segue i link.\n\nLa reference possiede finestra, copertura, risoluzione dei riferimenti, lettura dell'output, canali e codici d'uscita. Il comando resta sottile: lancia, ristampa verbatim, rimanda.\n\nChiude anche il rimando lasciato senza link in issues.md, adesso che il file esiste.\n\nTask 4 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [
+        "76e83448-44df-4cd6-a655-c0503f4c92d7"
+      ],
+      "validation": {
+        "criteria": [
+          "npm run test esce 0",
+          "commands/docs-gate.md esiste ed e' in COMMANDS in test/plugin-commands.test.mjs",
+          "skills/harness/references/docs-gate.md esiste ed e' linkata dall'indice Reference di SKILL.md",
+          "il corpo di commands/docs-gate.md sta sotto i 4000 caratteri e linka la reference",
+          "il README documenta /harness:docs-gate nella tabella dei comandi",
+          "in issues.md il rimando al gate e' ora il link markdown a docs-gate.md, e i cross-link restano verdi"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-11T14:53:29Z",
+      "updated_at": "2026-08-11T14:53:29Z"
+    },
+    {
+      "id": "958f86ae-a66a-497d-99da-1ec1194e9b97",
+      "title": "references/sweep.md e il comando che ci rimanda",
+      "description": "Il setaccio dei documenti: rilegge il corpus del progetto per le occasioni che il lavoro ha scoperto, annotato dove stava lavorando, e mai portato nel tracker. Su un progetto reale un audit manuale ne ha recuperate venticinque, di cui otto meritavano una issue.\n\nNessuno script: e' tutto giudizio, e usa --get-all e --insert che esistono gia'. Ma il procedimento vive nella reference, non nel comando: scritto dentro il comando sarebbe invisibile a meta' dei suoi lettori, e farebbe fallire il test che impone a ogni comando di linkare la reference che possiede il contratto.\n\nIl tier e' reasoning perche' qui non c'e' codice a fare da rete: il valore della issue sta interamente in quanto e' scritto bene il procedimento.\n\nTask 5 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md.",
+      "status": "backlog",
+      "tier": "reasoning",
+      "depends_on": [
+        "c8cce222-371d-4a3b-9e3e-a23627f5ced0"
+      ],
+      "validation": {
+        "criteria": [
+          "npm run test esce 0",
+          "commands/sweep.md esiste ed e' in COMMANDS in test/plugin-commands.test.mjs",
+          "skills/harness/references/sweep.md esiste ed e' linkata dall'indice Reference di SKILL.md",
+          "la reference impone l'incrocio col tracker in tutti gli stati e la verifica contro il codice prima di proporre",
+          "la reference rimanda alla bussola di SKILL.md per decidere cosa promuovere, e dice che le non promosse non diventano issue di backlog",
+          "il README documenta /harness:sweep nella tabella dei comandi"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-11T14:53:29Z",
+      "updated_at": "2026-08-11T14:53:29Z"
+    },
+    {
+      "id": "d88b2b87-fea7-4535-95a0-24775cfeb163",
+      "title": "SKILL.md: il gate nomina covers e lo script, e nessuno script resta orfano",
+      "description": "Il capitolo 'Dopo il commit: gate documentale' descrive oggi un controllo a occhio. Diventa due cose: la issue docs si apre dichiarando in covers la revisione che copre, e docs-gate.mjs e' come ci si accorge che il promemoria e' saltato. Piu' una riga sul setaccio.\n\nE l'asimmetria che manca: plugin-skill.test.mjs impedisce la reference orfana, ma niente impedisce lo script orfano. Che oggi siano tutti nominati e' una disciplina, non un invariante - e senza, docs-gate.mjs potrebbe finire invisibile proprio a chi legge la skill. Il test nuovo passa gia' su tutti e sei: e' una disciplina che diventa invariante.\n\nTask 6 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [
+        "c8cce222-371d-4a3b-9e3e-a23627f5ced0",
+        "958f86ae-a66a-497d-99da-1ec1194e9b97"
+      ],
+      "validation": {
+        "criteria": [
+          "npm run test esce 0",
+          "il capitolo del gate documentale in SKILL.md nomina covers e nomina direttamente docs-gate.mjs",
+          "SKILL.md rimanda a references/docs-gate.md e a references/sweep.md dal corpo, non solo dall'indice",
+          "esiste un test che fallisce se uno script sotto scripts/ non e' nominato da SKILL.md ne' da una reference",
+          "quel test passa su tutti e sei gli script che il plugin spedisce"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-11T14:53:29Z",
+      "updated_at": "2026-08-11T14:53:29Z"
+    },
+    {
+      "id": "8d3f4db5-fffb-4d13-9804-990ebd2da31d",
+      "title": "Il giudizio esce da /harness:issue e /harness:compact",
+      "description": "I due comandi hanno adesso lo stesso difetto che le due reference nuove evitano: il giudizio che sta sopra le primitive - i criteri di qualita' di una issue, il raggruppamento in blocchi da far confermare - vive nel comando, e un agente che arriva dalla skill impara l'esistenza della primitiva senza quella del giudizio. references/issues.md lo dice gia' a meta': nomina il giro che --compact non fa, e non lo descrive.\n\nIl contenuto di giudizio si sposta in issues.md, che gia' possiede le primitive, e i comandi si accorciano.\n\nAttenzione: due test misurano il contenuto di questi comandi e devono restare verdi - la proiezione id/title di compact con la menzione di --page, e il divieto di done/pass in issue. Si sposta il giudizio, non la meccanica.\n\nTask 7 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [
+        "aa9a07bf-0611-400e-b22a-fd0a9ff6cb40"
+      ],
+      "validation": {
+        "criteria": [
+          "npm run test esce 0",
+          "issues.md ha una sezione su cosa decide chi apre una issue, e descrive il giro che --compact non fa",
+          "il test 'the compact command projects id and title when it reads the done issues' resta verde",
+          "il test 'the issue command cannot close an issue' resta verde",
+          "i corpi di commands/issue.md e commands/compact.md sono piu' corti di prima, non piu' lunghi"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-11T14:53:29Z",
+      "updated_at": "2026-08-11T14:53:29Z"
     }
   ]
 }
