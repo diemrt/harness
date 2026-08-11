@@ -36,7 +36,7 @@ non fa". Per ogni blocco proposto mostra `title`, `description` e la lista `id` 
 
 **Non chiamare la primitiva finché l'utente non conferma il raggruppamento mostrato.**
 
-## 4. Chiama la primitiva
+## 3. Chiama la primitiva
 
 Scrivi il payload confermato su file e passalo con `--issue-data-file` (nessun escaping di
 quote da gestire nella shell):
@@ -49,7 +49,7 @@ quote da gestire nella shell):
 node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --compact --issue-data-file <path>
 ```
 
-## 5. Riporta l'esito
+## 4. Riporta l'esito
 
 Successo → riporta `archivePath` e, per ogni blocco creato, `id` e `title`.
 
