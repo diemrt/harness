@@ -12,7 +12,13 @@ import {
   buildGateReport,
   renderGateReport,
   WIDTH,
+  parseLog,
 } from "../scripts/docs-gate.mjs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const INCLUDE = ["**/*.mjs", "**/*.ts"];
 const EXCLUDE = ["docs/**", "test/**", "**/*.md", "issues.json"];
@@ -200,4 +206,292 @@ test("an unresolved reference becomes an alert line above the bar, wrapped and n
   for (const line of lines) {
     assert.ok(line.length <= WIDTH, `line longer than ${WIDTH} columns: ${JSON.stringify(line)}`);
   }
+});
+
+// ---------------------------------------------------------------------------
+// The shell: everything that needs a real repository. One temporary git repo per test, built with
+// a fixed clock — the window autocalibrates on committer date, and two commits made inside the
+// same second would make "the oldest" a coin toss.
+// ---------------------------------------------------------------------------
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const SCRIPT = path.join(__dirname, "..", "scripts", "docs-gate.mjs");
+
+function sh(cmd, args, cwd, env = {}) {
+  const result = spawnSync(cmd, args, {
+    cwd,
+    encoding: "utf8",
+    env: { ...process.env, ...env },
+  });
+  assert.equal(
+    result.status,
+    0,
+    `${cmd} ${args.join(" ")} failed: ${result.stderr || result.stdout}`
+  );
+  return result;
+}
+
+let minute = 0;
+
+function gitRepo() {
+  const dir = mkdtempSync(path.join(tmpdir(), "harness-gate-"));
+  sh("git", ["init", "-q", "-b", "main"], dir);
+  sh("git", ["config", "user.email", "test@example.com"], dir);
+  sh("git", ["config", "user.name", "Test"], dir);
+  return dir;
+}
+
+function makeCommit(dir, files, subject) {
+  for (const [file, content] of Object.entries(files)) {
+    const full = path.join(dir, file);
+    mkdirSync(path.dirname(full), { recursive: true });
+    writeFileSync(full, content, "utf8");
+  }
+  sh("git", ["add", "-A"], dir);
+  minute += 1;
+  const when = `2026-01-01T${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(
+    minute % 60
+  ).padStart(2, "0")}:00Z`;
+  sh("git", ["commit", "-q", "-m", subject], dir, {
+    GIT_AUTHOR_DATE: when,
+    GIT_COMMITTER_DATE: when,
+  });
+  return sh("git", ["rev-parse", "HEAD"], dir).stdout.trim();
+}
+
+// Written AFTER the commits on purpose: the tracker and the config are the gate's input, not part
+// of the history it reads.
+function writeHarness(dir, { issues = [], docsGate } = {}) {
+  mkdirSync(path.join(dir, ".harness"), { recursive: true });
+  writeFileSync(
+    path.join(dir, ".harness", "config.json"),
+    JSON.stringify({ verify: "npm test", ...(docsGate === undefined ? {} : { docsGate }) }, null, 2),
+    "utf8"
+  );
+  writeFileSync(
+    path.join(dir, "issues.json"),
+    JSON.stringify({ schema_version: 2, last_updated: "2026-01-01T00:00:00Z", issues }, null, 2),
+    "utf8"
+  );
+}
+
+function issue(covers, status = "backlog") {
+  return { id: "11111111-1111-1111-1111-111111111111", status, covers };
+}
+
+function runGate(dir, args = []) {
+  return spawnSync(process.execPath, [SCRIPT, "--project-dir", dir, ...args], {
+    encoding: "utf8",
+  });
+}
+
+test("parseLog splits records without any quoting", () => {
+  const stdout = "\u001fsha1\u001ffeat: one\n\nscripts/a.mjs\nREADME.md\n\u001fsha2\u001ffix: two\n\ndocs/b.md\n";
+  assert.deepEqual(parseLog(stdout), [
+    { sha: "sha1", subject: "feat: one", files: ["scripts/a.mjs", "README.md"] },
+    { sha: "sha2", subject: "fix: two", files: ["docs/b.md"] },
+  ]);
+});
+
+test("the window starts at the oldest declared revision, and the report is exit 0", () => {
+  const dir = gitRepo();
+  try {
+    const first = makeCommit(dir, { "a.mjs": "1" }, "feat: first");
+    makeCommit(dir, { "b.mjs": "2" }, "feat: second");
+    makeCommit(dir, { "README.md": "3" }, "docs: third");
+    writeHarness(dir, { issues: [issue([first])] });
+
+    const result = runGate(dir);
+    assert.equal(result.status, 0, result.stdout);
+    assert.equal(result.stderr, "", "nothing is ever written to stderr");
+    assert.match(result.stdout, new RegExp(`finestra da ${first.slice(0, 8)}`));
+    // Two commits after the start: the .mjs one is code and uncovered, the .md one is not code.
+    assert.match(result.stdout, /2 commit nella finestra/);
+    assert.match(result.stdout, /1 tocca codice/);
+    assert.match(result.stdout, /1 non coperto/);
+    assert.match(result.stdout, /feat: second/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("finding uncovered commits is still exit 0: a finding is not a failure", () => {
+  const dir = gitRepo();
+  try {
+    const first = makeCommit(dir, { "a.mjs": "1" }, "feat: first");
+    makeCommit(dir, { "b.mjs": "2" }, "feat: uncovered");
+    writeHarness(dir, { issues: [issue([first])] });
+
+    // A different exit code for "I found uncovered commits" would be handy in CI and would break
+    // the contract every other script of this plugin keeps, where 1 means the request was not
+    // carried out. Whoever wants a CI gate reads the output.
+    assert.equal(runGate(dir).status, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a short sha in covers resolves to the same revision as the long one", () => {
+  const dir = gitRepo();
+  try {
+    const first = makeCommit(dir, { "a.mjs": "1" }, "feat: first");
+    const second = makeCommit(dir, { "b.mjs": "2" }, "feat: second");
+    writeHarness(dir, { issues: [issue([first]), issue([second.slice(0, 7)])] });
+
+    const result = runGate(dir);
+    assert.equal(result.status, 0, result.stdout);
+    assert.match(result.stdout, /0 non coperti/);
+    assert.match(result.stdout, /nessun commit di codice scoperto/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a covers entry that does not resolve is reported, not silently dropped", () => {
+  const dir = gitRepo();
+  try {
+    const first = makeCommit(dir, { "a.mjs": "1" }, "feat: first");
+    makeCommit(dir, { "b.mjs": "2" }, "feat: second");
+    writeHarness(dir, { issues: [issue([first, "deadbeefdeadbeef"])] });
+
+    const result = runGate(dir);
+    assert.equal(result.status, 0, "an unresolved reference is a finding, not an error");
+    assert.match(result.stdout, /deadbeefdeadbeef/);
+    assert.match(result.stdout, /non risolve/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("coverage counts an issue in backlog: the gate is a reminder, not a veto", () => {
+  const dir = gitRepo();
+  try {
+    const first = makeCommit(dir, { "a.mjs": "1" }, "feat: first");
+    const second = makeCommit(dir, { "b.mjs": "2" }, "feat: second");
+    writeHarness(dir, { issues: [issue([first]), issue([second], "backlog")] });
+
+    assert.match(runGate(dir).stdout, /0 non coperti/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("no declared revision and no --since: it stops and asks, exit 1", () => {
+  const dir = gitRepo();
+  try {
+    makeCommit(dir, { "a.mjs": "1" }, "feat: first");
+    writeHarness(dir, { issues: [] });
+
+    const result = runGate(dir);
+    // A guessed starting point here does not produce an error: it produces a plausible, useless
+    // list, which is worse.
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /--since/);
+    assert.equal(result.stderr, "");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--since gives an explicit window even with an empty tracker", () => {
+  const dir = gitRepo();
+  try {
+    const first = makeCommit(dir, { "a.mjs": "1" }, "feat: first");
+    makeCommit(dir, { "b.mjs": "2" }, "feat: second");
+    writeHarness(dir, { issues: [] });
+
+    const result = runGate(dir, ["--since", first]);
+    assert.equal(result.status, 0, result.stdout);
+    assert.match(result.stdout, /--since/);
+    assert.match(result.stdout, /1 non coperto/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a --since that does not resolve is exit 1", () => {
+  const dir = gitRepo();
+  try {
+    makeCommit(dir, { "a.mjs": "1" }, "feat: first");
+    writeHarness(dir, { issues: [] });
+
+    const result = runGate(dir, ["--since", "not-a-revision"]);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /not-a-revision/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("docsGate.enabled false is declared and the script stops, exit 0", () => {
+  const dir = gitRepo();
+  try {
+    makeCommit(dir, { "a.mjs": "1" }, "feat: first");
+    writeHarness(dir, { issues: [], docsGate: { enabled: false } });
+
+    const result = runGate(dir);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /disabilitato/);
+    assert.doesNotMatch(result.stdout, /NON COPERTI/, "a disabled gate reports nothing else");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a partial docsGate is completed with the defaults, not left half empty", () => {
+  const dir = gitRepo();
+  try {
+    const first = makeCommit(dir, { "a.mjs": "1" }, "feat: first");
+    makeCommit(dir, { "b.mjs": "2" }, "feat: second");
+    // Only `exclude` is given: `include` must still come from the defaults, or the gate would
+    // report itself as active while matching no file at all.
+    writeHarness(dir, { issues: [issue([first])], docsGate: { exclude: ["docs/**"] } });
+
+    assert.match(runGate(dir).stdout, /1 non coperto/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a missing .harness/config.json is exit 1: the globs are the project's decision", () => {
+  const dir = gitRepo();
+  try {
+    makeCommit(dir, { "a.mjs": "1" }, "feat: first");
+    const result = runGate(dir);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /config\.json/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a directory that is not a git repository is exit 1", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "harness-nogit-"));
+  try {
+    writeHarness(dir, { issues: [] });
+    const result = runGate(dir);
+    assert.equal(result.status, 1);
+    assert.equal(result.stderr, "", "git's own noise must never reach stderr through this script");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an unknown flag stops instead of answering a different question", () => {
+  const dir = gitRepo();
+  try {
+    writeHarness(dir, { issues: [] });
+    const result = runGate(dir, ["--all"]);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /--project-dir/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--help exits 0 and needs no project at all", () => {
+  const result = spawnSync(process.execPath, [SCRIPT, "--help"], { encoding: "utf8" });
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /--since/);
+  assert.equal(result.stderr, "");
 });

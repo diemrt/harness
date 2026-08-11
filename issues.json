@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-11T15:16:35Z",
+  "last_updated": "2026-08-11T15:28:15Z",
   "rules": {
     "single_active_issue": false
   },
@@ -557,25 +557,18 @@
       "id": "76e83448-44df-4cd6-a655-c0503f4c92d7",
       "title": "Il guscio di docs-gate.mjs: config, git, finestra, uscite",
       "description": "Quello che la parte pura non poteva provare senza un repository: la lettura di .harness/config.json, la risoluzione dei riferimenti con git rev-parse, la finestra che si autocalibra sulla piu' vecchia revisione dichiarata, e i codici d'uscita.\n\nDue casi che la spec non fissa e che il piano decide: nessuna revisione dichiarata e nessun --since esce 1 (lo script non ha risposto, come un flag sconosciuto), e un config.json mancante esce 1 invece di indovinare i glob.\n\nAttenzione al guard verificato a mano: git log --no-walk senza revisioni ripiega su HEAD in silenzio, quindi oldestCommit([]) deve uscire prima di chiamarlo.\n\nTask 3 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
         "3c56866d-6515-49f5-b13f-2b3152409067"
       ],
+      "covers": [],
       "validation": {
-        "criteria": [
-          "npm run test esce 0",
-          "su un repo git temporaneo la finestra parte dalla piu' vecchia revisione dichiarata in covers",
-          "uno sha corto in covers copre lo stesso commit dello sha lungo",
-          "un riferimento che non risolve compare in un'allerta e l'uscita resta 0",
-          "trovare commit scoperti esce 0; nessuna revisione dichiarata senza --since esce 1 chiedendo --since",
-          "docsGate.enabled false stampa una riga ed esce 0; config.json mancante o directory non git escono 1",
-          "stderr resta vuoto in ogni caso, anche quando git fallisce"
-        ],
-        "state": "unknown"
+        "criteria": "npm run test: exit 0, 320 pass/0 fail/0 skipped. Repo git temporaneo costruito in una directory scratchpad separata dal tracker reale (4 commit A/B/C/D, A il piu' vecchio): con covers=[short sha di A, sha lungo di C, un ref inesistente] lo script stampa 'finestra da <short di A> . piu' vecchia revisione dichiarata' e scandisce 3 commit (B,C,D), non 1 (che sarebbe partendo dal piu' recente dichiarato C) ne' 0 (che sarebbe da HEAD): conferma che la finestra parte dalla piu' vecchia revisione dichiarata. Il ref inesistente compare come '! 1 riferimento dichiarato non risolve: <ref>' con exit 0. Sostituendo covers con lo short sha di D, D smette di comparire tra i NON COPERTI: prova diretta che short sha e long sha risolvono allo stesso commit. In ogni run con commit scoperti trovati l'exit resta 0. Con covers:[] e nessun --since: exit 1 e messaggio che chiede esplicitamente --since. Con docsGate.enabled:false: stdout di una riga sola, exit 0. Con .harness/config.json assente in un repo git valido: exit 1. Con una directory con config.json ma senza repo git: exit 1. In tutti i run (inclusi i due in cui git fallisce: --since su un ref inesistente e ref covers non risolvibile) stderr catturato separatamente e' 0 byte in ogni caso (wc -c). Controllo sui due file toccati (scripts/docs-gate.mjs, test/plugin-docs-gate.test.mjs): conteggio programmatico in Node di String.fromCharCode(0x1f) sul contenuto dei file -> zero occorrenze in entrambi; la costante SEP a scripts/docs-gate.mjs riga 237 e' scritta come sequenza di sei caratteri ASCII (backslash, u, 0, 0, 1, f), non come il byte di controllo vero, confermato per grep e per il conteggio programmatico. Nessun file toccato fuori scope oltre a issues.json (stato e timestamp), scripts/docs-gate.mjs e test/plugin-docs-gate.test.mjs: git status --short confermato. Tutte le prove eseguite su copie in directory temporanee con --project-dir esplicito, nessuna scrittura di prova sul tracker reale.",
+        "state": "pass"
       },
       "created_at": "2026-08-11T14:53:29Z",
-      "updated_at": "2026-08-11T14:53:29Z"
+      "updated_at": "2026-08-11T15:28:15Z"
     },
     {
       "id": "c8cce222-371d-4a3b-9e3e-a23627f5ced0",

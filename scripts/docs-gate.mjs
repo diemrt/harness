@@ -20,6 +20,12 @@
 // pure functions below are exported so the tests can prove the decision without a fake repository
 // and without a process, the way status-cli.mjs exports buildSnapshot.
 
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { parseArgs } from "node:util";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
 // Fixed 80 columns, no colour, no ANSI, no isTTY: the surface this exists for is
 // `/harness:docs-gate`, where stdout is a pipe to the agent and a colour branch would never run.
 export const WIDTH = 80;
@@ -196,4 +202,294 @@ export function renderGateReport(report, { project, window, unresolved = [] }) {
     RULE,
     " coperto = una issue lo dichiara in covers, in qualunque stato",
   ].join("\n");
+}
+
+// A copy of harness-config.mjs's DEFAULT_DOCS_GATE, not an import: this script is autonomous by
+// design, and one script reaching into another's constant is the coupling that autonomy exists to
+// avoid. It only ever applies to the fields a hand-written config.json omits — `--init` always
+// writes all three, so on a project configured through the plugin this is dead weight that costs
+// nothing and covers the case where it is not.
+const DEFAULT_DOCS_GATE = {
+  enabled: true,
+  include: [
+    "**/*.mjs",
+    "**/*.js",
+    "**/*.cjs",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.jsx",
+    "**/*.py",
+    "**/*.go",
+    "**/*.cs",
+    "**/*.java",
+    "**/*.rb",
+    "**/*.rs",
+    "**/*.php",
+  ],
+  exclude: ["docs/**", "test/**", "tests/**", "**/*.md", "issues.json"],
+};
+
+// Unit separator: it cannot occur in a commit subject or in a path, so it separates the fields of
+// a log record without any quoting to undo.
+//
+// Written as an escape, never as the literal byte: an invisible control character in a source
+// file survives no diff review and no copy-paste through a terminal.
+const SEP = "\u001f";
+
+const USAGE = [
+  "Usage:",
+  "  node docs-gate.mjs [--project-dir <path>] [--since <rev>] [--help]",
+  "",
+  "Prints which commits touched code without any issue naming them in 'covers'. Cumulative, not",
+  "pointwise: it answers over a window of history, not about HEAD.",
+  "Output is text, not JSON, and nothing is ever written to stderr.",
+  "",
+  "--project-dir  directory holding issues.json and .harness/config.json (default: the current one)",
+  "--since <rev>  start the window at this revision instead of the oldest declared one",
+  "",
+  "The window starts at the oldest revision any issue declares in 'covers'. When no issue declares",
+  "anything, the script stops and asks for an explicit --since instead of guessing a starting",
+  "point: a wrong default here does not produce an error, it produces a plausible useless list.",
+  "",
+  "Exit codes: 0 on a printed report, including one that found uncovered commits, and on a gate",
+  "disabled in config.json; 1 when the request could not be carried out at all — missing project,",
+  "missing or unreadable .harness/config.json, unreadable issues.json, no window and no --since,",
+  "a --since that does not resolve, no git repository, an unknown flag.",
+  "",
+].join("\n");
+
+function fail(message) {
+  process.stdout.write(`${message}\n`);
+  process.exit(1);
+}
+
+function resolveProjectDir(projectDir) {
+  const dir = path.resolve(projectDir ?? process.cwd());
+  if (!existsSync(dir) || !statSync(dir).isDirectory()) {
+    fail(`La directory di progetto '${dir}' non esiste.`);
+  }
+  return dir;
+}
+
+// Every git call goes through here, so "git is not installed" is reported once, as a sentence,
+// instead of surfacing as an unhandled spawn error.
+function git(args, cwd) {
+  const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+  if (result.error) {
+    fail(`git non è disponibile: ${result.error.message}`);
+  }
+  return result;
+}
+
+// The gate reads which files count as code from .harness/config.json. A missing config is not a
+// case to guess through: which globs are code is the project's decision, and inventing it silently
+// is the thing references/config.md forbids.
+function readDocsGate(projectDir) {
+  const configPath = path.join(projectDir, ".harness", "config.json");
+  if (!existsSync(configPath)) {
+    fail(
+      `Nessuna configurazione harness in '${projectDir}': manca '.harness/config.json'. ` +
+        "Il gate legge da lì quali file contano come codice, e indovinarlo non è una cosa che harness fa."
+    );
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(configPath, "utf8"));
+  } catch {
+    fail(`'${configPath}' non è un JSON valido: la configurazione non è leggibile.`);
+  }
+  // Field by field, exactly as harness-config.mjs merges on --init: a partial docsGate must never
+  // end up active with an empty include, which would report itself as a working gate matching
+  // nothing.
+  return { ...DEFAULT_DOCS_GATE, ...(parsed.docsGate ?? {}) };
+}
+
+function readIssues(projectDir) {
+  const trackerPath = path.join(projectDir, "issues.json");
+  if (!existsSync(trackerPath)) {
+    // Same reading as everywhere else in harness: a project without issues.json is an empty
+    // tracker, not an error. It declares no revision, so the window question comes up next.
+    return [];
+  }
+  let data;
+  try {
+    data = JSON.parse(readFileSync(trackerPath, "utf8"));
+  } catch {
+    fail(`'${trackerPath}' non è un JSON valido: il tracker non è leggibile.`);
+  }
+  return Array.isArray(data.issues) ? data.issues : [];
+}
+
+// Every declared reference goes through rev-parse, so a short sha and a long one are the same
+// revision and a tag is the commit it points at. A reference that does not resolve is REPORTED,
+// never silently dropped: that is the difference between a wrong datum you can see and one that
+// passes.
+function resolveRefs(refs, cwd) {
+  const resolved = new Map();
+  const unresolved = [];
+  for (const ref of refs) {
+    const result = git(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], cwd);
+    const sha = result.stdout.trim();
+    if (result.status !== 0 || sha === "") {
+      unresolved.push(ref);
+      continue;
+    }
+    resolved.set(ref, sha);
+  }
+  return { resolved, unresolved };
+}
+
+// Oldest by committer date, in one process: --no-walk asks git about exactly these revisions
+// instead of walking all the history behind them.
+function oldestCommit(shas, cwd) {
+  if (shas.length === 0) {
+    // Guarded, not left to git: `git log --no-walk` with no revision quietly falls back to HEAD,
+    // which would turn "nothing is declared" into a window of exactly one commit.
+    return null;
+  }
+  const result = git(["log", "--no-walk", `--format=%H${SEP}%ct`, ...shas], cwd);
+  if (result.status !== 0) {
+    fail(`git log --no-walk è fallito: ${result.stdout.trim() || "nessun output"}`);
+  }
+  let oldest = null;
+  for (const line of result.stdout.split(/\r?\n/)) {
+    if (line.trim() === "") {
+      continue;
+    }
+    const [sha, stamp] = line.split(SEP);
+    const when = Number.parseInt(stamp, 10);
+    if (oldest === null || when < oldest.when) {
+      oldest = { sha, when };
+    }
+  }
+  return oldest === null ? null : oldest.sha;
+}
+
+// Exported for the tests: the parsing is where a format string and a stream of file names can
+// quietly disagree, and it deserves a check that costs no repository.
+export function parseLog(stdout) {
+  const commits = [];
+  let current = null;
+  for (const line of stdout.split(/\r?\n/)) {
+    if (line.startsWith(SEP)) {
+      const [, sha, subject] = line.split(SEP);
+      current = { sha, subject: subject ?? "", files: [] };
+      commits.push(current);
+      continue;
+    }
+    if (current === null || line.trim() === "") {
+      continue;
+    }
+    current.files.push(line.trim());
+  }
+  return commits;
+}
+
+// The window is what came AFTER the starting revision: that commit is covered by definition — it
+// is the one an issue names — so `start..HEAD` loses nothing and avoids the `^` that has no
+// meaning on a root commit.
+//
+// Merges are skipped: --name-only prints nothing for them anyway, so counting them would only
+// inflate the scanned figure with rows that can never be code.
+function readWindow(startSha, cwd) {
+  const result = git(
+    [
+      // Paths stay literal UTF-8 instead of being octal-escaped by git's default quoting, or a
+      // non-ASCII filename would never match a glob.
+      "-c",
+      "core.quotePath=false",
+      "log",
+      "--no-merges",
+      "--name-only",
+      `--format=${SEP}%H${SEP}%s`,
+      `${startSha}..HEAD`,
+    ],
+    cwd
+  );
+  if (result.status !== 0) {
+    fail(`git log è fallito: ${result.stdout.trim() || "nessun output"}`);
+  }
+  return parseLog(result.stdout);
+}
+
+function main() {
+  let values;
+  try {
+    ({ values } = parseArgs({
+      args: process.argv.slice(2),
+      strict: true,
+      options: {
+        "project-dir": { type: "string" },
+        since: { type: "string" },
+        help: { type: "boolean", default: false },
+      },
+    }));
+  } catch (error) {
+    // strict on purpose, like status-cli.mjs: an invented flag must stop here. A report that looks
+    // right but answers a different question is worse than no report.
+    fail(
+      `${error.message.replace(/\.?$/, ".")} docs-gate.mjs accetta solo --project-dir, --since e --help.`
+    );
+  }
+
+  if (values.help) {
+    process.stdout.write(USAGE);
+    return;
+  }
+
+  const projectDir = resolveProjectDir(values["project-dir"]);
+  const project = path.basename(projectDir);
+
+  const docsGate = readDocsGate(projectDir);
+  if (docsGate.enabled === false) {
+    process.stdout.write(
+      ` ${project} · gate documentale disabilitato in .harness/config.json\n`
+    );
+    return;
+  }
+
+  if (git(["rev-parse", "--is-inside-work-tree"], projectDir).status !== 0) {
+    fail(
+      `'${projectDir}' non è un repository git: il gate legge la storia dei commit, e senza git non ha niente da leggere.`
+    );
+  }
+
+  const { resolved, unresolved } = resolveRefs(declaredRefs(readIssues(projectDir)), projectDir);
+
+  let startSha;
+  let window;
+  if (values.since) {
+    const start = git(["rev-parse", "--verify", "--quiet", `${values.since}^{commit}`], projectDir);
+    startSha = start.stdout.trim();
+    if (start.status !== 0 || startSha === "") {
+      fail(`--since '${values.since}' non è una revisione di questo repository.`);
+    }
+    window = `finestra da ${shortSha(startSha)} · --since`;
+  } else {
+    startSha = oldestCommit([...new Set(resolved.values())], projectDir);
+    if (startSha === null) {
+      // Harness only knows the period in which it was used: a window of "all the history" on a
+      // repository that predates it by years produces thousands of rows.
+      fail(
+        "Nessuna issue dichiara una revisione in 'covers': non c'è un punto di partenza da cui " +
+          "calcolare la finestra. Rilancia con --since <rev> esplicito — un default indovinato qui " +
+          "non produce un errore, produce un elenco plausibile e inutile, che è peggio."
+      );
+    }
+    window = `finestra da ${shortSha(startSha)} · più vecchia revisione dichiarata`;
+  }
+
+  const report = buildGateReport({
+    commits: readWindow(startSha, projectDir),
+    covered: new Set(resolved.values()),
+    include: docsGate.include,
+    exclude: docsGate.exclude,
+  });
+
+  process.stdout.write(`${renderGateReport(report, { project, window, unresolved })}\n`);
+}
+
+// The pure functions above are imported by the tests; main() must not run then.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
 }
