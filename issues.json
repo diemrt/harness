@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-11T15:10:51Z",
+  "last_updated": "2026-08-11T15:16:35Z",
   "rules": {
     "single_active_issue": false
   },
@@ -540,25 +540,18 @@
       "id": "3c56866d-6515-49f5-b13f-2b3152409067",
       "title": "La parte che decide di docs-gate.mjs",
       "description": "Il cuore del gate documentale, come funzione dei soli dati in memoria: quali file contano come codice (matching dei glob di docsGate), quali revisioni il tracker dichiara, quali commit restano scoperti, e come si stampa il report a 80 colonne.\n\nNessun git, nessun filesystem, nessun processo: la stessa separazione che status-cli.mjs ha gia' fra buildSnapshot e main(). A fine issue il file non e' ancora lanciabile - e' un modulo di funzioni pure con i suoi test, e il guscio arriva dopo.\n\nTask 2 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md. Il codice del piano e' stato eseguito in una cartella temporanea prima di essere scritto: i test passano cosi' come sono.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
         "aa9a07bf-0611-400e-b22a-fd0a9ff6cb40"
       ],
+      "covers": [],
       "validation": {
-        "criteria": [
-          "npm run test esce 0",
-          "test/plugin-docs-gate.test.mjs esiste e i suoi test passano",
-          "globToRegExp('**/*.mjs') matcha sia index.mjs sia scripts/a/b.mjs, e globToRegExp('issues.json') non matcha issuesXjson",
-          "isCodeFile applica exclude sopra include: test/x.mjs non e' codice con i default di docsGate",
-          "declaredRefs raccoglie covers da issue di ogni stato e legge la chiave assente come []",
-          "renderGateReport non produce nessuna riga oltre 80 colonne col nome di progetto e l'etichetta di finestra reali",
-          "la riga dei conteggi concorda al singolare: '1 tocca codice', '1 non coperto'"
-        ],
-        "state": "unknown"
+        "state": "pass",
+        "criteria": "npm run test -> tests 305, pass 305, fail 0 (exit 0). node --test test/plugin-docs-gate.test.mjs -> tests 13, pass 13, fail 0. Probe via node -e import('./scripts/docs-gate.mjs'): globToRegExp('**/*.mjs').test('index.mjs')=true, .test('scripts/a/b.mjs')=true; globToRegExp('issues.json').test('issuesXjson')=false. isCodeFile('test/x.mjs', include, exclude) con i default docsGate letti da .harness/config.json = false (exclude vince). declaredRefs su issue backlog/blocked/done con covers=['aaa1111']/['bbb2222']/['ccc3333'] -> ['aaa1111','bbb2222','ccc3333']; issue senza covers legge come []. renderGateReport con project:'activitymanager', window:'finestra da 3a612087 · più vecchia revisione dichiarata' -> tutte le 10 righe misurate con .length, max=80, WIDTH=80, nessuna riga oltre 80. Riga conteggi con 1 commit/1 codice/1 non coperto: '1 commit nella finestra · 1 tocca codice · 1 non coperto' (singolare corretto). git status: solo issues.json (status backlog->in_review, covers:[] aggiunto, timestamp — mossa legittima del worker), scripts/docs-gate.mjs e test/plugin-docs-gate.test.mjs nuovi non tracciati; nessun altro file toccato."
       },
       "created_at": "2026-08-11T14:53:29Z",
-      "updated_at": "2026-08-11T14:53:29Z"
+      "updated_at": "2026-08-11T15:16:35Z"
     },
     {
       "id": "76e83448-44df-4cd6-a655-c0503f4c92d7",
