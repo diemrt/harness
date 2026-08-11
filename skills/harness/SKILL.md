@@ -309,6 +309,8 @@ codice): è il confronto con quello del clock-in, e dice in una schermata cosa s
   come si legge l'output.
 - [references/status.md](references/status.md) — riepilogo del tracker a riga di comando: come
   si legge l'output, canali, codici di uscita.
+- [references/sweep.md](references/sweep.md) — setaccio dei documenti: cosa legge, cosa promuove,
+  cosa fa delle occasioni che non promuove.
 - [references/board.md](references/board.md) — board delle issue con aggiornamento live.
 - [references/external-worker.md](references/external-worker.md) — delega opt-in a una CLI
   esterna.

@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-11T15:36:28Z",
+  "last_updated": "2026-08-11T15:45:22Z",
   "rules": {
     "single_active_issue": false
   },
@@ -591,24 +591,18 @@
       "id": "958f86ae-a66a-497d-99da-1ec1194e9b97",
       "title": "references/sweep.md e il comando che ci rimanda",
       "description": "Il setaccio dei documenti: rilegge il corpus del progetto per le occasioni che il lavoro ha scoperto, annotato dove stava lavorando, e mai portato nel tracker. Su un progetto reale un audit manuale ne ha recuperate venticinque, di cui otto meritavano una issue.\n\nNessuno script: e' tutto giudizio, e usa --get-all e --insert che esistono gia'. Ma il procedimento vive nella reference, non nel comando: scritto dentro il comando sarebbe invisibile a meta' dei suoi lettori, e farebbe fallire il test che impone a ogni comando di linkare la reference che possiede il contratto.\n\nIl tier e' reasoning perche' qui non c'e' codice a fare da rete: il valore della issue sta interamente in quanto e' scritto bene il procedimento.\n\nTask 5 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md.",
-      "status": "backlog",
+      "status": "done",
       "tier": "reasoning",
       "depends_on": [
         "c8cce222-371d-4a3b-9e3e-a23627f5ced0"
       ],
+      "covers": [],
       "validation": {
-        "criteria": [
-          "npm run test esce 0",
-          "commands/sweep.md esiste ed e' in COMMANDS in test/plugin-commands.test.mjs",
-          "skills/harness/references/sweep.md esiste ed e' linkata dall'indice Reference di SKILL.md",
-          "la reference impone l'incrocio col tracker in tutti gli stati e la verifica contro il codice prima di proporre",
-          "la reference rimanda alla bussola di SKILL.md per decidere cosa promuovere, e dice che le non promosse non diventano issue di backlog",
-          "il README documenta /harness:sweep nella tabella dei comandi"
-        ],
-        "state": "unknown"
+        "criteria": "Gate: npm run test esce 0, tests 320 / pass 320 / fail 0 / skipped 0. Criterio 2: commands/sweep.md esiste (36 righe) e test/plugin-commands.test.mjs riga 16 elenca COMMANDS = board, compact, docs-gate, issue, status, sweep, verify. Criterio 3: skills/harness/references/sweep.md esiste (79 righe) ed e' linkata dall'indice Reference di SKILL.md riga 312 come references/sweep.md; il test che risolve i link fra reference passa. Criterio 4: sweep.md riga 38 dice 'Due controlli, entrambi prima di proporla', riga 40 'la incrocia col tracker, in tutti gli stati. Non solo backlog: un'occasione gia' tracciata e chiusa non e' un'occasione', riga 42 'la verifica contro il codice'; il guscio ripete la regola ai punti 3 di commands/sweep.md righe 24-26. Criterio 5: sweep.md righe 51-52 'Solo cio' che passa la bussola di [SKILL.md](../SKILL.md): se un errore li' sarebbe costoso e invisibile' senza riscriverla, e il capitolo puntato esiste davvero: SKILL.md riga 178 'Cosa diventa una issue', riga 182 'sarebbe costoso e invisibile'; il rifiuto della scorciatoia e' esplicito alle righe 61 ('Le riporta in sessione, e si ferma li') e 69-71 ('Metterle nel tracker come issue di backlog sarebbe la scorciatoia ovvia, e contraddice direttamente la bussola'). Criterio 6: README.md riga 95 documenta /harness:sweep nella tabella dei comandi. Lettura di merito richiesta dal tier reasoning: grep case-insensitive per vocabolario da piano (Task, Step, il/del/nel piano, fase, implementazione, deliverable, milestone) su sweep.md e commands/sweep.md non trova nulla, exit 1; commands/sweep.md resta un guscio (front matter, rimando alla reference con 'leggilo prima di cominciare', cinque passi condensati e una sezione 'Cosa non fare'), mentre motivazioni, 'Quando si lancia' e 'Cosa il setaccio non e'' vivono solo nella reference. git status --short: toccati solo README.md, issues.json, skills/harness/SKILL.md, test/plugin-commands.test.mjs, commands/sweep.md e skills/harness/references/sweep.md; il diff di issues.json contiene solo questa issue. Nessun file modificato dal verificatore.",
+        "state": "pass"
       },
       "created_at": "2026-08-11T14:53:29Z",
-      "updated_at": "2026-08-11T14:53:29Z"
+      "updated_at": "2026-08-11T15:45:22Z"
     },
     {
       "id": "d88b2b87-fea7-4535-95a0-24775cfeb163",
