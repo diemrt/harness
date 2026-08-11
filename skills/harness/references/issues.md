@@ -20,7 +20,7 @@ creato). Il file nasce al **primo `--insert`**, oppure di proposito con `--init`
 
 `issues.json` può portare, in cima e accanto a `last_updated`, la chiave `schema_version`: la
 versione dello schema descritto in questa pagina. Lo script conosce la propria versione tramite
-la costante `SCHEMA_VERSION` (oggi `1`).
+la costante `SCHEMA_VERSION` (oggi `2`).
 
 - **chiave assente = versione 0, e il file si legge lo stesso.** Nessun comando cambia
   comportamento in base a questa chiave, nessun progetto va aggiornato per continuare a
@@ -88,10 +88,10 @@ Crea `issues.json` nella directory del progetto (default cwd, o `--project-dir`)
 minimo:
 
 ```json
-{ "schema_version": 1, "last_updated": "<datetime>", "issues": [] }
+{ "schema_version": 2, "last_updated": "<datetime>", "issues": [] }
 ```
 
-`schema_version` vale la costante `SCHEMA_VERSION` dello script (oggi `1`).
+`schema_version` vale la costante `SCHEMA_VERSION` dello script (oggi `2`).
 
 **Se il file esiste già, rifiuta con `ALREADY_EXISTS` e non scrive niente** — il file
 preesistente resta identico byte per byte. Nessun flag di conferma o `--force`: un `--init` che
@@ -106,7 +106,8 @@ Porta `issues.json` dal proprio `schema_version` (assente = versione `0`) a `SCH
 eseguendo solo le migrazioni comprese fra le due versioni. La logica vive in una **lista
 ordinata** di migrazioni interna allo script, ognuna con la versione che produce (`to`); si
 applicano solo quelle con `to` maggiore della versione del file e non superiore a
-`SCHEMA_VERSION`. La migrazione `0 → 1` materializza `depends_on: []` dove la chiave manca.
+`SCHEMA_VERSION`. La migrazione `0 → 1` materializza `depends_on: []` dove la chiave manca; la
+`1 → 2` fa lo stesso con `covers: []`.
 
 - **aggiunge soltanto:** ogni migrazione mette il default sui campi nuovi, non tocca i valori
   esistenti e non rimuove niente. Un campo deprecato lo cancella l'utente, quando decide di
@@ -203,7 +204,7 @@ continuano a vedere **solo** `issues.json`. Un `--get` su una issue archiviata r
 `NOT_FOUND`. È storia congelata, e il blocco che la sostituisce ne porta il path.
 
 **La issue blocco** viene inserita con `status: "done"`, `validation.state: "pass"`,
-`depends_on: []` e `tier: null`. I suoi `validation.criteria` sono l'evidenza della
+`depends_on: []`, `covers: []` e `tier: null`. I suoi `validation.criteria` sono l'evidenza della
 compattazione: il path dell'archivio (relativo al progetto — `issues.json` è condiviso nel
 repository, un path assoluto di un clone non significherebbe niente in un altro) e una riga
 `id + titolo` per ogni issue coperta.
@@ -264,6 +265,7 @@ eccezione: testo semplice). Su stderr non viene scritto nulla.
   "status": "backlog|in_progress|in_review|blocked|done",
   "tier": "economy|standard|reasoning",
   "depends_on": ["<guid>"],
+  "covers": ["<git-ref>"],
   "validation": { "criteria": ["<string>"], "state": "unknown|pass|fail" },
   "created_at": "<datetime>",
   "updated_at": "<datetime>"
@@ -302,6 +304,30 @@ loro record muterebbe issue che il chiamante non ha nominato. Chi cancella scoll
 con dipendenze aperte: l'unico guard di processo resta quello anti-self-validation
 (`FORBIDDEN_ROLE`). Che si rispetti l'ordine della catena è una regola di workflow, e vive in
 [SKILL.md](../SKILL.md) come ci vive il tier.
+
+> **Attenzione al rimando.** Il testo qui sotto nomina il gate **senza link markdown**, ed è
+> deliberato: `references/docs-gate.md` nasce in Task 4, e un link a un file che non esiste
+> ancora farebbe fallire il test `cross-links between reference files resolve too`. Task 4 Step 5
+> lo trasforma nel link vero. Non anticiparlo.
+
+**`covers`** dichiara quali revisioni git quella issue copre. È **generale, non specifico della
+documentazione**: qualunque issue può dichiarare di coprire una revisione, e il gate documentale
+(`docs-gate.mjs`) chiede soltanto che *qualcuno* la nomini. È sempre un array —
+assente vale `[]`, `[]` esplicito ripulisce — e `null` **non** è ammesso, per lo stesso motivo di
+`depends_on`: "nessuna revisione" ha già una grafia, e una seconda obbligherebbe a indovinare
+quale delle due è memorizzata. Nessun tetto al numero di elementi.
+
+La validazione è **volutamente lasca**: stringhe non vuote, niente duplicati, e nient'altro.
+Harness non è una libreria git e non prova a riconoscere uno SHA valido — un riferimento sbagliato
+semplicemente non risolve, e il gate lo **riporta come irrisolto** invece di ignorarlo. Una
+validazione stretta rifiuterebbe tag e riferimenti simbolici legittimi per difendere da un errore
+che si vede comunque.
+
+**Quando si scrive.** All'`--insert`, mai dopo. Una issue non può registrare il **proprio**
+commit: quello nasce dopo il `pass` del verificatore, e servirebbe un update post-commit, cioè un
+altro passo dimenticabile. Una issue docs invece nasce **dopo** il commit di codice che deve
+documentare: quello SHA esiste già nel momento in cui la issue si apre. È questo che rende il
+campo praticabile invece che teorico.
 
 **Semantica di `validation`:** `criteria` descrive cosa rende la issue accettabile.
 - **alla creazione** — `criteria` con i criteri di accettazione, `state: "unknown"`;
@@ -375,6 +401,7 @@ il verificatore indipendente porta poi la issue a `done`/`pass` oppure `blocked`
 | `status` | string | obbligatorio | opzionale | `backlog`, `in_progress`, `in_review`, `blocked`, `done` |
 | `tier` | string \| null | opzionale | opzionale | `economy`, `standard`, `reasoning`, oppure `null` |
 | `depends_on` | array | opzionale | opzionale | id di issue esistenti; assente vale `[]`, `[]` ripulisce; niente self-reference, niente duplicati, niente cicli; `null` non è ammesso |
+| `covers` | array | opzionale | opzionale | riferimenti git che la issue copre; assente vale `[]`, `[]` ripulisce; stringhe non vuote, niente duplicati; `null` non è ammesso |
 | `validation` | object \| null | opzionale | opzionale | `null` oppure `{ criteria, state: unknown\|pass\|fail }`; `criteria` array a `state: unknown`, stringa o array alla chiusura |
 
 In `--update` i campi omessi restano invariati, ma un campo **presente** deve essere valido:

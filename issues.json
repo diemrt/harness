@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-11T14:53:29Z",
+  "last_updated": "2026-08-11T15:10:51Z",
   "rules": {
     "single_active_issue": false
   },
@@ -525,23 +525,16 @@
       "id": "aa9a07bf-0611-400e-b22a-fd0a9ff6cb40",
       "title": "covers nello schema della issue, e la migrazione 1 -> 2",
       "description": "Aggiunge alla issue il campo covers: array di riferimenti git che quella issue dichiara di coprire. E' il dato su cui il gate documentale decide, e senza di lui il gate non ha niente da leggere.\n\nGenerale e non specifico delle docs: qualunque issue puo' dichiarare una revisione, e il gate chiede solo che qualcuno la nomini. Assente vale [], null non e' ammesso, validazione volutamente lasca (stringhe non vuote, niente duplicati): harness non e' una libreria git, e un riferimento sbagliato viene riportato come irrisolto invece che rifiutato.\n\nSCHEMA_VERSION passa da 1 a 2 con la migrazione che materializza covers: [] dove la chiave manca, come la 0 -> 1 ha fatto con depends_on.\n\nTask 1 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md, che porta il codice esatto, i test e le tre aspettative esistenti da aggiornare.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [],
+      "covers": [],
       "validation": {
-        "criteria": [
-          "npm run test esce 0",
-          "--insert con covers ['a1b2c3d'] risponde ok:true e .data.covers vale ['a1b2c3d']",
-          "--insert senza covers risponde .data.covers uguale a []",
-          "--insert con covers:null risponde ok:false con code INVALID_INPUT",
-          "SCHEMA_VERSION vale 2 in scripts/issue-manager.mjs, e --upgrade su un tracker senza schema_version risponde to:2",
-          "references/issues.md documenta covers nello schema e nella tabella dei campi accettati in input",
-          "il rimando al gate in issues.md non e' un link markdown: docs-gate.md non esiste ancora"
-        ],
-        "state": "unknown"
+        "criteria": "npm run test esce 0: 292/292 pass, 0 fail (comando: npm run test). --insert con covers:[\"a1b2c3d\"] su tracker temp -> ok:true, data.covers=[\"a1b2c3d\"]. --insert senza covers -> ok:true, data.covers=[]. --insert con covers:null -> ok:false, code INVALID_INPUT, messaggio \"'covers' must be an array of git references. Pass [] to clear it.\". Tutti e tre lanciati su --project-dir temporaneo (mai su issues.json della radice). SCHEMA_VERSION=2 in scripts/issue-manager.mjs (grep confermato); --upgrade su tracker temp senza schema_version -> {ok:true,data:{from:0,to:2,migrated:0}}, file scritto con schema_version:2. references/issues.md documenta covers sia nello schema JSON di riferimento (blocco a fine file) sia nella tabella \"campi accettati in input\" (riga covers | array | opzionale | opzionale). Il rimando al gate in issues.md (righe 306-318) nomina docs-gate.mjs come testo/inline-code, MAI come link markdown [..](docs-gate.md); references/docs-gate.md infatti non esiste ancora sul filesystem, confermato con Glob. git status dopo le prove sul probe temporaneo mostra solo le 4 modifiche gia' presenti nel working tree (issues.json, scripts/issue-manager.mjs, skills/harness/references/issues.md, test/plugin-issue-manager.test.mjs), nessun file aggiuntivo toccato dal verificatore.",
+        "state": "pass"
       },
       "created_at": "2026-08-11T14:53:29Z",
-      "updated_at": "2026-08-11T14:53:29Z"
+      "updated_at": "2026-08-11T15:10:51Z"
     },
     {
       "id": "3c56866d-6515-49f5-b13f-2b3152409067",

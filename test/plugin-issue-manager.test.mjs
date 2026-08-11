@@ -1457,7 +1457,7 @@ test("--update preserves a schema_version that differs from this script's own SC
 // --init — creates issues.json with the minimal seed, and never overwrites an existing one
 // ---------------------------------------------------------------------------
 
-const SCHEMA_VERSION = 1; // mirrors the constant in scripts/issue-manager.mjs
+const SCHEMA_VERSION = 2; // mirrors the constant in scripts/issue-manager.mjs
 
 test("--init in a directory without issues.json creates it and reports created:true", () => {
   const { dir } = setupTempProject(null);
@@ -1559,7 +1559,7 @@ test("(a) --upgrade on a tracker without schema_version reports ok:true, from:0,
     assert.ok(!("schema_version" in rootData(dir)), "the fixture must start without the key");
 
     const data = assertOk(run(dir, ["--upgrade"]));
-    assert.deepEqual(data, { from: 0, to: SCHEMA_VERSION, migrated: 2 });
+    assert.deepEqual(data, { from: 0, to: SCHEMA_VERSION, migrated: 3 });
 
     assert.equal(rootData(dir).schema_version, SCHEMA_VERSION, "the file on disk must carry the new version");
   } finally {
@@ -1583,14 +1583,17 @@ test("(b) after --upgrade every issue has depends_on; issues that already had it
       const expectedDependsOn = Array.isArray(beforeIssue.depends_on) ? beforeIssue.depends_on : [];
       assert.deepEqual(afterIssue.depends_on, expectedDependsOn);
 
+      // covers: materialized to [] by migration 1 -> 2, exactly as depends_on was by 0 -> 1.
+      assert.deepEqual(afterIssue.covers, []);
+
       // Every other field is untouched, including updated_at: adding a field is not editing the
       // issue, and the migration must not read as a second --update pass.
       for (const field of ["title", "description", "status", "validation", "created_at", "updated_at"]) {
         assert.deepEqual(afterIssue[field], beforeIssue[field], `field '${field}' of ${beforeIssue.id} must be untouched`);
       }
       // No key present before is missing after, and no key absent before was invented besides
-      // depends_on.
-      const beforeKeys = new Set([...Object.keys(beforeIssue), "depends_on"]);
+      // the two the migrations materialize.
+      const beforeKeys = new Set([...Object.keys(beforeIssue), "depends_on", "covers"]);
       assert.deepEqual(new Set(Object.keys(afterIssue)), beforeKeys);
     }
   } finally {
@@ -1658,7 +1661,7 @@ test("--upgrade respects --project-dir", () => {
   try {
     const result = runFrom(elsewhere.dir, ["--upgrade", "--project-dir", target.dir]);
     const data = assertOk(result);
-    assert.deepEqual(data, { from: 0, to: SCHEMA_VERSION, migrated: 2 });
+    assert.deepEqual(data, { from: 0, to: SCHEMA_VERSION, migrated: 3 });
     assert.equal(
       existsSync(path.join(elsewhere.dir, "issues.json")),
       false,
@@ -2123,6 +2126,199 @@ test("--help lists --compact and the shape of its payload", () => {
     assert.match(result.stdout, /--compact/);
     assert.match(result.stdout, /issue_ids/);
     assert.match(result.stdout, /archivePath/);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// covers — the git revisions an issue declares it covers. General, not docs-specific: the gate
+// only asks that SOMEBODY names a revision.
+// ---------------------------------------------------------------------------
+
+test("--insert accepts covers and stores it verbatim", () => {
+  const { dir } = setupTempProject();
+  try {
+    const data = assertOk(
+      run(dir, [
+        "--insert",
+        "--issue-data",
+        JSON.stringify({
+          title: "Docs for the parser",
+          description: "Desc",
+          status: "backlog",
+          covers: ["a1b2c3d", "v1.2.0"],
+        }),
+      ])
+    );
+    assert.deepEqual(data.covers, ["a1b2c3d", "v1.2.0"]);
+    assert.deepEqual(assertOk(run(dir, ["--get", "--issue-id", data.id])).covers, [
+      "a1b2c3d",
+      "v1.2.0",
+    ]);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("covers absent at --insert is stored as [], never as a missing key", () => {
+  const { dir } = setupTempProject();
+  try {
+    const data = assertOk(
+      run(dir, [
+        "--insert",
+        "--issue-data",
+        JSON.stringify({ title: "T", description: "D", status: "backlog" }),
+      ])
+    );
+    assert.deepEqual(data.covers, [], "an absent covers must materialize as an empty array");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("covers rejects null, a non-array, an empty entry and a duplicate", () => {
+  const { dir } = setupTempProject();
+  const base = { title: "T", description: "D", status: "backlog" };
+  try {
+    // null is refused for depends_on's reason: "nothing" already has one spelling, [], and a
+    // second one would make every reader guess which of the two is stored.
+    assertFail(
+      run(dir, ["--insert", "--issue-data", JSON.stringify({ ...base, covers: null })]),
+      "INVALID_INPUT"
+    );
+    assertFail(
+      run(dir, ["--insert", "--issue-data", JSON.stringify({ ...base, covers: "a1b2c3d" })]),
+      "INVALID_INPUT"
+    );
+    assertFail(
+      run(dir, ["--insert", "--issue-data", JSON.stringify({ ...base, covers: ["   "] })]),
+      "INVALID_INPUT"
+    );
+    assertFail(
+      run(dir, ["--insert", "--issue-data", JSON.stringify({ ...base, covers: ["a1b2c3d", "a1b2c3d"] })]),
+      "INVALID_INPUT"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("covers validation stays loose: a tag, a branch and a long sha are all accepted", () => {
+  // Harness is not a git library. A reference that means nothing simply fails to resolve, and
+  // docs-gate reports it; a strict check here would refuse legitimate tags and symbolic refs to
+  // defend against a mistake that shows up anyway.
+  const { dir } = setupTempProject();
+  try {
+    const data = assertOk(
+      run(dir, [
+        "--insert",
+        "--issue-data",
+        JSON.stringify({
+          title: "T",
+          description: "D",
+          status: "backlog",
+          covers: ["v2.0.0", "origin/main", "0123456789abcdef0123456789abcdef01234567"],
+        }),
+      ])
+    );
+    assert.equal(data.covers.length, 3);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--update merges covers: omitted keeps it, [] clears it, a new array replaces it", () => {
+  const { dir } = setupTempProject();
+  try {
+    const created = assertOk(
+      run(dir, [
+        "--insert",
+        "--issue-data",
+        JSON.stringify({ title: "T", description: "D", status: "backlog", covers: ["a1b2c3d"] }),
+      ])
+    );
+
+    const untouched = assertOk(
+      run(dir, ["--update", "--issue-id", created.id, "--issue-data", JSON.stringify({ status: "in_progress" })])
+    );
+    assert.deepEqual(untouched.covers, ["a1b2c3d"], "an update that omits covers must keep it");
+
+    const replaced = assertOk(
+      run(dir, ["--update", "--issue-id", created.id, "--issue-data", JSON.stringify({ covers: ["ffffff1"] })])
+    );
+    assert.deepEqual(replaced.covers, ["ffffff1"]);
+
+    const cleared = assertOk(
+      run(dir, ["--update", "--issue-id", created.id, "--issue-data", JSON.stringify({ covers: [] })])
+    );
+    assert.deepEqual(cleared.covers, []);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("an issue written before covers existed stays readable, and the first --update materializes it", () => {
+  // Same promise tier and depends_on already made: a new field never invalidates data written
+  // before it existed, and no --upgrade is required to keep working.
+  const { dir } = setupTempProject();
+  try {
+    assert.ok(!("covers" in storedIssues(dir).find((i) => i.id === ID_ONE)));
+    const updated = assertOk(
+      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "in_progress" })])
+    );
+    assert.deepEqual(updated.covers, []);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--compact writes covers: [] on the block and preserves it on the archived originals", () => {
+  const { dir } = setupTempProject();
+  try {
+    const created = assertOk(
+      run(dir, [
+        "--insert",
+        "--issue-data",
+        JSON.stringify({
+          title: "Closed work",
+          description: "D",
+          status: "done",
+          covers: ["a1b2c3d"],
+        }),
+      ])
+    );
+
+    const data = assertOk(
+      run(dir, [
+        "--compact",
+        "--issue-data",
+        JSON.stringify({
+          blocks: [{ title: "Block", description: "Summary", issue_ids: [created.id] }],
+        }),
+      ])
+    );
+
+    const block = storedIssues(dir).find((i) => i.id === data.blocks[0].id);
+    assert.deepEqual(block.covers, [], "a block covers no revision of its own");
+
+    const archived = JSON.parse(readFileSync(data.archivePath, "utf8")).issues[0];
+    assert.deepEqual(
+      archived.covers,
+      ["a1b2c3d"],
+      "the archive stores the originals whole: dropping covers would rewrite history"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--help lists covers among the accepted input fields", () => {
+  const { dir } = setupTempProject();
+  try {
+    const result = run(dir, ["--help"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /covers/);
   } finally {
     cleanup(dir);
   }

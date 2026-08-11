@@ -49,6 +49,7 @@
 //     "status": "<backlog|in_progress|in_review|blocked|done>",
 //     "tier": "<economy|standard|reasoning>"|null,
 //     "depends_on": ["<guid>"],
+//     "covers": ["<git-ref>"],
 //     "validation": { "criteria": ["<string>"], "state": "<unknown|pass|fail>" }|null,
 //     "created_at": "<datetime>",
 //     "updated_at": "<datetime>"
@@ -68,6 +69,12 @@
 // for the same reason. Declaring a dependency does NOT block the work: nothing stops an issue with
 // open dependencies from going in_progress, because that is a workflow rule and it lives in the
 // skill, not in this script.
+//
+// covers: the git revisions this issue declares it covers. Always stored as an array ([] when
+// absent). General, not documentation-specific: any issue may declare a revision, and the docs
+// gate only asks that SOMEBODY names it. Validation is deliberately loose — non-empty strings, no
+// duplicates — because a reference that means nothing fails to resolve and is reported as such by
+// scripts/docs-gate.mjs, which is a mistake you can see rather than one that passes.
 //
 // --insert requires the full payload. --update merges: omitted fields keep their current value,
 // while an explicit "validation": null clears the validation object.
@@ -110,7 +117,7 @@ const TIERS = ["economy", "standard", "reasoning"];
 // see writeIssuesFile(). An absent key reads as version 0, and that is not an error: it is the
 // same choice already made for `tier` and `depends_on`, a new field never invalidates data
 // written before it existed.
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 // Ordered migrations for --upgrade. Each entry names the schema version it PRODUCES (`to`) and a
 // function that migrates one issue object, returning either the same reference (untouched) or a
@@ -144,6 +151,19 @@ const MIGRATIONS = [
         return issue;
       }
       return { ...issue, depends_on: [] };
+    },
+  },
+  {
+    to: 2,
+    // 1 -> 2: materialize covers: [] where the key is missing. Same shape as 0 -> 1 above: an
+    // issue written before the field existed already READS as "covers nothing" everywhere else
+    // (see docs-gate.mjs, which treats a missing key as []); this only makes that reading
+    // explicit on disk.
+    migrateIssue(issue) {
+      if (hasProp(issue, "covers")) {
+        return issue;
+      }
+      return { ...issue, covers: [] };
     },
   },
 ];
@@ -301,6 +321,34 @@ function validateDependsOnShape(dependsOn) {
   });
 }
 
+// Helper: validate the shape of covers — the git revisions an issue declares it covers.
+//
+// Deliberately loose: non-empty strings, no duplicates, and nothing else. Harness is not a git
+// library and does not try to recognise a valid sha — a wrong reference simply fails to resolve,
+// and docs-gate.mjs reports it as unresolved instead of dropping it. A strict check here would
+// refuse legitimate tags and symbolic references to defend against a mistake that shows up
+// anyway.
+//
+// Like depends_on: an array and nothing else, because "covers nothing" already has a spelling
+// ([]) and a second one would only make callers guess which is stored. No cap on the number of
+// entries either, for the same reason: a cap pushes a caller to drop a real revision to make the
+// payload fit.
+function validateCoversShape(covers) {
+  if (!Array.isArray(covers)) {
+    fail("'covers' must be an array of git references. Pass [] to clear it.", "INVALID_INPUT");
+  }
+  const seen = new Set();
+  covers.forEach((entry, index) => {
+    if (isNullOrWhitespace(entry)) {
+      fail(`'covers[${index}]' must be a non-empty string.`, "INVALID_INPUT");
+    }
+    if (seen.has(entry)) {
+      fail(`'covers' lists '${entry}' more than once.`, "INVALID_INPUT");
+    }
+    seen.add(entry);
+  });
+}
+
 // Helper: the part of depends_on that the payload cannot answer for — every id must exist, an issue
 // cannot depend on itself, and the tracker must stay a DAG.
 //
@@ -393,7 +441,7 @@ function validateIssueInput(issue, partial = false) {
     fail("Issue data must be a JSON object.", "INVALID_INPUT");
   }
 
-  const allowedFields = ["title", "description", "status", "validation", "tier", "depends_on"];
+  const allowedFields = ["title", "description", "status", "validation", "tier", "depends_on", "covers"];
   const providedFields = Object.keys(issue);
   const unknownFields = providedFields.filter((f) => !allowedFields.includes(f));
   if (unknownFields.length > 0) {
@@ -448,6 +496,13 @@ function validateIssueInput(issue, partial = false) {
   // has been read.
   if (hasProp(issue, "depends_on")) {
     validateDependsOnShape(issue.depends_on);
+  }
+
+  // covers: optional everywhere, absent reads as []. Nothing here needs the stored tracker — a
+  // reference is checked against git, not against issues.json — so unlike depends_on the whole
+  // validation happens right here.
+  if (hasProp(issue, "covers")) {
+    validateCoversShape(issue.covers);
   }
 
   // validation: must be null or a well-formed object { criteria, state (valid) }
@@ -848,6 +903,9 @@ function compactTracker(compactData) {
     status: "done",
     tier: null,
     depends_on: [],
+    // A block summarises closed issues; it covers no revision of its own. The revisions the
+    // originals declared leave with them, whole, into the archive.
+    covers: [],
     validation: {
       // The evidence of a compaction is where the originals went and what they were, so the block
       // stays traceable back to the issues it replaced without reopening the archive to find out.
@@ -930,10 +988,11 @@ function showHelp() {
     "                writes nothing if the file is already there: remove it yourself to start over.",
     "  --upgrade   : { from, to, migrated } — brings issues.json's schema_version (absent reads as",
     "                0) up to SCHEMA_VERSION, running only the migrations in between. Adds new",
-    "                fields with their default (0->1 materializes depends_on: [] where missing);",
-    "                never touches or removes an existing value. Idempotent: a file already at",
-    "                SCHEMA_VERSION returns migrated: 0 and is NOT rewritten. A file declaring a",
-    "                schema_version ABOVE SCHEMA_VERSION fails with SCHEMA_TOO_NEW and writes",
+    "                fields with their default (0->1 materializes depends_on: [] where missing,",
+    "                1->2 does the same with covers: []); never touches or removes an existing",
+    "                value. Idempotent: a file already at SCHEMA_VERSION returns migrated: 0 and",
+    "                is NOT rewritten. A file declaring a schema_version ABOVE SCHEMA_VERSION fails",
+    "                with SCHEMA_TOO_NEW and writes",
     "                nothing: that is an old script in front of newer data. Neither --insert nor",
     "                --update ever runs a migration on your behalf.",
     "  --compact   : { archivePath, removed, blocks: [ { id, title, archivedCount } ] } — shrinks",
@@ -955,7 +1014,7 @@ function showHelp() {
     "  --issue-data-file <path>  reads the JSON from a file — no shell quoting/escaping",
     "  --issue-data '<json>'     inline JSON; mutually exclusive with --issue-data-file",
     "",
-    "Allowed input fields for --insert/--update: title, description, status, tier, depends_on, validation",
+    "Allowed input fields for --insert/--update: title, description, status, tier, depends_on, covers, validation",
     `  title        : non-empty string, at most ${LIMITS.title} characters`,
     `  description  : non-empty string, at most ${LIMITS.description} characters`,
     "  status       : backlog | in_progress | in_review | blocked | done",
@@ -964,6 +1023,9 @@ function showHelp() {
     "                 ids must exist, no self-reference, no cycles — rejected with INVALID_DEPENDENCY",
     "                 an issue other issues depend on cannot be deleted until they stop pointing at it",
     "                 it does not gate the work: an issue with open dependencies can still go in_progress",
+    "  covers       : array of git references this issue covers; absent reads as [], [] clears it",
+    "                 non-empty strings, no duplicates — no further check: harness is not a git",
+    "                 library, and a reference that does not resolve is reported by docs-gate.mjs",
     "  validation   : null OR { criteria, state: unknown|pass|fail }",
     `                 state=unknown : criteria is an array of at most ${LIMITS.criteriaCount} strings of ${LIMITS.criterion} characters`,
     "                 state=pass|fail : criteria carries the verification evidence — string or array, uncapped",
@@ -1054,6 +1116,10 @@ function insertIssue(issueData) {
     // Always an array, never absent: the field is read on every render of the graph, and a missing
     // key would push that check onto every reader instead of settling it here.
     depends_on: dependsOn,
+    // Always an array, never absent: docs-gate.mjs reads this field on every issue of the
+    // tracker, and a missing key would push that check onto every reader instead of settling it
+    // here — the same reason depends_on is materialized above.
+    covers: hasProp(newIssue, "covers") ? newIssue.covers : [],
     validation: hasProp(newIssue, "validation") ? newIssue.validation : null,
     created_at: now,
     updated_at: now,
@@ -1104,6 +1170,13 @@ function updateIssue(issueId, issueData) {
     // Same reason as tier: an issue written before this field has no key at all, and the merge must
     // materialise the empty array rather than carry an undefined into the stored object.
     depends_on: dependsOn,
+    // Same merge as depends_on: an issue written before this field has no key at all, so the
+    // merge must materialise the empty array rather than carry an undefined into the object.
+    covers: hasProp(updatedIssue, "covers")
+      ? updatedIssue.covers
+      : Array.isArray(existing.covers)
+        ? existing.covers
+        : [],
     validation: hasProp(updatedIssue, "validation") ? updatedIssue.validation : existing.validation,
     created_at: existing.created_at,
     updated_at: nowTimestamp(),
