@@ -89,6 +89,7 @@ source of truth: the workflow lives in the `harness` skill, and each command poi
 |---|---|---|
 | `/harness:board` | Starts the live issue board and prints its URL once; `stop` shuts it down | Starts the board for the current project |
 | `/harness:compact` | Proposes themed blocks to compact `done` issues, waits for confirmation, then archives them | Proposes blocks over every `done` issue in the tracker |
+| `/harness:docs-gate` | Lists the commits that touched code without any issue declaring them in `covers` | Uses the window autocalibrated on the current project |
 | `/harness:issue` | Lists issues by status, creates one, updates one | Shows the tracker: `in_progress`, `in_review`, `backlog` |
 | `/harness:status` | Prints one screen of tracker status: counts, what is in flight, what can be taken now | Reads the current project |
 | `/harness:verify` | Hands a finished issue to the independent `harness-verifier` agent | Picks among the issues sitting in `in_review` |

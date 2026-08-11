@@ -305,6 +305,8 @@ codice): è il confronto con quello del clock-in, e dice in una schermata cosa s
 - [references/git.md](references/git.md) — branch, commit, checklist prima del merge.
 - [references/config.md](references/config.md) — `.harness/config.json`: comandi, docs gate,
   worker esterno.
+- [references/docs-gate.md](references/docs-gate.md) — gate documentale: finestra, copertura,
+  come si legge l'output.
 - [references/status.md](references/status.md) — riepilogo del tracker a riga di comando: come
   si legge l'output, canali, codici di uscita.
 - [references/board.md](references/board.md) — board delle issue con aggiornamento live.

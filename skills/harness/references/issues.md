@@ -312,7 +312,7 @@ con dipendenze aperte: l'unico guard di processo resta quello anti-self-validati
 
 **`covers`** dichiara quali revisioni git quella issue copre. È **generale, non specifico della
 documentazione**: qualunque issue può dichiarare di coprire una revisione, e il gate documentale
-(`docs-gate.mjs`) chiede soltanto che *qualcuno* la nomini. È sempre un array —
+([docs-gate.md](docs-gate.md)) chiede soltanto che *qualcuno* la nomini. È sempre un array —
 assente vale `[]`, `[]` esplicito ripulisce — e `null` **non** è ammesso, per lo stesso motivo di
 `depends_on`: "nessuna revisione" ha già una grafia, e una seconda obbligherebbe a indovinare
 quale delle due è memorizzata. Nessun tetto al numero di elementi.
