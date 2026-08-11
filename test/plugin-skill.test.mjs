@@ -212,3 +212,39 @@ test("the board is a tool you ask for, not a clock-in step", () => {
     "board.md must record why the default changed, or it will be changed back"
   );
 });
+
+test("the docs gate names the field and the script, not just the duty", () => {
+  const content = readSkill();
+  const start = content.indexOf("## Dopo il commit: gate documentale");
+  const end = content.indexOf("## Clock out");
+  assert.ok(start !== -1 && end > start, "the docs gate chapter moved: fix this test, not the skill");
+  const chapter = content.slice(start, end);
+
+  // A duty with no field to write and no way to notice it was skipped is the instruction that
+  // already failed twice out of three times on the only project that ran it.
+  assert.match(chapter, /covers/, "the docs issue must declare the revision it covers");
+  assert.match(
+    chapter,
+    /docs-gate\.mjs/,
+    "the chapter prescribes running the script, so it must name it directly, like status-cli.mjs"
+  );
+});
+
+test("every CLI script the plugin ships is named where an agent will read it", () => {
+  // The mirror image of the orphan-reference test above. A subagent, or an agent loading this
+  // skill from outside, has no slash commands: it reads SKILL.md and follows the links into
+  // references/. A script named nowhere in that corpus exists for nobody.
+  const corpus = [
+    readSkill(),
+    ...readdirSync(referencesDir)
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => readFileSync(path.join(referencesDir, f), "utf8")),
+  ].join("\n");
+
+  for (const file of readdirSync(path.join(rootDir, "scripts")).filter((f) => f.endsWith(".mjs"))) {
+    assert.ok(
+      corpus.includes(file),
+      `scripts/${file} exists but neither SKILL.md nor any reference names it: an agent that reads the skill will never learn it is there`
+    );
+  }
+});

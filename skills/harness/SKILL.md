@@ -281,11 +281,29 @@ Convenzioni di branch e messaggi: [references/git.md](references/git.md).
 
 Subito dopo ogni commit, controlla i file che conteneva. Se il commit tocca **file di
 codice** (secondo `docsGate.include`/`exclude` in `.harness/config.json`), apri una issue
-docs con `--insert`, che verrà lavorata poi col workflow normale — clock-in, verifica
+docs con `--insert`, **dichiarando in `covers` la revisione che copre**: quello SHA esiste già —
+la issue docs nasce dopo il commit che deve documentare — e senza di lui il commit resta scoperto
+anche se la issue c'è. La issue verrà lavorata poi col workflow normale: clock-in, verifica
 indipendente, gate sul commit come qualsiasi altra.
 
 Non blocca mai il commit: è un promemoria tracciato, non un veto. Nel modello plugin questo
-controllo lo fai tu, non un hook `post-commit`.
+controllo lo fai tu, non un hook `post-commit` — e per questo è saltabile.
+
+**Come ci si accorge che è saltato**, che è la parte che regge quando il promemoria non ha retto:
+
+```bash
+node "$SCRIPTS/docs-gate.mjs"
+```
+
+Elenca i commit che hanno toccato codice senza che nessuna issue li nomini, **su una finestra di
+storia e non sull'ultimo commit**: chi se ne ricorda una volta a fine giornata recupera tutti i
+commit scoperti, non l'ultimo. Il costo del dimenticarsene diventa un ritardo, non una perdita.
+Contratto in [references/docs-gate.md](references/docs-gate.md).
+
+Il gate guarda i commit. Per quello che i **documenti** del progetto hanno scoperto e mai
+tracciato — un difetto annotato in un referto, una decisione scritta e mai eseguita — c'è il
+setaccio, [references/sweep.md](references/sweep.md): si lancia su richiesta, non a cadenza fissa,
+e propone solo ciò che passa la bussola qui sopra.
 
 ## Clock out (fine sessione)
 

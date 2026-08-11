@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-11T15:45:22Z",
+  "last_updated": "2026-08-11T15:50:32Z",
   "rules": {
     "single_active_issue": false
   },
@@ -608,24 +608,19 @@
       "id": "d88b2b87-fea7-4535-95a0-24775cfeb163",
       "title": "SKILL.md: il gate nomina covers e lo script, e nessuno script resta orfano",
       "description": "Il capitolo 'Dopo il commit: gate documentale' descrive oggi un controllo a occhio. Diventa due cose: la issue docs si apre dichiarando in covers la revisione che copre, e docs-gate.mjs e' come ci si accorge che il promemoria e' saltato. Piu' una riga sul setaccio.\n\nE l'asimmetria che manca: plugin-skill.test.mjs impedisce la reference orfana, ma niente impedisce lo script orfano. Che oggi siano tutti nominati e' una disciplina, non un invariante - e senza, docs-gate.mjs potrebbe finire invisibile proprio a chi legge la skill. Il test nuovo passa gia' su tutti e sei: e' una disciplina che diventa invariante.\n\nTask 6 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
         "c8cce222-371d-4a3b-9e3e-a23627f5ced0",
         "958f86ae-a66a-497d-99da-1ec1194e9b97"
       ],
+      "covers": [],
       "validation": {
-        "criteria": [
-          "npm run test esce 0",
-          "il capitolo del gate documentale in SKILL.md nomina covers e nomina direttamente docs-gate.mjs",
-          "SKILL.md rimanda a references/docs-gate.md e a references/sweep.md dal corpo, non solo dall'indice",
-          "esiste un test che fallisce se uno script sotto scripts/ non e' nominato da SKILL.md ne' da una reference",
-          "quel test passa su tutti e sei gli script che il plugin spedisce"
-        ],
-        "state": "unknown"
+        "criteria": "npm run test esce 0 (322 pass, 0 fail). Il capitolo Dopo il commit: gate documentale nomina covers (dichiarando in covers la revisione che copre) e docs-gate.mjs (node $SCRIPTS/docs-gate.mjs), eseguito davvero: esce con l'errore atteso su covers vuoto, comportamento corretto dello script. SKILL.md rimanda a references/docs-gate.md e a references/sweep.md dal corpo del capitolo (righe 301 e 305), distinti dalle voci gia' esistenti nell'indice Reference (righe 326 e 330, non duplicate). Esiste il test every CLI script the plugin ships is named where an agent will read it in test/plugin-skill.test.mjs che confronta ogni file scripts/*.mjs col corpus di SKILL.md + references/*.md. Verificato che morde: copiata la repo in una directory temporanea (mai il repo reale), creato scripts/__probe.mjs vuoto e rilanciato node --test test/plugin-skill.test.mjs nella copia: il test e' andato rosso con AssertionError 'scripts/__probe.mjs exists but neither SKILL.md nor any reference names it', poi la directory temporanea e' stata rimossa. Il test passa su tutti e sei gli script reali (board-server.mjs, docs-gate.mjs, harness-config.mjs, harness-worker.mjs, issue-manager.mjs, status-cli.mjs). Nessun vocabolario da piano (Task, Step, il piano, fase) trovato in SKILL.md. Il capitolo Clock out non e' stato toccato (il diff di SKILL.md si ferma prima della sua intestazione). git diff limitato a issues.json (metadati di clock-in), skills/harness/SKILL.md (solo il capitolo del gate documentale, 21 righe aggiunte 3 rimosse) e test/plugin-skill.test.mjs (due test nuovi).",
+        "state": "pass"
       },
       "created_at": "2026-08-11T14:53:29Z",
-      "updated_at": "2026-08-11T14:53:29Z"
+      "updated_at": "2026-08-11T15:50:32Z"
     },
     {
       "id": "8d3f4db5-fffb-4d13-9804-990ebd2da31d",
