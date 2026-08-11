@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-11T15:50:32Z",
+  "last_updated": "2026-08-11T15:59:00Z",
   "rules": {
     "single_active_issue": false
   },
@@ -626,23 +626,24 @@
       "id": "8d3f4db5-fffb-4d13-9804-990ebd2da31d",
       "title": "Il giudizio esce da /harness:issue e /harness:compact",
       "description": "I due comandi hanno adesso lo stesso difetto che le due reference nuove evitano: il giudizio che sta sopra le primitive - i criteri di qualita' di una issue, il raggruppamento in blocchi da far confermare - vive nel comando, e un agente che arriva dalla skill impara l'esistenza della primitiva senza quella del giudizio. references/issues.md lo dice gia' a meta': nomina il giro che --compact non fa, e non lo descrive.\n\nIl contenuto di giudizio si sposta in issues.md, che gia' possiede le primitive, e i comandi si accorciano.\n\nAttenzione: due test misurano il contenuto di questi comandi e devono restare verdi - la proiezione id/title di compact con la menzione di --page, e il divieto di done/pass in issue. Si sposta il giudizio, non la meccanica.\n\nTask 7 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
         "aa9a07bf-0611-400e-b22a-fd0a9ff6cb40"
       ],
+      "covers": [],
       "validation": {
         "criteria": [
-          "npm run test esce 0",
-          "issues.md ha una sezione su cosa decide chi apre una issue, e descrive il giro che --compact non fa",
-          "il test 'the compact command projects id and title when it reads the done issues' resta verde",
-          "il test 'the issue command cannot close an issue' resta verde",
-          "i corpi di commands/issue.md e commands/compact.md sono piu' corti di prima, non piu' lunghi"
+          "npm run test esce 0: 322 test, 322 pass, 0 fail (verificato con `npm run test` e con exit code 0 esplicito).",
+          "skills/harness/references/issues.md ha ora la sezione 'Aprire una issue: cosa decide chi la apre' (righe 85-107) che copre criteri/verifica leggera/tier/conferma, e la sezione 'Il giro che --compact non fa' (righe 239-260) che descrive lettura proiettata id/title, paginazione con --page, raggruppamento per argomento e conferma esplicita prima di chiamare la primitiva.",
+          "test 'the compact command projects id and title when it reads the done issues' verde: eseguito con `node --test --test-name-pattern=... test/plugin-commands.test.mjs`, 1 pass 0 fail.",
+          "test 'the issue command cannot close an issue' verde: eseguito con `node --test --test-name-pattern=... test/plugin-commands.test.mjs`, 1 pass 0 fail.",
+          "corpi (post-frontmatter, stesso stripper del test) piu' corti: commands/issue.md HEAD=3993 caratteri -> working=3448 (-545); commands/compact.md HEAD=3376 -> working=2887 (-489). Confrontato con `git show HEAD:commands/issue.md` e `git show HEAD:commands/compact.md`."
         ],
-        "state": "unknown"
+        "state": "pass"
       },
       "created_at": "2026-08-11T14:53:29Z",
-      "updated_at": "2026-08-11T14:53:29Z"
+      "updated_at": "2026-08-11T15:59:00Z"
     }
   ]
 }

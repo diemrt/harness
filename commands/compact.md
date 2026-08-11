@@ -24,28 +24,17 @@ separati i comandi dallo schema"). Nessun argomento: proponi i blocchi su tutte 
 node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --get-all --status done --page-size 50 | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log('totalCount '+j.data.totalCount);for(const i of j.data.issues)console.log(i.id.slice(0,8)+' | '+i.title)})"
 ```
 
-**Proietta id e titolo prima che l'output arrivi in contesto.** `--get-all` restituisce
-l'oggetto issue intero, description e criteri di validazione compresi: su questo repository
-sono stati 162.5KB per 88 issue, di cui la proposta usa due campi. Senza proiezione il comando
-si strozza proprio sui tracker grandi, cioè dove compattare serve di più.
+**Proietta id e titolo prima che l'output arrivi in contesto**, e scorri tutte le pagine con
+`--page <n>` se `totalCount` supera quanto mostrato: il perché è in `references/issues.md`.
 
-Scorri tutte le pagine con `--page <n>` se `totalCount` supera quanto mostrato: la proiezione
-toglie campi, non issue. Meno di due issue `done` → dillo e fermati: non c'è niente da
-compattare.
+## 2. Proponi i blocchi, e falli confermare
 
-## 2. Proponi i blocchi
+Il giro — come si raggruppa, perché non un blocco per issue, e perché la conferma è esplicita — è
+in `${CLAUDE_PLUGIN_ROOT}/skills/harness/references/issues.md`, sezione "Il giro che `--compact`
+non fa". Per ogni blocco proposto mostra `title`, `description` e la lista `id` (accorciato) +
+`title` delle issue che copre, tenendo conto di `$ARGUMENTS` se l'utente ha dato indicazioni.
 
-Raggruppa per argomento, non per ordine cronologico e non un blocco per issue: sapere che due
-issue chiuse parlano dello stesso argomento è un giudizio che la primitiva non fa. Per ogni
-blocco proposto mostra `title`, `description` e la lista `id` (accorciato) + `title` delle
-issue che copre. Tieni conto di `$ARGUMENTS` se l'utente ha dato indicazioni sul
-raggruppamento.
-
-## 3. Aspetta conferma esplicita
-
-**Non chiamare la primitiva finché l'utente non conferma il raggruppamento mostrato.** Un
-blocco scritto è un archivio da disfare a mano: correggi la proposta finché non va bene,
-procedi solo dopo un sì esplicito.
+**Non chiamare la primitiva finché l'utente non conferma il raggruppamento mostrato.**
 
 ## 4. Chiama la primitiva
 

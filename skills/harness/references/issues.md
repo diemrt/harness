@@ -82,6 +82,30 @@ $id = (node "$SCRIPTS/issue-manager.mjs" --insert --issue-data-file .\new-issue.
 
 Un `"validation": null` **esplicito** azzera la validazione; ometterlo la lascia invariata.
 
+## Aprire una issue: cosa decide chi la apre
+
+La CLI valida la **forma** del payload. Quello che rende una issue utile invece che ben formata
+sta qui, e vale per chiunque chiami `--insert`: il comando `/harness:issue` come un agente che è
+arrivato a questa pagina e chiama la primitiva direttamente. Scritto solo nel comando, questo giro
+sarebbe invisibile al secondo, che è il lettore più frequente.
+
+- **I criteri sono la parte che conta.** Si scrivono pensando a chi li leggerà: un altro agente,
+  che non ha visto la conversazione e ha gli accessi del worker e nient'altro. Le due regole per
+  scriverli sono in «Regole che la CLI non può misurare», più sotto.
+- **Se la issue non merita criteri**, `validation` può essere `null` — ma solo nei quattro casi
+  della verifica leggera elencati in [SKILL.md](../SKILL.md), e con la riga di motivazione che
+  quel capitolo richiede nella `description`. Fuori da quei casi i criteri sono obbligatori.
+- **Il `tier` si propone dicendo perché**, così chi dispatcha legge una decisione invece di
+  rifarla. Omesso vale `standard`: è un default, non un dato mancante da riempire.
+- **Il payload si mostra e si fa confermare prima di scriverlo.** Una issue sbagliata non rompe
+  niente, e per questo resta: la si corregge quando è ancora testo in sessione, non dopo che è
+  entrata nel tracker.
+- **`LIMIT_EXCEEDED` non si risolve comprimendo il testo:** vedi «Cosa fare quando la CLI risponde
+  `LIMIT_EXCEEDED`», più sotto.
+
+Prima ancora: **se il lavoro meriti una issue** lo decide la bussola in [SKILL.md](../SKILL.md).
+Questa pagina descrive come si scrive una issue, non se vada scritta.
+
 ## `--init`
 
 Crea `issues.json` nella directory del progetto (default cwd, o `--project-dir`) col seed
@@ -212,8 +236,25 @@ repository, un path assoluto di un clone non significherebbe niente in un altro)
 `data`: `{ archivePath, removed, blocks: [ { id, title, archivedCount } ] }`, con `archivePath`
 assoluto (il chiamante può aprirlo subito) e `removed` il numero di issue tolte da `issues.json`.
 
-Il giro che `--compact` **non** fa — leggere le `done`, proporre i blocchi, farli confermare — è
-il comando `/harness:compact`, che poi chiama questa primitiva col payload confermato.
+### Il giro che `--compact` non fa
+
+La primitiva riceve i blocchi già decisi. Deciderli è il giro qui sotto, che `/harness:compact`
+esegue e che **un agente arrivato da questa pagina deve poter eseguire lo stesso**: nominare il
+giro senza descriverlo lo rendeva invisibile a metà dei suoi lettori.
+
+1. **Leggere le `done` proiettando `id` e `title`.** `--get-all` restituisce l'oggetto issue
+   intero — su questo repository 162.5KB per 88 issue — di cui il raggruppamento usa due campi.
+   Senza proiezione il giro si strozza proprio sui tracker grandi, cioè dove compattare serve di
+   più. L'elenco è paginato: `totalCount` dice se restano pagine da scorrere con `--page`, e la
+   proiezione toglie campi, non issue.
+2. **Raggruppare per argomento**, non per ordine cronologico e non un blocco per issue: sapere che
+   due issue chiuse parlano dello stesso argomento è il giudizio che la primitiva non fa, ed è
+   l'unica cosa che questo giro aggiunge. Meno di due issue `done` → non c'è niente da compattare.
+3. **Far confermare il raggruppamento, esplicitamente, prima di chiamare la primitiva.** Un blocco
+   scritto è un archivio da disfare a mano: si corregge la proposta finché non va bene, e si
+   procede solo dopo un sì.
+4. **Chiamare `--compact` col payload confermato**, passato con `--issue-data-file` per non dover
+   gestire l'escaping delle quote nella shell.
 
 ## Paginazione
 

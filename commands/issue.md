@@ -43,26 +43,17 @@ issue verrà giudicata.
 
 ## `new <descrizione libera>` → creare
 
-Trasforma la descrizione dell'utente in `title`, `description` e `validation.criteria`.
-I criteri sono la parte che conta: devono essere verificabili da un altro agente che non ha
-visto questa conversazione — "funziona bene" non lo è, "il comando X esce 0 e stampa Y" sì.
-
-`criteria` è un **array**, un elemento per criterio; `title`/`description`/criteri hanno
-limiti di lunghezza (sezione "Limiti di formato" in `references/issues.md`), e `description`
-va in paragrafi separati da riga vuota.
-
-Proponi anche un `tier` (`economy`, `standard`, `reasoning`) dicendo perché — lo usa chi
-dispatcha; omettilo se il lavoro non è inquadrabile (assente vale `standard`).
+Trasforma la descrizione dell'utente in `title`, `description` e `validation.criteria`. **Cosa
+rende una issue buona invece che ben formata** — criteri, verifica leggera, `tier`, conferma prima
+di scrivere — è in `references/issues.md`, sezione "Aprire una issue": leggila, non è opzionale.
 
 Scrivi il payload **su file** e passalo con `--issue-data-file` (nessun escaping di quote da
 gestire nella shell), con `"status":"backlog"` e
-`"validation":{"criteria":["...","..."],"state":"unknown"}`. Mostra il payload all'utente e
-chiedi conferma **prima** di scrivere. L'id della issue creata si legge da `.data.id` della
-risposta, non dal testo del messaggio.
+`"validation":{"criteria":["...","..."],"state":"unknown"}`. L'id della issue creata si legge da
+`.data.id` della risposta, non dal testo del messaggio.
 
-`LIMIT_EXCEEDED`: non comprimere il testo, rimanda a un documento del progetto (path nella
-description) — vedi "Cosa fare quando..." in `references/issues.md`. Harness non scrive
-documenti da sé; proponi le skill di spec presenti nell'ambiente, se ci sono.
+Una issue docs che documenta un commit già fatto dichiara quel commit in `"covers":["<sha>"]`: è
+ciò che la rende visibile al gate (`/harness:docs-gate`).
 
 ## `update <id> <modifica>` → aggiornare
 
