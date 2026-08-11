@@ -48,6 +48,11 @@ per skill, reference e comandi.
 - **Lavorando inline il ruolo va dichiarato:** `$env:HARNESS_ROLE='worker'; node ...` su
   PowerShell, `HARNESS_ROLE=worker node ...` in bash.
 - **Il gate è `npm run test`** e dev'essere verde alla fine di ogni task.
+- **Nel file va solo ciò che sta dentro il blocco di codice.** La prosa che lo precede — note,
+  avvertenze, blockquote — parla a chi esegue il piano, non al lettore del file. È già successo
+  una volta: un'avvertenza su «Task 4» è finita dentro `references/issues.md` ed è stata spedita
+  come documentazione di harness, dove nessuno sa cosa sia un Task 4. Nessun test lo intercetta:
+  i controlli strutturali guardano i link, non a chi è rivolto il testo.
 - **Il passaggio a `in_review` scrive solo lo stato.** Non allegare l'evidenza in
   `validation.criteria`: con `state: "unknown"` la CLI esige un **array** di criteri brevi e
   rifiuta una stringa libera con `INVALID_INPUT` — la stringa di evidenza è ammessa solo alla
