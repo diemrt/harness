@@ -48,6 +48,12 @@ per skill, reference e comandi.
 - **Lavorando inline il ruolo va dichiarato:** `$env:HARNESS_ROLE='worker'; node ...` su
   PowerShell, `HARNESS_ROLE=worker node ...` in bash.
 - **Il gate è `npm run test`** e dev'essere verde alla fine di ogni task.
+- **Il passaggio a `in_review` scrive solo lo stato.** Non allegare l'evidenza in
+  `validation.criteria`: con `state: "unknown"` la CLI esige un **array** di criteri brevi e
+  rifiuta una stringa libera con `INVALID_INPUT` — la stringa di evidenza è ammessa solo alla
+  chiusura, che è del verificatore. I criteri scritti alla creazione restano dove sono, ed è
+  giusto: sono il contratto su cui la issue verrà giudicata, non un campo da sovrascrivere con un
+  resoconto. L'evidenza del worker va nel suo report, e nel tracker ce la mette il verificatore.
 
 ### Due decisioni che la spec non fissa, prese qui
 
@@ -621,7 +627,7 @@ chiude il rimando.
 
 ```powershell
 $env:HARNESS_ROLE='worker'
-node "${env:CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id-covers> --issue-data '{"status":"in_review","validation":{"criteria":"<cosa è stato fatto e con quale esito>","state":"unknown"}}'
+node "${env:CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id-covers> --issue-data '{"status":"in_review"}'
 ```
 
 ---
@@ -1090,7 +1096,7 @@ nomina. Non anticiparlo qui: fallirebbe.
 
 ```powershell
 $env:HARNESS_ROLE='worker'
-node "${env:CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id-gate-core> --issue-data '{"status":"in_review","validation":{"criteria":"<cosa è stato fatto e con quale esito>","state":"unknown"}}'
+node "${env:CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id-gate-core> --issue-data '{"status":"in_review"}'
 ```
 
 ---
@@ -1740,7 +1746,7 @@ Expected: PASS, tutta.
 
 ```powershell
 $env:HARNESS_ROLE='worker'
-node "${env:CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id-gate-shell> --issue-data '{"status":"in_review","validation":{"criteria":"<cosa è stato fatto e con quale esito>","state":"unknown"}}'
+node "${env:CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id-gate-shell> --issue-data '{"status":"in_review"}'
 ```
 
 ---
@@ -2035,7 +2041,7 @@ va inserita nel capitolo `## Reference`, dopo la voce di `references/config.md`.
 
 ```powershell
 $env:HARNESS_ROLE='worker'
-node "${env:CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id-docs-gate-ref> --issue-data '{"status":"in_review","validation":{"criteria":"<cosa è stato fatto e con quale esito>","state":"unknown"}}'
+node "${env:CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id-docs-gate-ref> --issue-data '{"status":"in_review"}'
 ```
 
 ---
@@ -2232,7 +2238,7 @@ esistenti).
 
 ```powershell
 $env:HARNESS_ROLE='worker'
-node "${env:CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id-sweep> --issue-data '{"status":"in_review","validation":{"criteria":"<cosa è stato fatto e con quale esito>","state":"unknown"}}'
+node "${env:CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id-sweep> --issue-data '{"status":"in_review"}'
 ```
 
 ---
@@ -2360,7 +2366,7 @@ per nessuno dei due test.
 
 ```powershell
 $env:HARNESS_ROLE='worker'
-node "${env:CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id-skill> --issue-data '{"status":"in_review","validation":{"criteria":"<cosa è stato fatto e con quale esito>","state":"unknown"}}'
+node "${env:CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id-skill> --issue-data '{"status":"in_review"}'
 ```
 
 ---
@@ -2529,7 +2535,7 @@ node --test test/plugin-commands.test.mjs
 
 ```powershell
 $env:HARNESS_ROLE='worker'
-node "${env:CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id-retrofit> --issue-data '{"status":"in_review","validation":{"criteria":"<cosa è stato fatto e con quale esito>","state":"unknown"}}'
+node "${env:CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id-retrofit> --issue-data '{"status":"in_review"}'
 ```
 
 ---
