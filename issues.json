@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-12T11:09:19Z",
+  "last_updated": "2026-08-12T11:15:44Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1138,25 +1138,39 @@
       "id": "c6425692-a90d-40ab-96ba-8804befe45c9",
       "title": "Verifica documentale del commit 62e9bd3 su --upgrade",
       "description": "Il gate documentale cumulativo ha trovato 62e9bd3 scoperto: ha toccato scripts/issue-manager.mjs e nessuna issue lo dichiara in covers. Il promemoria post-commit era saltato, e questo e' il ritardo che il gate trasforma in recupero invece che in perdita.\n\nIl commit fa scrivere a --upgrade lo schema_version dove la reference lo promette: primo campo della radice, come dopo --init, invece che in coda dove finiva l'assegnazione diretta.\n\nControlla che references/issues.md descriva il comportamento come e' adesso. Se lo dice gia' correttamente, la issue si chiude dichiarandolo: una verifica che non trova niente da cambiare e' comunque una verifica, e senza di essa il commit resta scoperto per sempre.",
-      "status": "backlog",
+      "status": "done",
       "tier": "economy",
       "depends_on": [],
       "covers": [
         "62e9bd3"
       ],
-      "tasks": [],
+      "tasks": [
+        {
+          "id": 1,
+          "short_title": "Rileggere references/issues.md contro il codice",
+          "full_description": "Sezione schema_version: confrontare ogni affermazione con --init e --upgrade in scripts/issue-manager.mjs, come il commit 62e9bd3 chiedeva di fare.",
+          "checked": true
+        },
+        {
+          "id": 2,
+          "short_title": "Correggere cio' che il tempo ha reso falso",
+          "full_description": "Due cose: la costante dichiarata oggi 2 mentre SCHEMA_VERSION e' 3, e la frase che cita issues.json di questo repository come esempio di chiave in coda, non piu' vera dopo l upgrade a schema 3 che ha ricostruito la radice.",
+          "checked": true
+        },
+        {
+          "id": 3,
+          "short_title": "Il gate non elenca piu' 62e9bd32",
+          "full_description": "node scripts/docs-gate.mjs: il commit risulta coperto dalla issue. npm run test verde.",
+          "checked": true
+        }
+      ],
       "validation": {
-        "criteria": [
-          "node scripts/docs-gate.mjs non elenca piu' 62e9bd32 fra i commit non coperti",
-          "La sezione --upgrade di references/issues.md dice dove finisce schema_version dopo una migrazione: primo campo della radice, come dopo --init",
-          "Se la reference era gia' corretta, la issue lo dichiara nell'evidenza invece di inventare una modifica",
-          "npm run test verde"
-        ],
+        "criteria": "1) node scripts/docs-gate.mjs -> '29 commit nella finestra . 7 toccano codice . 0 non coperti', NON COPERTI: 'nessun commit di codice scoperto' (62e9bd3 non compare). 2) skills/harness/references/issues.md riga 23: 'la costante SCHEMA_VERSION (oggi 3)' corrisponde a scripts/issue-manager.mjs:153 'const SCHEMA_VERSION = 3'. 3) righe 30-34: rimossa la frase che citava issues.json di questo repo come esempio di chiave in coda, sostituita con la spiegazione che il primo --upgrade che migra ricostruisce la radice (confermato in scripts/issue-manager.mjs:1008-1018, righe 1016-1017 fanno const {schema_version, ...rest} = data; writeIssuesFile({schema_version, ...rest})); verificato anche che issues.json reale ha oggi schema_version come prima chiave (upgrade a schema 3 nel commit 2232ec0). 4) Il resto della sezione (righe 41-49: chiave assente=versione 0, writer preserva quello che trova, --compact la legge per timbrare l'archivio) resta coerente col codice (issue-manager.mjs righe 922-924, 1214, 1338), nessuna altra correzione necessaria. 5) npm run test -> 359/359 pass, 0 fail. 6) git status --short mostra solo issues.json (aggiornamento tasks/status della issue stessa) e skills/harness/references/issues.md; nessun file fuori scope toccato.",
         "tasks": [],
-        "state": "unknown"
+        "state": "pass"
       },
       "created_at": "2026-08-12T09:51:17Z",
-      "updated_at": "2026-08-12T09:51:17Z"
+      "updated_at": "2026-08-12T11:15:44Z"
     }
   ]
 }
