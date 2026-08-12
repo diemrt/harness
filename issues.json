@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-12T14:23:38Z",
+  "last_updated": "2026-08-12T14:32:54Z",
   "rules": {
     "single_active_issue": false
   },
@@ -19,1198 +19,6 @@
     "testing"
   ],
   "issues": [
-    {
-      "id": "a4fdd64f-b648-4ed9-b4c9-4d27b68b2675",
-      "title": "Migrazione da pacchetto npm a plugin Claude Code",
-      "description": "Harness nasce come pacchetto npm con un motore di update e un template materializzato nei progetti, e finisce come plugin Claude Code autorato una volta sola. Il blocco copre le fasi P0-P7 dello scaffold originale, la demolizione del motore v1, la deprecazione del pacchetto pubblicato, lo scaffold del marketplace e lo spostamento nel plugin di issue-manager, runner del worker e slash command.",
-      "status": "done",
-      "tier": null,
-      "depends_on": [],
-      "validation": {
-        "criteria": [
-          "Archived originals: .harness/archive/2026-08-03T07-32-09Z.json",
-          "28fc023e-bca9-4947-ba53-0bef8a09cf62 - P0 - Scaffold pacchetto npm e cartella template/",
-          "fe10ec74-9663-4d7b-8d02-4c7753fd0f8f - P1 - Port issue-manager.ps1 -> template/issue-manager.mjs",
-          "3aaa3541-9159-4ef9-9d9e-ad5aa6bc4d39 - P2 - Port init.ps1 -> template/init.mjs e config portabile",
-          "df64edba-3ee7-46be-af4e-9581fd0967cd - P3 - CLI init e scrittura manifest",
-          "a63b75a5-e378-4eb8-af0a-6fd0cc060096 - P4 - CLI update, classificazione a hash e conflitti .new",
-          "6631260f-e8d4-4c40-baea-1d8be257d3e7 - P5 - Split AGENTS.md e migrazione testi del template",
-          "57ed2f0a-fe28-4855-9931-f9577ccbceea - P6 - Dogfooding: materializza harness in root e drift check CI",
-          "4a51c5c0-3527-4388-afc4-5af88d69de6e - P7 - README, LICENSE e pipeline di publish su npm",
-          "f11914ba-b522-4fcb-88e7-eff4915780da - Demolizione dell'harness v1: motore update, template e hook",
-          "b93f2268-15d6-4428-ab18-d0477637b993 - Deprecazione del pacchetto npm e riscrittura della documentazione del repo",
-          "63e51803-b028-4aa7-b98b-263909a9f679 - publish.yml pubblica ancora su npm il pacchetto che stiamo deprecando",
-          "75b75e31-9310-4ad9-b856-c237ade393ea - Scaffold marketplace Claude Code e skeleton del plugin harness",
-          "dde4e03b-00b2-4db9-bdbf-830a23f8af3e - Portare issue-manager.mjs nel plugin con risoluzione della project dir",
-          "c79b8bc8-449e-4ca2-8742-266857a8101a - Portare il runner del worker esterno nel plugin",
-          "5280cf02-bf3a-41e2-9a48-683bb0b46d9d - Slash command del plugin: board, issue, verify",
-          "7fcab7b1-4971-4c62-9a64-5663c5fa0b7f - docs/ARCHITECTURE.md descrive un motore che non esiste piu'"
-        ],
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-03T07:32:09Z",
-      "updated_at": "2026-08-03T07:32:09Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "da623851-f187-4956-a428-7341f6b747e1",
-      "title": "CLI del tracker: schema, campi e comandi di ciclo di vita",
-      "description": "Lo schema di issues.json e la superficie di issue-manager.mjs. Campi aggiunti alla issue (schema_version, depends_on, tier, criteria come lista, stato in_review) con le rispettive validazioni e limiti, e i comandi che governano il ciclo di vita del file: --init che non sovrascrive mai, --upgrade idempotente, --compact che archivia le done, e il comando /harness:compact che decide il raggruppamento che la primitiva non sa fare.",
-      "status": "done",
-      "tier": null,
-      "depends_on": [],
-      "validation": {
-        "criteria": [
-          "Archived originals: .harness/archive/2026-08-03T07-32-09Z.json",
-          "9489f774-e8eb-43d7-a07b-3acb825ca456 - schema_version nel tracker, tollerando i file che non ce l'hanno",
-          "2b1ac1a6-740c-4298-af9b-01315fffdf12 - CLI: limiti di lunghezza su title e description",
-          "2e2e7220-b660-4ad9-ae49-c765ca416a4a - CLI: campo depends_on con validazione del grafo",
-          "497230cc-342f-4841-9fa8-9f9e083b5710 - CLI: campo tier sulla issue, con codice INVALID_TIER",
-          "903cd6e8-9ede-4957-aa0b-aec337386fdb - CLI: criteria come lista, limiti condizionati a validation.state",
-          "740defaf-3883-4c9c-bf68-e4ba2081f5b9 - feat: stato in_review in issue-manager e issues.html",
-          "0f0374ce-6c87-485a-9554-c07d8afa854d - --init: crea issues.json col seed minimo, senza mai sovrascriverlo",
-          "b6100ba5-f743-42a2-8084-4c143d9bc5b2 - --upgrade: migrazioni idempotenti sullo schema del tracker",
-          "c112d836-b40b-478d-962d-e4672613ea08 - --compact: archivia le done e le sostituisce coi blocchi decisi a monte",
-          "cef2fd42-dd16-4400-8ddb-4ff9607778d4 - /harness:compact propone i blocchi, chiede conferma, chiama la primitiva",
-          "7bb64095-5ab6-496c-817b-bb97562fa7bd - issue-manager --get-all: --status ha un default che l'help non dichiara",
-          "fdc1e6d9-d93a-497c-9efd-009da2ce9cda - Docs: limiti di formato delle issue in issues.md e issue.md"
-        ],
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-03T07:32:09Z",
-      "updated_at": "2026-08-03T07:32:09Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "f83f71ff-8832-44b3-895b-308b69e80ac7",
-      "title": "Guard di ruolo contro la self-validation",
-      "description": "Il divieto di chiudere la propria issue non regge sulla buona volonta': vive nell'environment del processo. HARNESS_ROLE=worker fa rifiutare a issue-manager status=done e validation.state=pass, il pre-commit blocca il commit dello stesso ruolo, e i casi in cui il guard spingeva a disarmarsi (build sotto worker, insert di prova del verificatore) sono stati chiusi invece di tollerati.",
-      "status": "done",
-      "tier": null,
-      "depends_on": [],
-      "validation": {
-        "criteria": [
-          "Archived originals: .harness/archive/2026-08-03T07-32-09Z.json",
-          "25cc7ac3-d2b1-42fa-824e-17b9823f6e6f - feat: role guard worker in issue-manager.mjs (no self-validation)",
-          "3c3d9be5-5483-4de0-8520-d2138f79f0b3 - feat: role guard worker in pre-commit hook (blocco commit)",
-          "f1fb05ee-1526-4cf8-9c14-95ce9dee604e - pre-commit ridotto al solo blocco di ruolo worker",
-          "94672b3f-10c0-490d-88a4-ff302227e43e - node init.mjs build fallisce sotto HARNESS_ROLE=worker: il guard spinge i worker a disarmarlo",
-          "4f7c19f1-ad0c-474e-9832-8992df5430c1 - Agent verifier: vietare gli insert di prova sul tracker reale"
-        ],
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-03T07:32:09Z",
-      "updated_at": "2026-08-03T07:32:09Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "4faa2ce8-0857-47cc-b512-7df93fca3d93",
-      "title": "Hook git e gate documentale",
-      "description": "Il gate che tiene la documentazione allineata al codice, dalla prima versione bloccante alla forma finale. Installer via core.hooksPath, matcher glob, spostamento del controllo da pre-commit a post-commit con apertura di una issue docs invece di un veto sul commit, piu' le correzioni allo scope (README incluso, docsGate parziale o con include vuoto) e il dogfooding alla radice.",
-      "status": "done",
-      "tier": null,
-      "depends_on": [],
-      "validation": {
-        "criteria": [
-          "Archived originals: .harness/archive/2026-08-03T07-32-09Z.json",
-          "1b10437e-fc98-4c52-b0a8-399dbaec43e9 - feat: git hook pre-commit come gate di verifica docs/AGENTS.md",
-          "8868a652-6768-4246-91f4-d5d3f803d446 - feat: installer del hook pre-commit (core.hooksPath) e wiring nel setup",
-          "8581b202-d672-45ea-ade7-17f7b24801e3 - feat: pre-commit gate crea una issue di docs invece di editare i docs inline",
-          "76f4235f-c6c3-4ad7-a324-bb34a0252003 - Hook post-commit che crea la issue docs (sostituisce il blocco pre-commit)",
-          "ac4f5cae-15eb-48d4-87ed-90665e5d891f - Matcher glob per gli hook (hooks/match.mjs)",
-          "8131660b-a822-454a-a5be-da639a344c26 - test: copertura del git hook pre-commit (bypass e blocco)",
-          "9ccac732-bb43-4ded-bf78-1459805a86c5 - Gate pre-commit: includere README.md nello scope della verifica documentale",
-          "c3eb9048-a7bd-404a-8961-5e7054649518 - docsGate parziale disattiva il gate documentale in silenzio",
-          "654cbb05-94e5-4d0a-a0e2-a786a10c6c84 - docsGate con include vuoto esplicito: gate attivo ma inerte",
-          "88f6d937-50d6-4eeb-ab7f-c4de33c1b978 - Documentare il gate documentale post-commit",
-          "d9d73f60-6cc3-4082-88d4-a8b06730ec92 - docs: regola del gate pre-commit di verifica docs in AGENTS-RULES.md",
-          "d5964195-48a3-494d-83b8-21c55612e5ad - chore: dogfooding del gate pre-commit alla radice e aggiornamento ARCHITECTURE"
-        ],
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-03T07:32:09Z",
-      "updated_at": "2026-08-03T07:32:09Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "d40ff6ad-a83b-457b-a9b5-dab45cb26497",
-      "title": "Board delle issue",
-      "description": "Il board live servito dal plugin: server, ripristino della UI di issues.html, e la card della issue nelle sue iterazioni (criteria come lista, badge del tier, card delle dipendenze dopo il ritiro del board a grafo, nome del progetto, griglia dei contatori). Include la gestione degli argomenti sconosciuti del server e le due lacune di commands/board.md sui codici di errore.",
-      "status": "done",
-      "tier": null,
-      "depends_on": [],
-      "validation": {
-        "criteria": [
-          "Archived originals: .harness/archive/2026-08-03T07-32-09Z.json",
-          "1a6ddded-9269-4191-a2ae-c53fd81cb512 - Board server: issues.html servito dal plugin con live reload",
-          "3e7a852c-e9be-49e1-9f83-1adbd26bd159 - Ripristinare la UI di issues.html nel board servito dal plugin",
-          "2f36971e-e18e-46ea-a4f4-db6757b1aede - Board: un click sul link deve aprire una pagina sola",
-          "74cb0bdd-4de8-49cd-8564-55c6c8f743a0 - Board: render di criteria come lista, con fallback sulla forma stringa",
-          "a14f5543-f53a-4398-9cae-7d7773a8930e - Board: badge del tier sulla card della issue",
-          "a6c3e45e-bf0d-41cb-a7b0-444cfe4f0485 - Il board mostra il nome della cartella invece del nome del progetto",
-          "af96239e-384f-44d2-821a-43cb73fc4938 - issues.html: la griglia dei contatori taglia la card Done (6 card in 5 colonne)",
-          "f38fa140-663e-4adf-8c02-dbce5bcbd401 - board: card delle dipendenze fra titolo e description",
-          "97b9d3ee-9d74-4463-b90f-7c1357a1c6d5 - spec: ritiro del board a grafo e design nuovo della card dipendenze",
-          "70dce12a-fc0f-4fdb-8697-d2e11f22af5c - board-server: UNKNOWN_ARGUMENT etichetta anche gli errori dei flag noti",
-          "81e2a7f8-d9cd-472a-8913-b0e8b1d053f2 - board-server: strict false ingoia i flag sconosciuti e avvia comunque",
-          "a0fc54f0-79de-4b49-a357-eb0a1e2654b8 - commands/board.md non elenca INVALID_ARGUMENT_VALUE",
-          "ad5004dc-83f7-49d0-81af-51dd8d73d5f3 - commands/board.md non insegna cosa fare con UNKNOWN_ARGUMENT"
-        ],
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-03T07:32:09Z",
-      "updated_at": "2026-08-03T07:32:09Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "d269c9ff-461f-477b-a1f6-4c7e5e11a020",
-      "title": "Worker esterno e configurazione locale",
-      "description": "La delega opt-in a una CLI esterna: toggle e preflight, sottocomando worker run che garantisce log e HARNESS_ROLE, documentazione gated col prerequisito esplicito sui permessi, dogfooding sul repo stesso. Include .harness/ come cartella di configurazione locale che si auto-ignora senza toccare il .gitignore del progetto.",
-      "status": "done",
-      "tier": null,
-      "depends_on": [],
-      "validation": {
-        "criteria": [
-          "Archived originals: .harness/archive/2026-08-03T07-32-09Z.json",
-          "5ac51d73-9064-4b79-8210-6002bbc6aa89 - feat: toggle e preflight worker on|off|check in init.mjs",
-          "e0faef0e-3bc8-447d-8e47-858e1b9c1ad8 - init.mjs: sottocomando 'worker run' per lanciare l'external worker con log e HARNESS_ROLE garantiti",
-          "1d77fb40-4ce2-43ca-813a-1a7e13bc97d9 - docs: EXTERNAL-WORKER.md documenti 'worker run' e il prerequisito esplicito sui permessi",
-          "21a9bd3c-3aa7-4120-9691-fc657f8b979c - docs: EXTERNAL-WORKER.md gated + riga condizionale in AGENTS-RULES.md",
-          "eb641e21-e3cb-4e0d-bd86-6f0a68243d88 - chore: dogfood external-worker e dev:check drift gate",
-          "5ed04da6-c38e-4bdf-ba20-7dd1da495431 - Config locale .harness/ auto-ignorante con rilevamento dei comandi"
-        ],
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-03T07:32:09Z",
-      "updated_at": "2026-08-03T07:32:09Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "13f1bc2a-2844-40fc-b399-6ae50a9c3f45",
-      "title": "Regole del workflow: verifica indipendente, 1-WIP, tier",
-      "description": "Il metodo che harness impone, scritto nella skill e negli agent. L'agent harness-verifier e il suo gate anche sulle issue senza criteri, la whitelist chiusa della verifica leggera, la regola 1-WIP riscritta sulla catena calcolabile da depends_on, la modalita' di dispatch inline o subagent, e il tier: dove si dichiara, come si mappa sul modello e perche' va applicato nell'istante in cui il subagent nasce.",
-      "status": "done",
-      "tier": null,
-      "depends_on": [],
-      "validation": {
-        "criteria": [
-          "Archived originals: .harness/archive/2026-08-03T07-32-09Z.json",
-          "aa99ab24-30f1-4f44-9fdf-8dffc6bf813e - Agent harness-verifier per la verifica indipendente",
-          "55b06dcb-8530-4059-bc19-5210d136be2c - Agent harness-verifier: gate su una issue senza criteri",
-          "761521ee-4a3c-4e7f-81bb-c932bfdc6552 - Verifica leggera: whitelist chiusa nella skill e gate con criteria null",
-          "107fda1e-868e-41e9-bc59-9638db91ea8c - SKILL: regola 1-WIP riscritta, euristica di dispatch e guard inline",
-          "10679d39-c6e9-461e-b75d-0d84a9c6175b - Skill e reference: depends_on e catena calcolabile",
-          "6be9ff8f-d016-4192-8b0e-1d23e8e03ede - SKILL.md e references: workflow harness senza hook e senza init.mjs",
-          "8c89bdd3-f8d8-4489-830a-4e7422bae125 - Config: blocco execution con la modalita' di dispatch",
-          "8d4c64ce-79d2-4417-8ff0-c17eb4a02115 - Scelta del modello per subagent guidata dalla complessità della issue",
-          "8f6ddbe0-6dbe-4f80-9177-43cd110454f9 - Docs: tier nella skill, nel contratto della CLI e nel comando issue",
-          "de750e71-51a7-4561-914e-e8ed5422c769 - SKILL.md: il tier non viene applicato nel punto in cui si istanzia il subagent",
-          "25ab3cae-4bf6-400e-92c5-a65bae9d9495 - Docs: due frasi rimaste indietro sulle regole riscritte",
-          "0fd97d81-aeb1-4e6b-928a-0587d45405f1 - Test: assert vacuo sul fail fuori classe in plugin-agent",
-          "a6327f59-afd5-4fd1-b1d9-f39c44a853c6 - Riallineare README.md: docs/EXTERNAL-WORKER.md e hooks/pre-commit.mjs mancanti",
-          "81ea3be7-a90b-4485-ba64-4d6242bc8b43 - docs: documenta lo stato in_review nei doc gestiti (ISSUES.md)",
-          "34bf61e4-ed08-4830-ad67-e786302d1ad3 - chore: convenzione log .harness/runs/ in .gitignore"
-        ],
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-03T07:32:09Z",
-      "updated_at": "2026-08-03T07:32:09Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "718823d6-c12d-433b-93aa-c593bcefb793",
-      "title": "Issue di verifica documentale generate dal gate post-commit",
-      "description": "Le issue aperte automaticamente dal gate documentale dopo i commit che toccavano codice, lavorate col workflow normale e chiuse. Nessuna decisione di design: sono il residuo tracciato del gate che ha fatto il suo lavoro.",
-      "status": "done",
-      "tier": null,
-      "depends_on": [],
-      "validation": {
-        "criteria": [
-          "Archived originals: .harness/archive/2026-08-03T07-32-09Z.json",
-          "242720c8-28b5-4823-8a63-735e43ce3dde - docs: verifica documentazione per commit 0e06511",
-          "3532ee92-7342-42de-8270-fbb3c462d64c - docs: verifica documentazione per commit d74de8f",
-          "6e090e8d-98c4-42c0-84a9-b501a8bb2c93 - docs: verifica documentazione per commit b311c38",
-          "9c4be98c-8891-4b2c-8c9e-334d20870d4f - docs: verifica documentazione per commit 2f0ecfa",
-          "ad0a59f7-53c8-4b8b-a3c8-a279087a5f27 - docs: verifica documentazione per commit 2b57c43",
-          "b72cf682-bbb3-4f54-80df-1b728d8f2fc4 - docs: verifica documentazione per commit 325bf68",
-          "cd8cf9b4-abaa-43ab-8454-b632d2230bb4 - docs: verifica documentazione per commit 065c145",
-          "da8a6b63-490e-4673-a9fc-9d2d7b22da7c - docs: verifica documentazione per commit a44cf54",
-          "dae2472c-16f0-48ac-9ac7-2bb5fae6aa43 - docs: verifica documentazione per commit ce9272f",
-          "fa9e838f-890d-43bd-82b6-18b1da88ccca - docs: verifica documentazione per commit 420ecf6"
-        ],
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-03T07:32:09Z",
-      "updated_at": "2026-08-03T07:32:09Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "f0b83088-eb29-4e3e-8ebc-7f43a316befc",
-      "title": "/harness:compact legge le issue intere per usarne solo id e titolo",
-      "description": "Il passo 1 di commands/compact.md prescrive `--get-all --status done --page-size 50` e basta. Su questo repository, alla prima invocazione reale, quella chiamata ha restituito 162.5KB per 88 issue: l'oggetto issue intero, description e criteri di validazione compresi.\n\nDi tutto quel testo la proposta usa due campi, id e titolo. Il resto entra nel contesto della sessione, lo consuma e non cambia il raggruppamento di una virgola. Su un tracker piu' grande il comando diventa inservibile proprio quando compattare serve di piu'.\n\nIl passo 1 va riscritto perche' proietti id e titolo prima che l'output arrivi in contesto (una pipe `node -e` che stampa una riga per issue, sulla falsariga di quella gia' usata nel documento per leggere `.data.id` da un insert), spiegando in una riga perche': non e' una micro-ottimizzazione, e' la differenza fra un comando che scala e uno che no.\n\nResta invariato l'obbligo di scorrere tutte le pagine quando `totalCount` supera quanto mostrato: la proiezione riduce le colonne, non le righe.\n\nEmersa dalla verifica della issue che ha introdotto il comando, e giudicata fuori dai suoi criteri di accettazione.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [],
-      "validation": {
-        "criteria": "Tutti e sei i criteri soddisfatti. (1)(2)(3) commands/compact.md passo 1: la lettura e' ora `--get-all ... --page-size 50 | node -e '...'` che stampa solo `totalCount` e per ogni issue `id.slice(0,8) | title` (verificato riproducendo la pipe su una copia di issues.json in dir temporanea con --project-dir: totalCount 8 seguito da 8 righe id|titolo, nessuna description/criteri in output); il documento spiega in una riga il motivo citando il costo reale (\"162.5KB per 88 issue, di cui la proposta usa due campi\"); resta l'obbligo di scorrere le pagine (\"Scorri tutte le pagine con --page <n> se totalCount supera quanto mostrato\"). (4) test/plugin-commands.test.mjs aggiunge 'the compact command projects id and title when it reads the done issues' che asserisce la pipe (`| node -e`), la presenza di `.title` e di `--page` nel corpo del documento. (5) Invocazione live riportata dall'orchestratore: dopo il riavvio della sessione /harness:compact ha servito il passo 1 aggiornato, output totalCount 8 + 8 righe id|titolo, nessuna description/criterio in contesto, risparmio 14810 -> 450 byte sulle stesse 8 issue done; presa come dato non ispezionabile dai file. (6) `npm run test` nella root esce 0: 221/221 pass, incluso il nuovo test ('the compact command projects id and title when it reads the done issues', pass). Danni collaterali: git status --short mostra solo commands/compact.md, issues.json (solo il cambio di stato di questa issue, confermato da git diff) e test/plugin-commands.test.mjs modificati; nessun file untracked. Nessun file toccato dal verificatore oltre alla chiusura di questa issue; il probe di riproduzione della pipe e' stato eseguito su una copia di issues.json in una directory temporanea con --project-dir esplicito.",
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-03T07:33:06Z",
-      "updated_at": "2026-08-03T08:12:45Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "63406cce-2d07-4863-9329-0abe5bb10cf5",
-      "title": ".harness/ non si auto-ignora piu': cosa versionare lo decide il progetto",
-      "description": "harness scrive `.harness/.gitignore` con `*` in due punti: `--init` in scripts/harness-config.mjs e la scrittura che precede ogni `--compact` in scripts/issue-manager.mjs. Cosi' decide al posto del progetto cosa vada versionato.\n\nIl costo si vede sull'archivio. `--compact` scrive i blocchi in issues.json, che e' committato, e ogni blocco porta come primo criterio `Archived originals: .harness/archive/<ts>.json` — un file che per costruzione non entrera' mai in git. Chi clona trova puntatori morti al posto delle issue originali.\n\nHarness smette di scrivere quel file: `.harness/` compare fra gli untracked e il developer decide cosa versionare. Resta intatto il divieto di toccare il .gitignore del progetto: e' l'altra meta' della stessa regola.\n\nTolto il .gitignore dalla lista, va ricontrollato cosa `--init` deve ancora creare perche' tutto funzioni: quali file e directory servono davvero, cosa manca su un clone fresco, e che rilanciarlo su una cartella gia' popolata non sovrascriva niente.\n\nDa allineare: README.md, references/config.md, git.md (\"harness aggiunge solo issues.json\") e issues.md.",
-      "status": "done",
-      "tier": "reasoning",
-      "depends_on": [],
-      "validation": {
-        "state": "pass",
-        "criteria": "Riverifica dopo il fix. Il residuo che avevo fatto fallire non c'e' piu': scripts/issue-manager.mjs sopra emptyIssuesData ora legge \"issues.json is the file every clone of the project reads\" (era \"the only file the harness ever puts in a shared repository\"). Il diff vs HEAD del file e' 40 righe contro 36 del giro precedente: +2/-2 sul solo commento, nessuna riga di codice toccata; --stat di tutti gli altri 10 file e' identico riga per riga a quello che avevo gia' verificato, quindi i sei criteri gia' soddisfatti restano tali senza rifare il lavoro.\n\nCriteri non annacquati: confronto byte per byte dei sette validation.criteria attuali contro quelli letti al mio primo --get -> 7/7 stringhe identiche, stesso ordine, nessuna aggiunta o rimozione (script node su issues.json: \"CRITERIA IDENTICAL byte-for-byte\"). status in_review, state unknown al momento della riverifica. git diff issues.json tocca solo last_updated e il record di questa issue.\n\nResidui della stessa famiglia, stessa severita' del giro precedente: grep -i su \"only file|unico file|the harness ever puts|adds to git|aggiunge al progetto|self-ignor|auto-ignor|ignores itself|si auto-ignora|invisibile a git|never reaches git|must never reach\" su tutto il repo (escluso node_modules) -> zero hit in scripts/, skills/, README.md, commands/, agents/. Restano solo: .harness/archive/2026-08-03T07-32-09Z.json e docs/superpowers/specs/ (storia congelata, esenti), i blocchi storici issues.json:162,174, il titolo e i criteri di questa issue stessa, e test/plugin-config.test.mjs:88, che e' il messaggio di un assert che pretende l'ASSENZA del file, non una promessa.\n\nCriteri, uno per uno. [1] PASS: rimossi il writeFileSync di .harness/.gitignore in initConfig e la funzione ensureHarnessDir + la sua chiamata; test riscritti in negativo, non cancellati (plugin-config.test.mjs:78-98, plugin-issue-manager.test.mjs:1915-1925 asseriscono existsSync===false). [2] PASS: plugin-config.test.mjs:115-131 confronta ancora il .gitignore byte per byte e pretende git diff -- .gitignore vuoto; :133-145 invariato. [3] PASS: initConfig fa solo mkdirSync(recursive)+config.json; coperto da plugin-config.test.mjs:147-174 (runs/, archive/ e un .gitignore preesistente restano identici) e :206-218 (CONFIG_EXISTS senza --force). [4] PASS: issue-manager.mjs:866-872, ordine mkdirSync(dirname(archivePath)) -> writeFileSync(archivePath) -> writeIssuesFile(data), invariato. [5] PASS: README.md, SKILL.md, config.md, git.md, issues.md riallineati; nessuna promessa residua. [6] PASS: ls .harness/ -> archive, board.cmd, board.sh, config.json, runs (nessun .gitignore); git ls-files .harness -> .harness/archive/2026-08-03T07-32-09Z.json e .harness/config.json; gli 8 blocchi puntano tutti a quell'archivio. [7] PASS: npm run test -> tests 222, pass 222, fail 0, exit=0.\n\nCollaterali: git status --porcelain -uall elenca esattamente i 13 path dello scope, nessun file nuovo rispetto al giro precedente, nessun segreto nel diff staged.",
-        "tasks": []
-      },
-      "created_at": "2026-08-03T08:23:46Z",
-      "updated_at": "2026-08-03T08:42:22Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "2f76be67-521f-425c-b6f7-1fe41c72c321",
-      "title": "docs: verifica documentazione per commit cbde0b2",
-      "description": "Gate documentale sul commit cbde0b2, che tocca scripts/harness-config.mjs e scripts/issue-manager.mjs (file di codice secondo docsGate.include).\n\nIl commit ha gia' riscritto README.md, skills/harness/SKILL.md e le reference config.md, git.md, issues.md, e la verifica indipendente della issue 63406cce ha confermato che nessuna delle promesse vecchie e' sopravvissuta. Questa issue non ripete quel lavoro: controlla il perimetro che quella non copriva.\n\nDa guardare: il testo di --help dei due script, i commenti di testa che descrivono cosa harness scrive nel progetto, agents/ e commands/ (che parlano del tracker e potrebbero ripetere l'invariante caduta), references/board.md e references/external-worker.md, che nominano .harness/ per i propri file.\n\nEsito legittimo e' anche \"niente da cambiare\": in quel caso la chiusura dice cosa e' stato controllato, non si limita a dichiarare che va bene.\n\nRestano fuori, come storia congelata: .harness/archive/, docs/superpowers/specs/ e le description dei blocchi in issues.json.",
-      "status": "done",
-      "tier": "economy",
-      "depends_on": [],
-      "validation": {
-        "state": "pass",
-        "criteria": "Verifica indipendente, nessun documento modificato (diff = solo issues.json per lo stato di questa issue). Controllato con grep/lettura diretta: (1) `node scripts/harness-config.mjs --help` e `node scripts/issue-manager.mjs --help` non promettono che .harness/ si auto-ignori (harness-config.mjs --help dice esplicitamente 'Harness writes no .gitignore at all'). (2) grep case-insensitive su agents/, commands/, skills/harness/references/board.md, external-worker.md per 'issues.json|.gitignore|solo|only|mai in git|self-ignor' non trova nessuna ripetizione di 'harness aggiunge al progetto solo issues.json' ne' di '.harness/ non finisce mai in git'; board.md e external-worker.md nominano .harness/ solo per config.json e .harness/runs/<issueId>-<timestamp>.log, senza invarianti sul versionamento. (3) Verificato che l'elenco di .harness/ in README.md riga 72 e skills/harness/references/config.md righe 6-9 (config.json, archive/, runs/) e' completo rispetto a cio' che gli script scrivono davvero: harness-config.mjs scrive solo config.json (riga 354), issue-manager.mjs scrive solo archive/<timestamp>.json (riga 871), harness-worker.mjs scrive solo runs/<issueId>-<timestamp>.log (riga 237) piu' un promptFile temporaneo fuori da .harness/; nessun altro writeFileSync/mkdirSync tocca .harness/. (4) `npm run test` eseguito dal verificatore: 222/222 pass, exit code 0. Osservazione fuori scope (non blocca): .harness/board.cmd e .harness/board.sh sono relitti locali dell'harness v1, con path assoluti, aggiunti al .gitignore del progetto nel commit cbde0b2 invece che cancellati; non sono scritti da alcuno script del repository e non compaiono nell'elenco documentale, correttamente. Nessun file modificato dal verificatore oltre alla chiusura di questa issue.",
-        "tasks": []
-      },
-      "created_at": "2026-08-03T08:43:38Z",
-      "updated_at": "2026-08-03T08:48:21Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "6a53d9c8-f41e-44f0-9536-279de693e938",
-      "title": "status-cli: costanti, conteggi e sezione delle issue in corso",
-      "description": "Primo pezzo di scripts/status-cli.mjs: le costanti condivise (icone di stato e tier, ordini di lettura, larghezze) e buildSnapshot(issues) limitata a counts e inFlight.\n\ncounts porta sempre tutte e cinque le chiavi, anche a zero. inFlight raccoglie in_progress, in_review e blocked in quest'ordine, e dentro ogni stato ordina per updated_at decrescente. Non si tronca mai: dodici issue aperte sono un problema di WIP da vedere, non da riassumere.\n\nCodice e test in Task 1 di docs/superpowers/plans/2026-08-04-status-cli.md.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [],
-      "validation": {
-        "criteria": "scripts/status-cli.mjs esporta STATUS_ICON, TIER_ICON, IN_FLIGHT_ORDER, BAR_ORDER, WIDTH, BAR_INNER, TITLE_MAX, WORKABLE_SHOWN, buildSnapshot (righe 16-43); STATUS_ICON/TIER_ICON matchano lo spec esatto (righe 16-24), confermato dal test 'the icon tables are the ASCII ones the spec fixes'; buildSnapshot([]) restituisce counts con le 5 chiavi a zero via emptyCounts() (righe 39-41, 44), confermato dal test 'an empty tracker counts zero everywhere instead of missing keys'; inFlight ordina per IN_FLIGHT_ORDER.indexOf(status) poi updated_at decrescente (righe 51-57), confermato dai test 'in flight is in_progress, in_review and blocked, in that order' e 'inside one status the most recently touched issue comes first'; 12 issue in_progress producono 12 elementi inFlight senza troncamento, confermato dal test omonimo. node --test test/plugin-status-cli.test.mjs: 6/6 pass. npm run test (gate da .harness/config.json): 228/228 pass, 0 fail. git status --short mostra solo i due file nuovi attesi (scripts/status-cli.mjs, test/plugin-status-cli.test.mjs) e issues.json (transizione backlog->in_review del worker), nessun danno collaterale fuori scope.",
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-04T09:14:41Z",
-      "updated_at": "2026-08-04T09:24:14Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "0fe39c8a-a84b-466b-9e39-b3d7912dcaf5",
-      "title": "status-cli: issue lavorabili e dipendenze fantasma",
-      "description": "buildSnapshot guadagna workable e workableTotal.\n\nLavorabile significa stato backlog e ogni id in depends_on che risolve a una issue esistente in stato done. Un id che non corrisponde a nessuna issue del tracker rende la issue NON lavorabile: non si sa cosa manchi, e dichiarare lavorabile qualcosa che dipende dal nulla e' il modo di far partire il lavoro sbagliato.\n\nworkable e' gia' tagliato a WORKABLE_SHOWN (tre), ordinato per created_at crescente; workableTotal dice quante sono davvero.\n\nCodice e test in Task 2 di docs/superpowers/plans/2026-08-04-status-cli.md.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [
-        "6a53d9c8-f41e-44f0-9536-279de693e938"
-      ],
-      "validation": {
-        "criteria": "npm run test: 236/236 pass (14 in test/plugin-status-cli.test.mjs, >= 14 richiesti). Codice in scripts/status-cli.mjs verificato riga per riga: isWorkable (righe 54-59) ritorna false quando deps.some(id => !byId.has(id)) e' vero, prima di controllare lo stato done, quindi un id inesistente rende l'issue NON lavorabile (coperto da test riga 124-130 'a dependency that does not exist makes the issue not workable'). buildSnapshot (righe 79-87) calcola workableAll con filter+sort, poi workable = workableAll.slice(0, WORKABLE_SHOWN) e workableTotal = workableAll.length, quindi workableTotal e' il totale prima del taglio a tre (coperto da test riga 144-155). Tutti gli altri criteri (nessuna dipendenza -> lavorabile, una dipendenza aperta -> non lavorabile, solo backlog lavorabile, ordinamento per created_at crescente e taglio a tre, depends_on assente letto come nessuna dipendenza) hanno test dedicati che passano. git status --short mostra solo issues.json (transizione di stato di questa issue) e i due file di scope (scripts/status-cli.mjs, test/plugin-status-cli.test.mjs); nessun danno collaterale. Osservazione fuori scope, non bloccante: la funzione danglingDeps (status-cli.mjs riga 50) e' definita ma mai chiamata (isWorkable duplica la stessa logica inline) - dead code, non tocca nessun criterio di validazione.",
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-04T09:14:41Z",
-      "updated_at": "2026-08-04T09:27:21Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "59819a08-06da-481c-9a4f-ba948c5432ec",
-      "title": "status-cli: allerte su cicli, dipendenze fantasma e stallo",
-      "description": "buildSnapshot guadagna alerts: un array di stringhe senza il punto esclamativo davanti, che aggiunge il renderer.\n\nTre allerte, in quest'ordine: ciclo nei depends_on (visita in profondita' limitata alle issue non done, perche' un ciclo fra issue chiuse e' storia), dipendenze che puntano a id inesistenti (con singolare e plurale corretti), stallo quando il backlog non e' vuoto e non c'e' nessuna lavorabile.\n\nLe issue blocked non generano allerta: compaiono gia' in inFlight con la loro icona. Un ciclo non interrompe il resto dello snapshot.\n\nCodice e test in Task 3 di docs/superpowers/plans/2026-08-04-status-cli.md.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [
-        "0fe39c8a-a84b-466b-9e39-b3d7912dcaf5"
-      ],
-      "validation": {
-        "criteria": "npm run test: 245/245 pass, incluso node --test test/plugin-status-cli.test.mjs (23/23, tutti in scope). Ogni criterio verificato contro scripts/status-cli.mjs: (1) 'no alerts on a healthy tracker' -> alerts:[] su tracker sano; (2) 'a cycle among open issues...' -> alert 'ciclo nei depends_on: aaaaaaaa bbbbbbbb' con entrambi gli id, alerts[0]; (3) 'a cycle among done issues is history, not an alert' -> alerts:[] invariato e ancora strict (deepEqual), non indebolito; (4) 'a cycle does not stop the rest of the snapshot' -> counts/inFlight corretti per issue non coinvolta; (5) dangling deps singolare/plurale -> due test dedicati con regex esatta; (6) standstill 'lavorabili 0 di 2 - ...' e blocked-da-sola senza alert -> verificati. Il test riscritto su 'a cycle among open issues' e' legittimo: due backlog che si depends_on a vicenda hanno counts.backlog=2 e workableTotal=0, quindi buildAlerts (scripts/status-cli.mjs righe 93-116) genera SIA l'alert di ciclo SIA quello di stallo, coerentemente con la logica indipendente descritta nella issue ('tre allerte' come controlli separati, 'un ciclo non interrompe il resto dello snapshot'); asserire alerts.length===1 era quindi errato rispetto al comportamento reale, non l'implementazione ad essere sbagliata. Il nuovo test resta rigoroso: usa .find + assert.ok per l'esistenza, assert.match per entrambi gli id, e verifica esplicitamente l'ordine (cycle deve essere alerts[0]). git diff test/plugin-status-cli.test.mjs mostra solo aggiunte in coda (righe 159+), nessun test preesistente modificato o ammorbidito. git status --short: solo issues.json, scripts/status-cli.mjs, test/plugin-status-cli.test.mjs toccati, tutti in scope; nessun danno collaterale. Nessun file modificato da me oltre alla chiusura della issue.",
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-04T09:14:41Z",
-      "updated_at": "2026-08-04T09:32:27Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "9c45bfd7-977f-4e00-84b6-9c42545ae0c1",
-      "title": "status-cli: intestazione, barra proporzionale e legenda degli stati",
-      "description": "Nasce renderSnapshot(snapshot, { project, lastUpdated }): stringa multiriga, senza newline finale. In questa issue rende solo intestazione, riga di separazione, barra e legenda.\n\nL'intestazione porta nome del progetto, totale delle issue (done incluse) e la data di last_updated in ora locale a precisione di minuti; se la data manca o non e' interpretabile, l'intestazione si ferma al conteggio.\n\nLa barra sta in 77 colonne esatte: i segmenti sono proporzionali, uno stato con almeno una issue occupa sempre almeno una colonna, e l'errore di arrotondamento viene assorbito dal segmento piu' largo. La legenda elenca solo gli stati presenti.\n\nCodice e test in Task 4 di docs/superpowers/plans/2026-08-04-status-cli.md.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [
-        "59819a08-06da-481c-9a4f-ba948c5432ec"
-      ],
-      "validation": {
-        "criteria": "node --test test/plugin-status-cli.test.mjs: 31/31 pass (includes header, bar-width, legend, 80-col tests). npm run test (gate ex .harness/config.json): 253/253 pass, 0 fail. renderSnapshot is exported from scripts/status-cli.mjs:193 and produces ' harness · 1 issue · aggiornato 2026-08-04 11:12' verified with a scratch script importing buildSnapshot/renderSnapshot; with lastUpdated null or 'not a date' the line stops at ' harness · 1 issue' with no raw date, no trailing separator. Probed BAR_INNER (77) on three distributions the test suite does not cover (1/1/1/1/1, 1000/1/1/1/1, 3/3/3/3/3): inner bar length was exactly 77 in all three, and no output line exceeded 80 columns. Existing tests already cover: at-least-one-column for a status with 1/200 issues (line 296-302), legend limited to counts>0 (304-311), and 80-column bound with three-digit counts across all five statuses (313-320). git diff is purely additive to scripts/status-cli.mjs (formatWhen/barSegments/renderBar/renderLegend/renderSnapshot) and test/plugin-status-cli.test.mjs (new imports + 9 new tests); issues.json diff is only this issue's own status/timestamp transition. Note (not blocking): the criteria text quotes the header form with '-' as separator, while the implementation, the plan doc (docs/superpowers/plans/2026-08-04-status-cli.md) and the tests themselves consistently use '·' (middle dot); treated as an informal paraphrase since structure and all other content match exactly.",
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-04T09:14:41Z",
-      "updated_at": "2026-08-04T09:36:54Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "f2595673-a499-4185-b86d-33034431560f",
-      "title": "status-cli: sezioni in corso e lavorabili, con troncamento a 45 colonne",
-      "description": "renderSnapshot rende le due sezioni e la legenda dei tier in fondo.\n\nUna riga di IN CORSO porta icona, id corto a 8, parola dello stato, icona del tier e titolo. Una riga di LAVORABILI lascia via la parola dello stato: sono tutte backlog. Il tier non dichiarato si rende con un trattino - la CLI dice cosa c'e' scritto nel tracker, non cosa qualcun altro ne dedurra'.\n\nIl titolo si tronca a 45 caratteri con tre punti ASCII, mai il glifo singolo, e gli spazi interni si normalizzano prima: un a capo dentro un titolo non deve poter aggiungere una riga alla tabella.\n\nL'intestazione di LAVORABILI dichiara sempre il totale reale. Codice e test in Task 5 di docs/superpowers/plans/2026-08-04-status-cli.md.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [
-        "9c45bfd7-977f-4e00-84b6-9c42545ae0c1"
-      ],
-      "validation": {
-        "criteria": "Probe usa-e-getta (buildSnapshot/renderSnapshot importati da scripts/status-cli.mjs, nessuna scrittura nel repo) conferma le due righe esatte: in corso = '  + aaaaaaaa  in_progress  $$   vista albero delle catene' (match esatto), lavorabile = '  o bbbbbbbb  $    drawer con focus trap' (match esatto, senza 'backlog'). Troncamento a titolo lungo produce esattamente 45 caratteri terminanti con tre punti ASCII '...', nessun glifo ellissi '…' nell'output. grep 'IN VOLO' su scripts/status-cli.mjs: nessun match. Intestazioni ' IN CORSO' e ' LAVORABILI · N di M' presenti (il carattere separatore e' '·' come nel piano docs/superpowers/plans/2026-08-04-status-cli.md e nei test, non un trattino ASCII come nel testo del criterio - annotato come osservazione, non blocca). node --test test/plugin-status-cli.test.mjs: 41/41 pass. npm run test (gate da .harness/config.json): 263/263 pass, 0 fail. git diff --stat: solo issues.json (status/updated_at), scripts/status-cli.mjs, test/plugin-status-cli.test.mjs — nessun danno collaterale.",
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-04T09:14:41Z",
-      "updated_at": "2026-08-04T09:41:39Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "b6b848b9-26e4-49c1-9037-71207f958c5c",
-      "title": "status-cli: resa delle allerte e dei casi vuoti",
-      "description": "Le allerte si stampano sopra la barra, ognuna preceduta da ' ! ', e vanno a capo invece di essere troncate: un'allerta e' dato, e troncarla nasconde proprio l'id che serve.\n\nQuattro casi vuoti, tutti a uscita normale: tracker senza issue rende la sola riga '<project> - tracker vuoto'; nessuna issue in corso rende comunque la sezione con 'nessuna issue aperta', perche' l'assenza e' la verifica 1-WIP; nessuna lavorabile rende 'niente in backlog'; backlog pieno senza lavorabili aggiunge l'allerta di stallo in cima.\n\nCodice e test in Task 6 di docs/superpowers/plans/2026-08-04-status-cli.md.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [
-        "f2595673-a499-4185-b86d-33034431560f"
-      ],
-      "validation": {
-        "criteria": "Tutti i 7 criteri verificati contro scripts/status-cli.mjs e test/plugin-status-cli.test.mjs. (1) alertLines (status-cli.mjs:225-240) apre ogni riga con ' !'/'   ' prima di '='.repeat(WIDTH); test 'alerts sit above the bar' passa. (2) 'a healthy tracker prints no exclamation line' passa. (3) Catena ciclica di 40 issue: test 'an alert line is wrapped, never allowed past eighty columns' passa; probe indipendente in tmp (buildSnapshot su 40 issue circolari) conferma MAX_LEN=80<=WIDTH=80 su tutte le righe. (4) renderSnapshot(buildSnapshot([]),...) verificato via probe indipendente: restituisce esattamente ' harness · tracker vuoto' (il carattere separatore · e' quello usato ovunque nel file, incluso l'header non-vuoto; il '-' nel testo della issue e nella description e' una resa in prosa dello stesso separatore, non un contratto letterale diverso - osservazione, non blocco). (5) 'nothing in flight is itself the answer' passa: sezione IN CORSO resta con '  nessuna issue aperta'. (6) 'an empty backlog says there is nothing to take' e 'a full backlog with nothing workable shows the standstill alert and the empty section' passano: '  niente in backlog' e allerta di stallo presenti. (7) node --test test/plugin-status-cli.test.mjs: 48/48 pass; npm run test (gate da .harness/config.json): 270/270 pass. Punto sollevato dal contesto: il test corretto da 'LAVORABILI 0 di 1' a 'LAVORABILI 0 di 0' e' legittimo, non piegato. Confermato con probe diretto su buildSnapshot(scenario stallo): counts.backlog=1, workableTotal=0 (workableAll.length, coerente con la definizione di workableTotal introdotta nel Task 5 del piano: 'quante sono lavorabili in tutto, prima del taglio'). L'header usa shown/workableTotal (0 di 0, entrambi zero perche' nessuna issue e' davvero lavorabile), l'allerta usa 0/counts.backlog (0 di 1, il denominatore e' il backlog totale) - due semantiche diverse per costruzione, non un unico contatore riusato in modo incoerente. Il letterale 'LAVORABILI 0 di 1' nel piano docs/superpowers/plans/2026-08-04-status-cli.md riga 1009 e' un refuso del piano stesso (contraddice la sua stessa definizione di workableTotal a riga 249 e il valore realmente prodotto da buildSnapshot), non un target valido da cui il codice si e' discostato. git status --short mostra solo issues.json (transizione di stato del workflow), scripts/status-cli.mjs e test/plugin-status-cli.test.mjs, coerenti con lo scope della issue; nessun altro file toccato.",
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-04T09:14:42Z",
-      "updated_at": "2026-08-04T09:48:07Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "74d2b630-f4de-4b94-99da-741562328fbe",
-      "title": "status-cli: contratto della riga di comando e codici d'uscita",
-      "description": "main(): parseArgs in modalita' strict con i soli --project-dir e --help, risoluzione della directory di progetto, lettura di issues.json, stampa.\n\nStdout e' testo, non JSON: rottura dichiarata rispetto a issue-manager.mjs e board-server.mjs, che stampano una riga JSON perche' un agente la parsa. Questo script parla a un umano e non deve acquisire consumatori automatici. Niente viene scritto su stderr in nessun caso.\n\nIl nome del progetto viene dal campo project di issues.json se c'e', altrimenti dal basename della directory. main() non deve partire quando il file viene importato dai test.\n\nCodice e test in Task 7 di docs/superpowers/plans/2026-08-04-status-cli.md.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [
-        "b6b848b9-26e4-49c1-9037-71207f958c5c"
-      ],
-      "validation": {
-        "criteria": "Verificato con probe manuali su scripts/status-cli.mjs in directory temporanee (mai sul tracker reale) piu' `npm run test`. (1) tracker valido: exit=0, stdout con riepilogo (' probe-valid ...'), stderr 0 byte. (2) tracker senza campo project: stdout inizia con basename directory ('probe-valid'). (3) directory senza issues.json: exit=0, stdout ' probe-empty . tracker vuoto', stderr 0 byte. (4) issues.json corrotto ('{ not json'): exit=1, stdout contiene \"non e' un JSON valido\", stderr 0 byte. (5) --project-dir inesistente: exit=1, messaggio 'non esiste', stderr 0 byte; flag inventato --wat: exit=1, messaggio nomina --project-dir, stderr 0 byte; --help: exit=0, stampa usage, stderr 0 byte. (6) prima riga di stdout su tracker valido non e' JSON (' probe-valid · 1 issue ...', coerente col test 'stdout is text, not the one-line JSON'). (7) guard: import del modulo da un probe con pathToFileURL non stampa nulla di main() (solo il log del probe stesso), confermando che `if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)` blocca l'esecuzione a import. npm run test: 278/278 pass, 0 fail (node --test su tutta la suite, inclusi i test process-level in test/plugin-status-cli.test.mjs). git status --short mostra solo issues.json (transizione di stato), scripts/status-cli.mjs e test/plugin-status-cli.test.mjs, tutti in scope della issue; nessun danno collaterale.",
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-04T09:14:42Z",
-      "updated_at": "2026-08-04T09:52:08Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "8718f44a-2a45-40f5-9735-7ee3501cccf4",
-      "title": "Slash command /harness:status",
-      "description": "commands/status.md, e status aggiunto alla lista COMMANDS di test/plugin-commands.test.mjs.\n\nIl comando istruisce a lanciare lo script e a ristampare l'output verbatim dentro un blocco di codice, senza riformattarlo, senza convertirlo in tabella markdown, senza riordinare le sezioni. L'allineamento e' gia' fatto a 80 colonne: rifarlo consuma contesto e rende ogni invocazione diversa dalla precedente.\n\nIl file deve rispettare i cinque vincoli che plugin-commands.test.mjs impone gia' agli altri comandi. Nessuna references/status.md: il contratto sta nel comando.\n\nContenuto in Task 8 di docs/superpowers/plans/2026-08-04-status-cli.md.",
-      "status": "done",
-      "tier": "economy",
-      "depends_on": [
-        "74d2b630-f4de-4b94-99da-741562328fbe"
-      ],
-      "validation": {
-        "criteria": "commands/status.md esiste (2208 char, body 1991 char <4000); frontmatter con description di 138 char contenente 'Senza argomenti', argument-hint '[--project-dir <path>]', allowed-tools: Bash, nessun campo name. Corpo tratta il caso senza argomenti (riga 12: 'nessun argomento = progetto corrente'). Unica invocazione node usa ${CLAUDE_PLUGIN_ROOT}/scripts/status-cli.mjs (esiste); unico path ${CLAUDE_PLUGIN_ROOT}/... nominato e' skills/harness/references/issues.md (esiste). Corpo impone 'Ristampa l'output verbatim, dentro un blocco di codice' e vieta riformattarlo/tabellarlo/riordinarlo (righe 24-28). test/plugin-commands.test.mjs: COMMANDS include 'status' (riga 16). 'npm run test' -> 278/278 pass, 0 fail (node --test include test/plugin-commands.test.mjs). Verificato inoltre il claim sul README: il test 'the README documents the commands under the names the plugin ships' (test/plugin-commands.test.mjs:209-223) itera su COMMANDS e fallisce se /harness:status non e' menzionato nel README quando aggiunto a COMMANDS -- conferma che il confine del piano era sbagliato e la riga appartiene a questa issue. git diff README.md mostra una sola riga aggiunta (tabella comandi, riga 93), nessun'altra modifica. git status --short mostra solo README.md, issues.json (stato tracker), test/plugin-commands.test.mjs modificati e commands/status.md nuovo: nessun danno collaterale fuori scope.",
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-04T09:14:42Z",
-      "updated_at": "2026-08-04T09:56:18Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "90048eaf-d5bc-42d5-a7d9-f41dc3c40a56",
-      "title": "Riepilogo del tracker a clock-in e a clock-out",
-      "description": "Aggancio del comando nel workflow e nella documentazione.\n\nIl punto 5 del clock-in in skills/harness/SKILL.md viene sostituito, non affiancato: oggi lancia due volte issue-manager.mjs e chiede un riassunto scritto a mano, e il riepilogo risponde alla stessa domanda in un giro solo. Il dettaglio su una singola issue resta --get --issue-id.\n\nIl clock out si chiude ristampando il riepilogo: e' il confronto con quello del clock-in.\n\nIl README guadagna una riga nella tabella dei comandi, in ordine alfabetico fra issue e verify.\n\nContenuto in Task 9 di docs/superpowers/plans/2026-08-04-status-cli.md.",
-      "status": "done",
-      "tier": "economy",
-      "depends_on": [
-        "8718f44a-2a45-40f5-9735-7ee3501cccf4"
-      ],
-      "validation": {
-        "criteria": "Verificato sullo stato attuale: (1) skills/harness/SKILL.md riga 33 punto 5 del clock-in lancia solo `node \"$SCRIPTS/status-cli.mjs\"`, le due chiamate --get-all sono sparite (git diff conferma la sostituzione). (2) sezione Clock out (righe 245-251) impone di ristampare il riepilogo con status-cli.mjs 'verbatim in un blocco di codice' come confronto col clock-in. (3) README.md riga 93 ha la riga `/harness:status` fra `/harness:issue` (riga 92) e `/harness:verify` (riga 94), ordine alfabetico rispettato; la riga era gia' presente dalla issue 8718f44a e resta invariata (nessun diff su README.md nel working tree). (4) `npm run test` eseguito: 278/278 pass, 0 fail, incluso test/plugin-skill.test.mjs (6/6 pass, eseguito anche isolato). git status --short mostra solo issues.json e skills/harness/SKILL.md modificati, nessun danno collaterale.",
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-04T09:14:42Z",
-      "updated_at": "2026-08-04T09:59:07Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "1b7587bf-a25d-4caa-bd63-810dde5fef2e",
-      "title": "Gate documentale dei nove commit di status-cli",
-      "description": "Gate documentale dei commit 3852f8a..c79bf1d, che hanno introdotto scripts/status-cli.mjs.\n\nQuattro verifiche indipendenti hanno chiuso fail, ognuna trovando comportamenti osservabili non documentati: intestazione, fallback del nome progetto, id a 8, barra non proporzionale, stdout mai JSON, nessuna scrittura su stderr, tracker vuoto anche con zero issue, allerte che vanno a capo. La quarta ne ha enumerati 48 in tutto e ha dichiarato che i restanti non entrano: il corpo di commands/status.md era a 3900 caratteri contro il limite di 4000 che plugin-commands.test.mjs impone proprio per impedire che un comando diventi il contratto.\n\nDue regole del progetto si scontravano: il gate vuole tutto documentato, quel test vuole i comandi corti. A cedere e' la decisione dello spec di non scrivere references/status.md.\n\nDecisione presa dall'utente, non dal worker, dopo il quarto fail: il contratto va in skills/harness/references/status.md e il comando torna magro. I criteri sono riscritti di conseguenza, perche' quelli precedenti ammettevano solo tre file e rendevano la soluzione scelta impossibile da dichiarare soddisfatta.",
-      "status": "done",
-      "tier": "economy",
-      "depends_on": [],
-      "validation": {
-        "state": "pass",
-        "criteria": "Settimo giro. Criterio 1 (riproducibilita' dell'esempio, difetto del sesto giro): ricostruito in una directory temporanea un tracker con esattamente i conteggi dichiarati (17 issue: 6 done, 1 in_progress, 1 in_review, 1 blocked, 8 backlog di cui una con depends_on verso un id inesistente ffffffff-...), project 'harness', last_updated 2026-08-04T10:00:00Z, stessi id/tier/titoli dell'esempio per un confronto diretto. Eseguito 'node scripts/status-cli.mjs --project-dir <tmp>' e diffato riga per riga (node -e con split su \n) contro il blocco annotato in skills/harness/references/status.md (righe 54-72, corpo del code fence 53-73): diff -u restituisce exit 0, zero differenze su tutte le 19 righe di contenuto, inclusa l'intestazione '17 issue' (non piu' incoerente come il 22-vs-12 del sesto giro), la barra a 77 colonne interne (### 27 + ++++ 4 + ~~~~ 4 + !!!! 4 + oooo 38, verificato via conteggio), la legenda con due spazi fra voci, il troncamento a 45 caratteri di 'filtri per tier nel board, con scorciatoie...', e la riga di allerta dangling singolare 'ffffffff'. Anche la riga dell'ora ha coinciso ('12:00'), pura coincidenza di fuso locale come la issue anticipa che puo' non accadere altrove: non e' un criterio di confronto. Il difetto del sesto giro (76 vs 77 colonne, spaziatura a 4 spazi, 22 vs 12) e' quindi chiuso e verificato con una ricostruzione indipendente, non con una rilettura del codice. Criterio 2 rifatto da zero: rilette tutte le 357 righe di scripts/status-cli.mjs ed enumerati autonomamente 51 comportamenti osservabili (canali stdout/stderr, formato solo testo mai JSON, niente ANSI/isTTY, STATUS_ICON x5, TIER_ICON x3, IN_FLIGHT_ORDER, BAR_ORDER, WIDTH=80, BAR_INNER=77, TITLE_MAX=45, WORKABLE_SHOWN=3, danglingDeps, isWorkable, shortId a 8, findCycle limitata alle issue non-done e la sua motivazione, alert ciclo, alert dangling singolare/plurale, alert stallo con denominatore backlog distinto da quello dell'intestazione sezione, ordinamento inFlight (IN_FLIGHT_ORDER poi updated_at desc) e workable (created_at asc) con relativo WORKABLE_SHOWN, formatWhen locale a minuto con fallback null, barSegments proporzionale con minimo 1 colonna e drift assorbito dal segmento piu' largo, renderBar, renderLegend con soli stati presenti, RULE (79 trattini), riga '='x80, TIER_LEGEND fissa, truncate con normalizzazione whitespace e '...' ASCII, tierIcon '-' per non dichiarato, formato riga inFlight/workable, alertLines con wrap a 80 colonne su continuazione indentata, renderSnapshot con caso tracker vuoto, intestazione con fallback nome progetto a basename, sezioni IN CORSO/LAVORABILI con casi vuoti dedicati e le due variabili di 'niente in backlog' distinte solo dall'allerta, USAGE/--help, fail() che scrive su stdout ed esce 1, resolveProjectDir, main() con parseArgs strict e messaggio d'errore per flag sconosciuto, gestione issues.json mancante/non-array/JSON invalido, project non stringa o vuoto, codici d'uscita 0/1, guardia import.meta.url, trailing newline). Cercati tutti fra skills/harness/references/status.md, commands/status.md, skills/harness/SKILL.md e README.md: tutti risultano documentati, nessun comportamento raggiungibile in condizioni legittime e' senza copertura. Un caso limite trovato durante l'enumerazione (issue con uno status fuori dai cinque valori validi scompare da conteggi/intestazione senza traccia, verificato con un probe in directory temporanea con status:'archived': intestazione mostra '1 issue' su un array di due) e' risultato NON raggiungibile attraverso l'unico percorso di scrittura ammesso: scripts/issue-manager.mjs valida lo status con validateStatus (righe 352-361, valori ammessi backlog/in_progress/in_review/blocked/done) e CLAUDE.md vieta esplicitamente la modifica a mano di issues.json; classificato come osservazione fuori scope, non come gap di documentazione, a differenza dei depends_on penzolanti che restano raggiungibili anche per via legittima (un archivio che rimuove una issue ancora referenziata) e sono infatti documentati. Gate: 'npm run test' (da .harness/config.json, campo verify) -> 278/278 pass, 0 fail. git status --short mostra solo commands/status.md, skills/harness/SKILL.md e issues.json modificati piu' skills/harness/references/status.md nuovo; git diff issues.json conferma che il solo cambiamento e' il record di questa issue (000 -> in_review, validation, updated_at) piu' il last_updated di root, nessun danno collaterale. Nessun file modificato da questo verificatore oltre alla chiusura della issue; ogni probe (rigenerazione tracker, tracker con status invalido) e' avvenuto in directory temporanee con --project-dir esplicito, mai contro l'issues.json reale.",
-        "tasks": []
-      },
-      "created_at": "2026-08-04T10:00:14Z",
-      "updated_at": "2026-08-04T11:13:07Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "aa07fb72-713c-4d65-bba9-6e1399652813",
-      "title": "Stallo e intestazione LAVORABILI: 'N di M' con due denominatori diversi",
-      "description": "Trovato lavorando b6b848b9. In stallo l'output stampava a due righe di distanza:\n\n  ! lavorabili 0 di 2 - ogni issue in backlog attende qualcosa\n  LAVORABILI - 0 di 0\n\nIl primo \"0 di 2\" era lavorabili sul totale del BACKLOG. Il secondo \"0 di 0\" e' righe mostrate sul totale delle LAVORABILI. Stessa forma, due denominatori, indistinguibili a schermo.\n\nDECISIONE: cambia l'allerta, non l'intestazione. \"mostrate di totale\" e' la convenzione normale di un elenco e l'intestazione compare sempre; l'allerta prendeva in prestito quella forma per dire un'altra cosa, e compare solo in stallo. Raggio minore, e a cedere e' l'uso improprio.\n\nL'allerta abbandona la forma N di M: da 'lavorabili 0 di <n> - ogni issue in backlog attende qualcosa' a 'backlog fermo: <n> issue, nessuna lavorabile - tutte attendono qualcosa'. Nomina cosa conta invece di lasciarlo dedurre.\n\nIl testo precedente era stato verificato pass nella issue 59819a08: il cambio tocca un criterio gia' chiuso, ed e' questa la ragione che il terzo criterio chiede di scrivere. Aggiornati i due test che lo asserivano, piu' due nuovi che fissano il denominatore di ogni numero mostrato, e la sezione allerte di references/status.md.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [],
-      "validation": {
-        "criteria": "Verificato con probe reali (temp dir con --project-dir, non issues.json del repo). (1) Stallo: node scripts/status-cli.mjs --project-dir <tmp> su tracker con 1 in_progress + 2 backlog dipendenti dalla in_progress produce ' ! backlog fermo: 2 issue, nessuna lavorabile - tutte attendono qualcosa' seguito poche righe dopo da ' LAVORABILI - 0 di 0': un solo numero nella forma N di M vicino all'alert, non piu' due denominatori diversi. Caso con lavorabili presenti (1 done + 1 backlog sbloccata): nessuna riga con punto esclamativo in output, intestazione ' LAVORABILI - 1 di 1' (mostrate su lavorabili). (2) git diff test/plugin-status-cli.test.mjs mostra due nuovi test che fissano esplicitamente entrambi i denominatori: 'the standstill alert names the backlog...' asserisce counts.backlog=4, workableTotal=0, testo alert con '4 issue', un assert.ok che verifica che l'alert non riusi la forma N di M dell'intestazione, e intestazione 'LAVORABILI - 0 di 0'; 'with workable issues...' asserisce counts.backlog=8, workableTotal=7, nessun alert 'backlog fermo', intestazione 'LAVORABILI - 3 di 7'. (3) git diff scripts/status-cli.mjs mostra solo il cambio della riga alert (da 'lavorabili 0 di n - ...' a 'backlog fermo: n issue, nessuna lavorabile - ...') piu' un commento che spiega perche'; i due test preesistenti che asserivano il testo vecchio sono stati aggiornati al nuovo testo, non rimossi ne' indeboliti. La description della issue riporta esplicitamente che il testo precedente era stato verificato pass nella issue 59819a08 e che il cambio tocca un criterio gia' chiuso: entrambe le condizioni del criterio 3 soddisfatte. skills/harness/references/status.md aggiornato con il nuovo testo dell'allerta e la spiegazione del perche' non usa la forma N di M (righe 164-168), nessun residuo del testo vecchio nella reference. git diff --stat limitato a issues.json, scripts/status-cli.mjs, skills/harness/references/status.md, test/plugin-status-cli.test.mjs: nessun danno collaterale, nessun altro comportamento alterato. (4) npm run test: 280/280 pass, 0 fail (gate .harness/config.json verify=npm run test). Osservazione fuori scope: docs/superpowers/plans/2026-08-04-status-cli.md e docs/superpowers/specs/2026-08-04-status-cli-design.md contengono ancora il testo vecchio 'lavorabili 0 di n' nei blocchi di codice storici del piano/spec originali; non fanno parte dei criteri di questa issue (solo status.md e il test sono citati) e non sono stati toccati dal lavoro, quindi non blocca. Nessun file modificato da me oltre alla chiusura di questa issue; probe eseguiti solo su directory temporanee con --project-dir esplicito.",
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-04T10:00:35Z",
-      "updated_at": "2026-08-04T11:20:59Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "5a1636cd-6379-4c14-b14f-fd75fd5becaa",
-      "title": "La bussola: harness dice quale lavoro diventa una issue",
-      "description": "Harness apre dicendo «ogni pezzo di lavoro è una issue tracciata», e non dice mai quale lavoro lo diventi davvero. Il primo consumer esterno ha dovuto ricavarsi la regola da sé, dopo un primo tentativo da 21 issue su un piano da 15 passi: 21 giri di verificatore su criteri che il livello sotto già controllava inline.\n\nEntra in SKILL.md la bussola «costoso e invisibile», la premessa si riscrive, e il capitolo si colloca prima di «Verifica leggera»: sono la stessa domanda a due stadi — questo lavoro entra nel tracker, e poi quanta cerimonia gli serve.\n\nModifica solo documentale: nessuno script, nessun campo di schema.\n\nSpec: docs/superpowers/specs/2026-08-10-harness-regole-e-default-design.md §1\nPiano: docs/superpowers/plans/2026-08-10-harness-regole-e-default.md, Task 1",
-      "status": "done",
-      "tier": "reasoning",
-      "depends_on": [],
-      "validation": {
-        "state": "pass",
-        "criteria": "Verifica indipendente, 7/7 criteri soddisfatti. (1) skills/harness/SKILL.md:178 porta '## Cosa diventa una issue'; l'elenco degli heading e' Tier -> Cosa diventa una issue -> Verifica leggera (indexOf: compass < light). (2) grep della vecchia clausola 'ogni pezzo di lavoro e' una issue tracciata' su SKILL.md: nessuna occorrenza; la premessa e' quella nuova del piano. (3)(4) I tre blocchi markdown del Task 1 del piano (premessa nuova, capitolo, raccordo) sono presenti VERBATIM in SKILL.md (confronto programmatico blocco-per-blocco: true/true/true; il blocco della vecchia premessa: assente, come atteso): il capitolo enuncia 'costoso e invisibile' con entrambe le meta', i quattro passi numerati per il lavoro che emerge a meta', e il paragrafo 'Sotto il tracker c'e' un livello a grana fine ... Harness non prescrive come lo produci'. (5) Diff del solo capitolo 'Verifica leggera' fra HEAD e working tree: rimuovendo le due righe di raccordo il testo e' byte-identico a HEAD (28 -> 31 righe, nessuna riga riscritta o mangiata). (6) test/plugin-skill.test.mjs: test nuovo 'the skill says which work becomes an issue at all' aggiunto in fondo, verbatim rispetto al piano, nessun test esistente modificato (git diff: solo 30 righe aggiunte in coda). (7) Gate: npm run test -> exit 0, 282 tests / 282 pass / 0 fail; il test nuovo passa. Nessun file modificato dal verificatore; git status --short: solo issues.json, skills/harness/SKILL.md, test/plugin-skill.test.mjs. Fuori scope (non bloccante): il working tree di issues.json contiene anche la issue nuova 7619689e (gate documentale del commit board 06a2576), estranea a questo Task 1.",
-        "tasks": []
-      },
-      "created_at": "2026-08-10T13:43:55Z",
-      "updated_at": "2026-08-10T14:09:56Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "5b994254-c97b-425f-bef3-76c72154c037",
-      "title": "Un criterio dev'essere controllabile con gli accessi del verificatore",
-      "description": "references/issues.md chiede che ogni criterio sia «verificabile da un altro agente che non ha visto la conversazione». Non dice che quell'agente ha l'ambiente del worker e non di piu'.\n\nSu quel vuoto si e' rotta la issue [F2.3] del primo consumer: un criterio chiedeva di ispezionare un agent Jenkins irraggiungibile, il verificatore ha bloccato correttamente, e la issue si e' sbloccata solo con una riformulazione firmata dal committente. Un ciclo di blocked piu' una firma, senza niente che impedisse al caso di ripresentarsi al criterio successivo.\n\nEntrano la regola in issues.md e il protocollo in verification.md: l'artefatto committato che dichiara la propria revisione, le quattro voci della richiesta a chi puo' eseguirla, e chi firma la riformulazione.\n\nModifica solo documentale.\n\nSpec: docs/superpowers/specs/2026-08-10-harness-regole-e-default-design.md §2\nPiano: docs/superpowers/plans/2026-08-10-harness-regole-e-default.md, Task 2",
-      "status": "done",
-      "tier": "reasoning",
-      "depends_on": [],
-      "validation": {
-        "state": "pass",
-        "criteria": "PASS su tutti e 7 i criteri. (1) skills/harness/references/issues.md:351-355 aggiunge il bullet «e dev'essere controllabile **con gli accessi che il verificatore ha**: il suo ambiente e' quello del worker, non di piu'... Si riformula su un artefatto che entra nel repository: [verification.md](verification.md);». Il link risolve: skills/harness/references/verification.md esiste su disco, e il test 'cross-links between reference files resolve too' (test/plugin-skill.test.mjs:59-69, che estrae i link .md relativi e ne fa existsSync) lo copre ed e' verde. (2) verification.md:76 ha l'heading esatto '## Quando la prova sta fuori dalla portata dell'agent'; i soli '## ' del file mostrano che il capitolo sta fra 'Cosa rende una verifica reale' (68) e 'Perche' non c'e' piu' un hook' (122), la posizione chiesta dal piano. (3) verification.md:78-81: «La prova e' *impossibile* da raccogliere dall'ambiente di lavoro - non soltanto scomoda. Se e' scomoda, si fa.» (4) verification.md:90-94, tabella con le tre proprieta': committato / dichiara su quale revisione e' stato misurato / porta le righe decisive verbatim, piu' un puntatore alla fonte. (5) verification.md:96-104, elenco numerato introdotto da 'ha quattro voci, tutte obbligatorie' con Cosa lanciare, Cosa serve indietro, Su cosa si prosegue intanto, Perche' non si puo' fare da qui. (6) verification.md:115-120: «La riformulazione la **firma il committente**, mai il worker a cui gioverebbe» e «E' l'**eccezione disciplinata** al divieto - scritto in [SKILL.md](../SKILL.md) - di declassare a posteriori i criteri»; il divieto referenziato esiste davvero (skills/harness/SKILL.md:241) e ../SKILL.md risolve. (7) test/plugin-skill.test.mjs:144-182 aggiunge 'a criterion must be checkable with the verifier's own access' che asserisce i criteri 1, 2, 5 e 6; nel run e' verde. GATE: npm run test -> EXIT=0, tests 283, pass 283, fail 0. FEDELTA' AL PIANO: i tre blocchi inseriti (bullet di issues.md, capitolo di verification.md, test) combaciano VERBATIM col testo atteso in docs/superpowers/plans/2026-08-10-harness-regole-e-default.md Task 2: confronto programmatico dei fenced block del piano contro i file, EXACT MATCH su tutti e tre. NIENTE TESTO MANGIATO: git diff --numstat da 5/0, 46/0, 40/0 sui tre file, sole aggiunte e zero righe rimosse. COLLATERALI: git status --short elenca solo issues.json piu' i tre file in scope; il diff di issues.json e' unicamente la transizione backlog->in_review e i timestamp. Il verificatore non ha modificato nessun file.",
-        "tasks": []
-      },
-      "created_at": "2026-08-10T13:43:55Z",
-      "updated_at": "2026-08-10T14:16:44Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "11e3060d-6efa-45b0-8b43-f0057015c46d",
-      "title": "Il board esce dal clock-in: si avvia su richiesta, non da solo",
-      "description": "Il passo 4 di 'Clock in' impone di avviare il board. Il primo consumer esterno ha fatto l'opposto, per iscritto, e con una misura: in una sessione il processo e' morto tre volte, dopo circa 50, 25 e 16 minuti — durate diverse, quindi non un timeout da configurare — lasciando ogni volta un URL annunciato come attivo e gia' morto. In una sessione successiva ha retto 55 minuti. L'instabilita' non e' sistematica, il che e' la cosa peggiore.\n\nIl board resta e non viene deprecato: smette di essere un passo obbligatorio. Il riepilogo di status-cli diventa l'unico passo di visibilita' del clock-in, perche' e' testo e non dipende da un processo che deve sopravvivere fra i turni.\n\nDipende dalla issue della bussola: tocca lo stesso SKILL.md, e le due non vanno lavorate in parallelo.\n\nSpec: docs/superpowers/specs/2026-08-10-harness-regole-e-default-design.md §3\nPiano: docs/superpowers/plans/2026-08-10-harness-regole-e-default.md, Task 3",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [
-        "5a1636cd-6379-4c14-b14f-fd75fd5becaa"
-      ],
-      "validation": {
-        "state": "pass",
-        "criteria": "npm run test: 284/284 pass, incluso 'the board is a tool you ask for, not a clock-in step' e i test di reference esistenti ('every reference link in SKILL.md resolves to a file that exists', 'every reference file is reachable from SKILL.md', ancora verdi con board.md linkato dal capitolo Reference a SKILL.md:310). SKILL.md: passo 4 'Board' rimosso da Clock in, passi 5/6 rinumerati 4/5 senza buchi (righe 29-40), passo 4 'Stato del tracker' aggiunge la frase attesa sull'essere l'unico passo di visibilita'. Clock out reso condizionale (righe 292-293). board.md: rimossa 'al clock-in, automaticamente' dal ciclo di vita, Avvio e Stop resi condizionali, aggiunta sezione '## Perche non parte da solo' (righe 104-123) con le durate 50/25/16/55 minuti, testo verbatim uguale al piano/spec §3. Diff confrontato riga per riga con Task 3 del piano 2026-08-10-harness-regole-e-default.md e con la spec §3: nessuna divergenza. Capitolo 'Cosa diventa una issue' (righe 178-218, fra Tier e Verifica leggera) confermato non toccato dal diff. git diff limitato a skills/harness/SKILL.md, skills/harness/references/board.md, test/plugin-skill.test.mjs, issues.json (solo transizione di stato via issue-manager).",
-        "tasks": []
-      },
-      "created_at": "2026-08-10T13:44:30Z",
-      "updated_at": "2026-08-10T14:20:49Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "ac6892cb-b314-4fa1-93c0-25066808d550",
-      "title": "Il board muore se la directory del progetto e' un path 8.3",
-      "description": "Il gate `npm run test` e' rosso su HEAD: `test/plugin-board.test.mjs` -> \"a change to issues.json is pushed to the browser\" fallisce, e non per un evento mancato. Il server viene abortito da libuv.\n\nIl test crea il progetto temporaneo con `os.tmpdir()`, che su Windows puo' tornare la forma 8.3 (`C:\\Users\\DIEGO_~1\\...`). `fs.watch()` su una directory in forma corta fa abortire il processo: `Assertion failed: !_wcsnicmp(filename, dir, dirlen), file src\\win\\fs-event.c, line 72`, exit 9. Sullo stesso scenario con path lungo il watcher emette gli eventi e il processo esce 0.\n\nNon e' un difetto del test: e' il board che muore. Un progetto che vive sotto un path corto oggi ottiene un URL annunciato vivo e un server gia' morto — lo stesso sintomo che la issue del board fuori dal clock-in documenta.\n\nFix: `resolveProjectDir` in `scripts/board-server.mjs` normalizza la directory con `realpathSync.native()` dopo il controllo di esistenza, cosi' il watcher riceve sempre la forma lunga. Chi scrive puo' continuare a usare il path corto: provato, gli eventi arrivano lo stesso.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [],
-      "validation": {
-        "state": "pass",
-        "criteria": "1) scripts/board-server.mjs:41-60 resolveProjectDir() ritorna realpathSync.native(dir) dopo existsSync/statSync, dentro un try/catch che ricade sul dir dato (normalizzazione non fatale); quel valore e' l'unico usato da watch(projectDir) alla riga 165, da issuesFilePath alla riga 117 e dalla riga di avvio alla riga 194. 2+3) Probe manuale su path 8.3 reale (qui os.tmpdir() e' gia' corto: C:/Users/DIEGO_~1/AppData/Local/Temp). Server avviato con --project-dir sulla forma corta .../DIEGO_~1/.../probe-board-V3s91v: la riga JSON di avvio riporta projectDir = C:/Users/diego_martignoni/AppData/Local/Temp/probe-board-V3s91v (forma lunga); dopo una scrittura su issues.json arriva l'evento SSE 'event: issues' (true) e il processo resta vivo (exitCode null). Stesso probe contro il board-server.mjs di HEAD (pre-fix): 'Assertion failed: !_wcsnicmp(filename, dir, dirlen), file src/win/fs-event.c, line 72', nessun evento, exitCode 3221226505 (0xC0000409). 4) test/plugin-board.test.mjs:245 \"a project directory given as an 8.3 short path does not kill the board\" gira davvero su questa macchina, non e' skipped: node --test --test-name-pattern -> tests 1, pass 1, skipped 0. Contro il sorgente pre-fix (copia del repo in tmp con scripts/board-server.mjs preso da git show HEAD:) fallisce: fail 1, AssertionError 'the announced path must be the canonical one', actual C:/Users/DIEGO_~1/AppData/Local/Temp/harness-board-e6kywr vs expected la forma lunga. 5) Gate `npm run test`: tests 281, pass 281, fail 0, cancelled 0, skipped 0, todo 0, duration_ms 17147, exit 0. Collaterali: git status --short elenca solo issues.json, scripts/board-server.mjs, test/plugin-board.test.mjs; nessun file untracked; nessun segreto nel diff. Verificatore: nessun file modificato oltre questa chiusura.",
-        "tasks": []
-      },
-      "created_at": "2026-08-10T13:56:55Z",
-      "updated_at": "2026-08-10T14:05:46Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "7619689e-c007-4f0a-a94a-d253da55bcea",
-      "title": "board.md non dice che il server canonicalizza la directory del progetto",
-      "description": "Gate documentale del commit \"fix: canonicalise the board's project dir before watching it\", che ha toccato `scripts/board-server.mjs`.\n\nDa quel commit `resolveProjectDir()` normalizza la directory con `realpathSync.native()`, quindi il `projectDir` della riga di avvio non e' piu' il path passato in `--project-dir` ma la sua forma canonica. `references/board.md` e il comando `/harness:board` continuano a descrivere il controllo su `projectDir` come un confronto con quello che si e' passato: chi passa un path 8.3 vede tornare una stringa diversa da quella che ha scritto e non trova scritto da nessuna parte che e' voluto.\n\nC'e' anche un fatto nuovo da registrare: `fs.watch()` su una directory in forma 8.3 non fallisce, fa abortire il processo da libuv (`!_wcsnicmp(filename, dir, dirlen)`, `src\\win\\fs-event.c`). E' un candidato concreto come causa dell'instabilita' che la sezione \"Perche' non parte da solo\" documenta, e va scritto li' vicino invece di restare in un messaggio di commit.\n\nDipende dalla issue che riscrive board.md: toccano lo stesso file e non vanno lavorate in parallelo.",
-      "status": "done",
-      "tier": "economy",
-      "depends_on": [
-        "11e3060d-6efa-45b0-8b43-f0057015c46d"
-      ],
-      "validation": {
-        "state": "pass",
-        "criteria": "Criterio 1 (canonicalizzazione): board.md dichiara esplicitamente che il server canonicalizza la directory ricevuta e che projectDir puo' differire da quanto passato in --project-dir. Esempi dati: path 8.3 torna in forma lunga, link simbolici nella destinazione. Verificato nelle righe 30-35.\n\nCriterio 2 (abort libuv): la sezione 'Perche' non parte da solo' cita l'abort di libuv su path 8.3 come causa nota e chiusa, senza dichiararla l'unica. Il testo spiega che NON spiega le tre morti elencate (50, 25, 16 minuti) perche' l'abort scatta alla prima scrittura su issues.json, non dopo 50 minuti. Afferma che resta almeno una causa non identificata. Verificato nelle righe 122-127.\n\nCriterio 3 (controllo projectDir): il testo non contraddice il comando /harness:board. Dichiara esplicitamente 'Il controllo resta quello — guardare projectDir prima di annunciare l'URL — solo che si fa su un valore canonico'. Verificato nella riga 32-33.\n\nCriterio 4 (gate): npm run test eseguito. 284 test passati, exit code 0. Output completo: 'ℹ tests 284 / ℹ pass 284 / ℹ fail 0'.\n\nTutti i criteri soddisfatti. Nessuna modifica fuori scope del lavoro documentale.",
-        "tasks": []
-      },
-      "created_at": "2026-08-10T14:06:55Z",
-      "updated_at": "2026-08-10T14:25:25Z",
-      "covers": [],
-      "tasks": []
-    },
-    {
-      "id": "aa9a07bf-0611-400e-b22a-fd0a9ff6cb40",
-      "title": "covers nello schema della issue, e la migrazione 1 -> 2",
-      "description": "Aggiunge alla issue il campo covers: array di riferimenti git che quella issue dichiara di coprire. E' il dato su cui il gate documentale decide, e senza di lui il gate non ha niente da leggere.\n\nGenerale e non specifico delle docs: qualunque issue puo' dichiarare una revisione, e il gate chiede solo che qualcuno la nomini. Assente vale [], null non e' ammesso, validazione volutamente lasca (stringhe non vuote, niente duplicati): harness non e' una libreria git, e un riferimento sbagliato viene riportato come irrisolto invece che rifiutato.\n\nSCHEMA_VERSION passa da 1 a 2 con la migrazione che materializza covers: [] dove la chiave manca, come la 0 -> 1 ha fatto con depends_on.\n\nTask 1 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md, che porta il codice esatto, i test e le tre aspettative esistenti da aggiornare.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [],
-      "covers": [],
-      "validation": {
-        "criteria": "npm run test esce 0: 292/292 pass, 0 fail (comando: npm run test). --insert con covers:[\"a1b2c3d\"] su tracker temp -> ok:true, data.covers=[\"a1b2c3d\"]. --insert senza covers -> ok:true, data.covers=[]. --insert con covers:null -> ok:false, code INVALID_INPUT, messaggio \"'covers' must be an array of git references. Pass [] to clear it.\". Tutti e tre lanciati su --project-dir temporaneo (mai su issues.json della radice). SCHEMA_VERSION=2 in scripts/issue-manager.mjs (grep confermato); --upgrade su tracker temp senza schema_version -> {ok:true,data:{from:0,to:2,migrated:0}}, file scritto con schema_version:2. references/issues.md documenta covers sia nello schema JSON di riferimento (blocco a fine file) sia nella tabella \"campi accettati in input\" (riga covers | array | opzionale | opzionale). Il rimando al gate in issues.md (righe 306-318) nomina docs-gate.mjs come testo/inline-code, MAI come link markdown [..](docs-gate.md); references/docs-gate.md infatti non esiste ancora sul filesystem, confermato con Glob. git status dopo le prove sul probe temporaneo mostra solo le 4 modifiche gia' presenti nel working tree (issues.json, scripts/issue-manager.mjs, skills/harness/references/issues.md, test/plugin-issue-manager.test.mjs), nessun file aggiuntivo toccato dal verificatore.",
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-11T14:53:29Z",
-      "updated_at": "2026-08-11T15:10:51Z",
-      "tasks": []
-    },
-    {
-      "id": "3c56866d-6515-49f5-b13f-2b3152409067",
-      "title": "La parte che decide di docs-gate.mjs",
-      "description": "Il cuore del gate documentale, come funzione dei soli dati in memoria: quali file contano come codice (matching dei glob di docsGate), quali revisioni il tracker dichiara, quali commit restano scoperti, e come si stampa il report a 80 colonne.\n\nNessun git, nessun filesystem, nessun processo: la stessa separazione che status-cli.mjs ha gia' fra buildSnapshot e main(). A fine issue il file non e' ancora lanciabile - e' un modulo di funzioni pure con i suoi test, e il guscio arriva dopo.\n\nTask 2 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md. Il codice del piano e' stato eseguito in una cartella temporanea prima di essere scritto: i test passano cosi' come sono.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [
-        "aa9a07bf-0611-400e-b22a-fd0a9ff6cb40"
-      ],
-      "covers": [],
-      "validation": {
-        "state": "pass",
-        "criteria": "npm run test -> tests 305, pass 305, fail 0 (exit 0). node --test test/plugin-docs-gate.test.mjs -> tests 13, pass 13, fail 0. Probe via node -e import('./scripts/docs-gate.mjs'): globToRegExp('**/*.mjs').test('index.mjs')=true, .test('scripts/a/b.mjs')=true; globToRegExp('issues.json').test('issuesXjson')=false. isCodeFile('test/x.mjs', include, exclude) con i default docsGate letti da .harness/config.json = false (exclude vince). declaredRefs su issue backlog/blocked/done con covers=['aaa1111']/['bbb2222']/['ccc3333'] -> ['aaa1111','bbb2222','ccc3333']; issue senza covers legge come []. renderGateReport con project:'activitymanager', window:'finestra da 3a612087 · più vecchia revisione dichiarata' -> tutte le 10 righe misurate con .length, max=80, WIDTH=80, nessuna riga oltre 80. Riga conteggi con 1 commit/1 codice/1 non coperto: '1 commit nella finestra · 1 tocca codice · 1 non coperto' (singolare corretto). git status: solo issues.json (status backlog->in_review, covers:[] aggiunto, timestamp — mossa legittima del worker), scripts/docs-gate.mjs e test/plugin-docs-gate.test.mjs nuovi non tracciati; nessun altro file toccato.",
-        "tasks": []
-      },
-      "created_at": "2026-08-11T14:53:29Z",
-      "updated_at": "2026-08-11T15:16:35Z",
-      "tasks": []
-    },
-    {
-      "id": "76e83448-44df-4cd6-a655-c0503f4c92d7",
-      "title": "Il guscio di docs-gate.mjs: config, git, finestra, uscite",
-      "description": "Quello che la parte pura non poteva provare senza un repository: la lettura di .harness/config.json, la risoluzione dei riferimenti con git rev-parse, la finestra che si autocalibra sulla piu' vecchia revisione dichiarata, e i codici d'uscita.\n\nDue casi che la spec non fissa e che il piano decide: nessuna revisione dichiarata e nessun --since esce 1 (lo script non ha risposto, come un flag sconosciuto), e un config.json mancante esce 1 invece di indovinare i glob.\n\nAttenzione al guard verificato a mano: git log --no-walk senza revisioni ripiega su HEAD in silenzio, quindi oldestCommit([]) deve uscire prima di chiamarlo.\n\nTask 3 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [
-        "3c56866d-6515-49f5-b13f-2b3152409067"
-      ],
-      "covers": [],
-      "validation": {
-        "criteria": "npm run test: exit 0, 320 pass/0 fail/0 skipped. Repo git temporaneo costruito in una directory scratchpad separata dal tracker reale (4 commit A/B/C/D, A il piu' vecchio): con covers=[short sha di A, sha lungo di C, un ref inesistente] lo script stampa 'finestra da <short di A> . piu' vecchia revisione dichiarata' e scandisce 3 commit (B,C,D), non 1 (che sarebbe partendo dal piu' recente dichiarato C) ne' 0 (che sarebbe da HEAD): conferma che la finestra parte dalla piu' vecchia revisione dichiarata. Il ref inesistente compare come '! 1 riferimento dichiarato non risolve: <ref>' con exit 0. Sostituendo covers con lo short sha di D, D smette di comparire tra i NON COPERTI: prova diretta che short sha e long sha risolvono allo stesso commit. In ogni run con commit scoperti trovati l'exit resta 0. Con covers:[] e nessun --since: exit 1 e messaggio che chiede esplicitamente --since. Con docsGate.enabled:false: stdout di una riga sola, exit 0. Con .harness/config.json assente in un repo git valido: exit 1. Con una directory con config.json ma senza repo git: exit 1. In tutti i run (inclusi i due in cui git fallisce: --since su un ref inesistente e ref covers non risolvibile) stderr catturato separatamente e' 0 byte in ogni caso (wc -c). Controllo sui due file toccati (scripts/docs-gate.mjs, test/plugin-docs-gate.test.mjs): conteggio programmatico in Node di String.fromCharCode(0x1f) sul contenuto dei file -> zero occorrenze in entrambi; la costante SEP a scripts/docs-gate.mjs riga 237 e' scritta come sequenza di sei caratteri ASCII (backslash, u, 0, 0, 1, f), non come il byte di controllo vero, confermato per grep e per il conteggio programmatico. Nessun file toccato fuori scope oltre a issues.json (stato e timestamp), scripts/docs-gate.mjs e test/plugin-docs-gate.test.mjs: git status --short confermato. Tutte le prove eseguite su copie in directory temporanee con --project-dir esplicito, nessuna scrittura di prova sul tracker reale.",
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-11T14:53:29Z",
-      "updated_at": "2026-08-11T15:28:15Z",
-      "tasks": []
-    },
-    {
-      "id": "c8cce222-371d-4a3b-9e3e-a23627f5ced0",
-      "title": "references/docs-gate.md e il comando che ci rimanda",
-      "description": "Il contratto del gate va nella reference, non nel comando: e' la stessa divisione che references/status.md ha gia' con /harness:status, ed e' l'unica che raggiunge i lettori che non sono l'utente. Un subagent non ha /harness:docs-gate fra le cose che puo' invocare: legge SKILL.md e segue i link.\n\nLa reference possiede finestra, copertura, risoluzione dei riferimenti, lettura dell'output, canali e codici d'uscita. Il comando resta sottile: lancia, ristampa verbatim, rimanda.\n\nChiude anche il rimando lasciato senza link in issues.md, adesso che il file esiste.\n\nTask 4 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [
-        "76e83448-44df-4cd6-a655-c0503f4c92d7"
-      ],
-      "covers": [],
-      "validation": {
-        "criteria": "npm run test: 320 pass, 0 fail, exit 0. commands/docs-gate.md esiste (untracked) e docs-gate compare in COMMANDS in test/plugin-commands.test.mjs riga 16. skills/harness/references/docs-gate.md esiste ed e linkata dall indice Reference di SKILL.md riga 308. Corpo di commands/docs-gate.md e 2012 caratteri, sotto i 4000, e rimanda alla reference senza riscriverne il contratto (stesso pattern di commands/status.md: lancia, ristampa verbatim, rimanda; la tabella dei codici d uscita non e duplicata, solo il caso piu comune). README.md documenta /harness:docs-gate nella tabella dei comandi in ordine alfabetico dopo compact. In issues.md il rimando a docs-gate.mjs e ora il link markdown a docs-gate.md, riga 315; npm test conferma i cross-link verdi (cross-links between reference files resolve too, every reference file is reachable from SKILL.md). Confronto contenuto/output reale: node scripts/docs-gate.mjs --since 2fc7dcd stampa intestazione su due righe, barra di 82 caratteri, riga dei conteggi, sezione NON COPERTI con separatori, riga di chiusura coperto = una issue lo dichiara in covers: stessa forma dell esempio nella reference (numeri diversi come atteso). Codici d uscita provati: --help esce 0; --project-dir su directory inesistente esce 1 con una riga; nessuna issue con covers e nessun --since esce 1 con una riga che chiede --since esplicito (verificato lanciando lo script reale in sola lettura, nessuna scrittura prodotta, coerente con Non scrive niente nella reference). SKILL.md: il diff tocca solo la voce di indice nel capitolo Reference (riga 308), il capitolo Dopo il commit: gate documentale a riga 280 resta quello vecchio, non toccato. Osservazione fuori scope, non bloccante: in issues.md resta il blockquote Attenzione al rimando che spiega perche il link sotto non c e ancora; ora che il link c e quel blockquote descrive uno stato non piu vero, ma e conforme al piano (Task 4 Step 5 del piano prescrive di sostituire solo la riga del rimando, non di rimuovere il blockquote, e nessun task successivo lo tocca), quindi non e un difetto introdotto da questo lavoro. git status mostra solo i file attesi dal Task 4 (README.md, issues.json, SKILL.md, references/issues.md, test/plugin-commands.test.mjs modificati, commands/docs-gate.md e references/docs-gate.md nuovi) sia prima sia dopo le mie verifiche, nessuna modifica aggiuntiva prodotta dal verificatore.",
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-11T14:53:29Z",
-      "updated_at": "2026-08-11T15:36:28Z",
-      "tasks": []
-    },
-    {
-      "id": "958f86ae-a66a-497d-99da-1ec1194e9b97",
-      "title": "references/sweep.md e il comando che ci rimanda",
-      "description": "Il setaccio dei documenti: rilegge il corpus del progetto per le occasioni che il lavoro ha scoperto, annotato dove stava lavorando, e mai portato nel tracker. Su un progetto reale un audit manuale ne ha recuperate venticinque, di cui otto meritavano una issue.\n\nNessuno script: e' tutto giudizio, e usa --get-all e --insert che esistono gia'. Ma il procedimento vive nella reference, non nel comando: scritto dentro il comando sarebbe invisibile a meta' dei suoi lettori, e farebbe fallire il test che impone a ogni comando di linkare la reference che possiede il contratto.\n\nIl tier e' reasoning perche' qui non c'e' codice a fare da rete: il valore della issue sta interamente in quanto e' scritto bene il procedimento.\n\nTask 5 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md.",
-      "status": "done",
-      "tier": "reasoning",
-      "depends_on": [
-        "c8cce222-371d-4a3b-9e3e-a23627f5ced0"
-      ],
-      "covers": [],
-      "validation": {
-        "criteria": "Gate: npm run test esce 0, tests 320 / pass 320 / fail 0 / skipped 0. Criterio 2: commands/sweep.md esiste (36 righe) e test/plugin-commands.test.mjs riga 16 elenca COMMANDS = board, compact, docs-gate, issue, status, sweep, verify. Criterio 3: skills/harness/references/sweep.md esiste (79 righe) ed e' linkata dall'indice Reference di SKILL.md riga 312 come references/sweep.md; il test che risolve i link fra reference passa. Criterio 4: sweep.md riga 38 dice 'Due controlli, entrambi prima di proporla', riga 40 'la incrocia col tracker, in tutti gli stati. Non solo backlog: un'occasione gia' tracciata e chiusa non e' un'occasione', riga 42 'la verifica contro il codice'; il guscio ripete la regola ai punti 3 di commands/sweep.md righe 24-26. Criterio 5: sweep.md righe 51-52 'Solo cio' che passa la bussola di [SKILL.md](../SKILL.md): se un errore li' sarebbe costoso e invisibile' senza riscriverla, e il capitolo puntato esiste davvero: SKILL.md riga 178 'Cosa diventa una issue', riga 182 'sarebbe costoso e invisibile'; il rifiuto della scorciatoia e' esplicito alle righe 61 ('Le riporta in sessione, e si ferma li') e 69-71 ('Metterle nel tracker come issue di backlog sarebbe la scorciatoia ovvia, e contraddice direttamente la bussola'). Criterio 6: README.md riga 95 documenta /harness:sweep nella tabella dei comandi. Lettura di merito richiesta dal tier reasoning: grep case-insensitive per vocabolario da piano (Task, Step, il/del/nel piano, fase, implementazione, deliverable, milestone) su sweep.md e commands/sweep.md non trova nulla, exit 1; commands/sweep.md resta un guscio (front matter, rimando alla reference con 'leggilo prima di cominciare', cinque passi condensati e una sezione 'Cosa non fare'), mentre motivazioni, 'Quando si lancia' e 'Cosa il setaccio non e'' vivono solo nella reference. git status --short: toccati solo README.md, issues.json, skills/harness/SKILL.md, test/plugin-commands.test.mjs, commands/sweep.md e skills/harness/references/sweep.md; il diff di issues.json contiene solo questa issue. Nessun file modificato dal verificatore.",
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-11T14:53:29Z",
-      "updated_at": "2026-08-11T15:45:22Z",
-      "tasks": []
-    },
-    {
-      "id": "d88b2b87-fea7-4535-95a0-24775cfeb163",
-      "title": "SKILL.md: il gate nomina covers e lo script, e nessuno script resta orfano",
-      "description": "Il capitolo 'Dopo il commit: gate documentale' descrive oggi un controllo a occhio. Diventa due cose: la issue docs si apre dichiarando in covers la revisione che copre, e docs-gate.mjs e' come ci si accorge che il promemoria e' saltato. Piu' una riga sul setaccio.\n\nE l'asimmetria che manca: plugin-skill.test.mjs impedisce la reference orfana, ma niente impedisce lo script orfano. Che oggi siano tutti nominati e' una disciplina, non un invariante - e senza, docs-gate.mjs potrebbe finire invisibile proprio a chi legge la skill. Il test nuovo passa gia' su tutti e sei: e' una disciplina che diventa invariante.\n\nTask 6 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [
-        "c8cce222-371d-4a3b-9e3e-a23627f5ced0",
-        "958f86ae-a66a-497d-99da-1ec1194e9b97"
-      ],
-      "covers": [],
-      "validation": {
-        "criteria": "npm run test esce 0 (322 pass, 0 fail). Il capitolo Dopo il commit: gate documentale nomina covers (dichiarando in covers la revisione che copre) e docs-gate.mjs (node $SCRIPTS/docs-gate.mjs), eseguito davvero: esce con l'errore atteso su covers vuoto, comportamento corretto dello script. SKILL.md rimanda a references/docs-gate.md e a references/sweep.md dal corpo del capitolo (righe 301 e 305), distinti dalle voci gia' esistenti nell'indice Reference (righe 326 e 330, non duplicate). Esiste il test every CLI script the plugin ships is named where an agent will read it in test/plugin-skill.test.mjs che confronta ogni file scripts/*.mjs col corpus di SKILL.md + references/*.md. Verificato che morde: copiata la repo in una directory temporanea (mai il repo reale), creato scripts/__probe.mjs vuoto e rilanciato node --test test/plugin-skill.test.mjs nella copia: il test e' andato rosso con AssertionError 'scripts/__probe.mjs exists but neither SKILL.md nor any reference names it', poi la directory temporanea e' stata rimossa. Il test passa su tutti e sei gli script reali (board-server.mjs, docs-gate.mjs, harness-config.mjs, harness-worker.mjs, issue-manager.mjs, status-cli.mjs). Nessun vocabolario da piano (Task, Step, il piano, fase) trovato in SKILL.md. Il capitolo Clock out non e' stato toccato (il diff di SKILL.md si ferma prima della sua intestazione). git diff limitato a issues.json (metadati di clock-in), skills/harness/SKILL.md (solo il capitolo del gate documentale, 21 righe aggiunte 3 rimosse) e test/plugin-skill.test.mjs (due test nuovi).",
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-11T14:53:29Z",
-      "updated_at": "2026-08-11T15:50:32Z",
-      "tasks": []
-    },
-    {
-      "id": "8d3f4db5-fffb-4d13-9804-990ebd2da31d",
-      "title": "Il giudizio esce da /harness:issue e /harness:compact",
-      "description": "I due comandi hanno adesso lo stesso difetto che le due reference nuove evitano: il giudizio che sta sopra le primitive - i criteri di qualita' di una issue, il raggruppamento in blocchi da far confermare - vive nel comando, e un agente che arriva dalla skill impara l'esistenza della primitiva senza quella del giudizio. references/issues.md lo dice gia' a meta': nomina il giro che --compact non fa, e non lo descrive.\n\nIl contenuto di giudizio si sposta in issues.md, che gia' possiede le primitive, e i comandi si accorciano.\n\nAttenzione: due test misurano il contenuto di questi comandi e devono restare verdi - la proiezione id/title di compact con la menzione di --page, e il divieto di done/pass in issue. Si sposta il giudizio, non la meccanica.\n\nTask 7 di docs/superpowers/plans/2026-08-11-harness-perdite-tracker.md.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [
-        "aa9a07bf-0611-400e-b22a-fd0a9ff6cb40"
-      ],
-      "covers": [],
-      "validation": {
-        "criteria": [
-          "npm run test esce 0: 322 test, 322 pass, 0 fail (verificato con `npm run test` e con exit code 0 esplicito).",
-          "skills/harness/references/issues.md ha ora la sezione 'Aprire una issue: cosa decide chi la apre' (righe 85-107) che copre criteri/verifica leggera/tier/conferma, e la sezione 'Il giro che --compact non fa' (righe 239-260) che descrive lettura proiettata id/title, paginazione con --page, raggruppamento per argomento e conferma esplicita prima di chiamare la primitiva.",
-          "test 'the compact command projects id and title when it reads the done issues' verde: eseguito con `node --test --test-name-pattern=... test/plugin-commands.test.mjs`, 1 pass 0 fail.",
-          "test 'the issue command cannot close an issue' verde: eseguito con `node --test --test-name-pattern=... test/plugin-commands.test.mjs`, 1 pass 0 fail.",
-          "corpi (post-frontmatter, stesso stripper del test) piu' corti: commands/issue.md HEAD=3993 caratteri -> working=3448 (-545); commands/compact.md HEAD=3376 -> working=2887 (-489). Confrontato con `git show HEAD:commands/issue.md` e `git show HEAD:commands/compact.md`."
-        ],
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-11T14:53:29Z",
-      "updated_at": "2026-08-11T15:59:00Z",
-      "tasks": []
-    },
-    {
-      "id": "a741fbbe-9bde-4777-bebf-75f8516bac33",
-      "title": "Gate documentale dei quattro commit di codice di docs-gate, covers e board",
-      "description": "I quattro commit dichiarati in covers sono i soli scoperti su questo branch: due su scripts/docs-gate.mjs, uno su issue-manager.mjs (covers e migrazione 1 -> 2), uno su board-server.mjs (canonicalizzazione della project dir). I documenti che li descrivono esistevano gia' — references/docs-gate.md, issues.md, board.md — quindi il debito non era documentazione mancante ma documentazione mai riletta contro il codice.\n\nEsito della rilettura: docs-gate.md e board.md non avevano niente da correggere, e le affermazioni su covers in issues.md valgono tutte. La discrepanza su schema_version e' stata risolta su ENTRAMBI i lati, perche' la frase originale era insoddisfacibile: 'in cima' e 'accanto a last_updated' coincidono solo nel seed di --init, dove last_updated e' la seconda chiave, e mai su un tracker che porti un project. Quindi --upgrade ora ricostruisce l'oggetto radice e scrive la chiave in testa in modo deterministico, con un test che lo blocca; e la reference smette di promettere l'adiacenza, dichiarando che un tracker migrato prima della correzione la porta in coda ed e' legale cosi'. issues.json di questo repository e' esattamente quel caso: nessun comando legge la posizione.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [],
-      "covers": [
-        "61837295b3c476f4fdf048f3800527dd51b8948c",
-        "8ffd0d7288479be18fb4b13a09ce1d40cd383971",
-        "43f1557c621408e7074290a93a5b0f3c3d90975f",
-        "06a2576c3da897594e6a785e308817d888eacb86"
-      ],
-      "validation": {
-        "criteria": [
-          "C1 pass: docs-gate.mjs senza argomenti esce 0, stampa 'finestra da 06a2576c . piu vecchia revisione dichiarata', 17 commit / 3 toccano codice / 0 non coperti; i 4 SHA di covers risolvono e sono nella finestra.",
-          "C2 pass: temp dir con radice {project,last_updated,rules,issues} senza schema_version; --upgrade {from:0,to:2} lascia [schema_version,project,last_updated,rules,issues], come afferma issues.md: prima chiave, resto invariato.",
-          "C3 pass: tutte e 10 le righe provate. Uscita 0: report con 50 scoperti, --help, enabled:false. Uscita 1 (una riga): covers vuoto senza --since, --since deadbeef, project-dir inesistente, config mancante, config JSON rotto.",
-          "C3 (seguito): uscita 1 anche su issues.json JSON rotto, directory non-git, git rimosso dal PATH (git non e disponibile: spawnSync git ENOENT), flag --bogus. Codice osservato = codice dichiarato, caso per caso.",
-          "C4 pass: board.md:30 e board-server.mjs:53 concordano su realpathSync.native con fallback al path dato; server avviato su un path 8.3 (DIEGO_~1) stampa projectDir lungo, resta ALIVE dopo un --insert e serve la nuova issue.",
-          "C5 pass: npm run test -> tests 323, pass 323, fail 0, exit 0. git status --short invariato (issues.json, issue-manager.mjs, references/issues.md, plugin-issue-manager.test.mjs): nessun file toccato dal verificatore."
-        ],
-        "state": "pass",
-        "tasks": []
-      },
-      "created_at": "2026-08-12T08:11:30Z",
-      "updated_at": "2026-08-12T08:26:29Z",
-      "tasks": []
-    },
-    {
-      "id": "3a030d2b-e1d4-45e1-9075-6b9e55568b20",
-      "title": "Il modello npm non lascia trappole ne' un secondo numero di versione",
-      "description": "publish.yml e' stato cancellato in ec832c6: nessun workflow reagisce ai tag v* e taggare non pubblica niente. Restano tre residui, e il primo e' quello che costa: CONTRIBUTING.md avverte ancora di una pubblicazione npm al tag, spaventando chi rilascia con un pericolo inesistente.\n\nGli altri due in package.json: version 0.5.1 accanto ai manifest che dicono 0.6.0, cioe' due numeri di versione di cui uno non significa niente; e files piu' publishConfig, la superficie di pubblicazione di un pacchetto che nessuno pubblica. Togliere version e' sicuro, nulla lo legge. Il lucchetto e' private: true.\n\nIl test 'every path listed in files exists on disk' legge proprio il campo files: va sostituito, non cancellato, altrimenti la pulizia fa sparire un test invece di rimpiazzarlo.\n\nFirma del committente, 2026-08-12: il criterio 'npm publish --dry-run rifiuta perche' il pacchetto e' privato' e' stato RIMOSSO su sua decisione, perche' inverificabile. Su npm 11.8.0 --dry-run ignora private: costruisce il tarball, stampa 'Publishing to registry (dry-run)' ed esce 0, e il controllo scatta solo alla pubblicazione vera. Nel repository esce 1, ma per il version assente. Restano quattro criteri.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [],
-      "covers": [],
-      "validation": {
-        "state": "pass",
-        "criteria": "Verifica indipendente 2026-08-12, branch chore/close-the-npm-chapter, lavoro nel working tree (4 file: CONTRIBUTING.md, package.json, test/smoke.test.mjs, issues.json). [1] package.json non contiene piu' version, files ne' publishConfig (letto il file: campi assenti, aggiunto private: true); `npm ci` esce 0 ('up to date, audited 1 package'), poi `npm run test` esce 0. PASS. [2] .github/workflows/ contiene solo ci.yml (`ls`), che ha `on: push:` + `pull_request:` e nessun trigger su tag ne' step di publish; publish.yml assente. CONTRIBUTING.md non avverte piu' di pubblicazione npm al tag: il blocco WARNING su publish.yml e' rimosso e sostituito da 'Tagging publishes nothing.' (CONTRIBUTING.md:50-53). PASS. Osservazione fuori criterio: un `on: push:` senza filtri in GitHub Actions scatta anche sul push di un tag, quindi la frase 'it runs on pushes and pull requests, not on tags' (CONTRIBUTING.md:50-51) e' imprecisa; ci.yml esegue solo test, non pubblica, quindi 'Tagging publishes nothing' resta vero. [3] Conteggio test: baseline 62e9bd3 estratto con `git archive 62e9bd3 | tar -x` in directory temporanea e eseguito `node --test` -> tests 323 / pass 323. Working tree corrente -> tests 323 / pass 323 / fail 0. Nessun calo. Il test 'every path listed in files exists on disk' e' stato sostituito da 'package.json declares no npm publishing surface' (test/smoke.test.mjs:39), che asserisce private === true e version/files/publishConfig === undefined; i nomi dei test restano 5 prima e dopo. PASS. [4] Gate .harness/config.json verify = 'npm run test': exit 0, 'tests 323, pass 323, fail 0, duration_ms 22099'. PASS. Danni collaterali: `git status --short --untracked-files=all` mostra solo i 4 file attesi, nessun untracked; il diff di issues.json contiene solo il record di questa issue e last_updated; nessun segreto nel diff. Corroborato in directory temporanea (mai nel repo, mai senza --dry-run) il fatto alla base della rimozione del quinto criterio: su npm 11.8.0 `npm publish --dry-run` con private: true costruisce il tarball, stampa 'Publishing to registry ... (dry-run)' ed esce 0.",
-        "tasks": []
-      },
-      "created_at": "2026-08-12T08:38:54Z",
-      "updated_at": "2026-08-12T08:51:03Z",
-      "tasks": []
-    },
-    {
-      "id": "d56925cd-2096-463c-bc92-8c75c6612954",
-      "title": "I due array di task nello schema, e la migrazione 2 -> 3",
-      "description": "Lo schema della issue guadagna due array: `tasks` per l'esecuzione e `validation.tasks` dentro `validation` per il giudizio. Sono la decomposizione della prosa alla grana a cui l'agente lavora davvero; `description` e `validation.criteria` restano invariati e restano prosa.\n\nPiano: docs/superpowers/plans/2026-08-12-harness-continuita-del-lavoro.md, Task 1. Spec: docs/superpowers/specs/2026-08-10-harness-continuita-del-lavoro-design.md, §2 e §7.\n\nSCHEMA_VERSION va a 3 e la migrazione si accoda a MIGRATIONS senza rinumerare le voci esistenti. Entrambi gli array si materializzano a [] come depends_on e covers; una validation a null non ne guadagna uno, perché non c'è dove metterli.\n\nUn --update che non nomina validation.tasks li conserva: il payload di chiusura è {criteria, state}, e senza questa regola ogni chiusura cancellerebbe la checklist che ha appena giudicato. Per svuotarli si passa \"tasks\": [] esplicito.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [],
-      "covers": [],
-      "tasks": [],
-      "validation": {
-        "criteria": "RI-VERIFICA DOPO IL DELTA (messaggio del campo ignoto dentro validation).\nGATE: npm run test -> EXIT=0, tests 337 / pass 337 / fail 0 / skipped 0. Il test nuovo \"the message for an unknown validation field names every field that is allowed\" e eseguito e verde (gate log riga 238).\nDELTA CONTENUTO: git diff -U0 mostra un solo hunk in piu rispetto alla verifica precedente in scripts/issue-manager.mjs (@@ -525 +694,2 @@), e nel test file la coda passa da +2356,302 a +2359,314 (un test nuovo, 12 righe). Nessun altro hunk cambiato, nessun file nuovo: git status --short resta issues.json, scripts/issue-manager.mjs, test/plugin-issue-manager.test.mjs.\nMESSAGGIO: scripts/issue-manager.mjs:694-695 deriva ora la lista da allowedValidationFields.join(\", \"). Probe su tracker temp (--project-dir, --init): validation con campo owner -> {ok:false, code INVALID_INPUT, \"Unknown field(s) in validation object: owner. Allowed fields: criteria, state, tasks.\"}. Il messaggio top-level e invariato e gia elencava tasks.\nCRITERI RICONTROLLATI DOPO IL DELTA: (2) --insert con validation:null -> validation null, tasks []; nessun oggetto inventato. (5) tracker temp v2 -> --upgrade {from:2,to:3,migrated:2}, validation null resta null, l altra guadagna validation.tasks:[]; secondo giro {from:3,to:3,migrated:0} e cmp: BYTE-IDENTICI. Regola di merge: --update {status:done, validation:{criteria,state}} conserva tasks [id1] e validation.tasks [id2] e porta state a pass.\nVERIFICA PRECEDENTE (invariata, codice non toccato in quei punti): (1) insert verbatim + get identico; (3) id non intero/stringa/0, id duplicato, checked non booleano, campo extra, campo mancante, tasks non-array -> tutti INVALID_INPUT, su tasks e su validation.tasks; (4) short_title 61 e full_description 1201 -> LIMIT_EXCEEDED (60 e 1200 accettati), 200 task per array accettati; (6) --compact archivia l originale con tasks e validation.tasks interi e scrive [] su entrambi nel blocco; (7) 14 test nuovi in test/plugin-issue-manager.test.mjs piu i due preesistenti aggiornati senza indebolirli.\nDanni collaterali: nessuno. Tutti i probe su copie in scratchpad con --project-dir esplicito, mai sul tracker reale; il verificatore non ha modificato alcun file oltre a questa chiusura, e non ha fatto commit.\nFuori scope (non blocca): il tracker di questo repo resta a schema_version 2 con 42 issue senza tasks (--upgrade su se stesso e un atto separato, come il commit 59885c1 per la v2); skills/harness/references/issues.md documentera i campi nuovi in Task 3 del piano. Nota di stato: alla riconsegna la issue risultava status in_review ma validation.state ancora \"pass\" (la lista originale dei criteri era gia stata sostituita dall evidenza della prima chiusura, come vuole il campo).",
-        "tasks": [],
-        "state": "pass"
-      },
-      "created_at": "2026-08-12T09:27:25Z",
-      "updated_at": "2026-08-12T09:49:47Z"
-    },
-    {
-      "id": "cf74ee9d-14b4-4463-bb6d-e03df0da004b",
-      "title": "I tre guard sui task, e il flag --decomposition-unchanged",
-      "description": "I tre punti in cui questa spec smette di consigliare e rende impossibile: un worker non spunta ciò che lo giudica, una issue in volo dichiara come ci arriva, e la prosa non si allontana dalla propria decomposizione.\n\nPiano: docs/superpowers/plans/2026-08-12-harness-continuita-del-lavoro.md, Task 2. Spec: docs/superpowers/specs/2026-08-10-harness-continuita-del-lavoro-design.md, §3.1, §3.2, §3.3.\n\nIl confronto dell'aggiornamento appaiato guarda id, short_title e full_description, mai checked: spuntare un task è avanzamento, non una nuova decomposizione, e una regola che chiedesse il flag a ogni spunta verrebbe risposta col flag a ogni chiamata. Per lo stesso motivo la prima materializzazione è esente (non c'è ancora una decomposizione da cui divergere) e sul lato validazione il guard vale solo finché state è unknown, perché alla chiusura criteria porta l'evidenza e non più il contratto.",
-      "status": "done",
-      "tier": "reasoning",
-      "depends_on": [
-        "d56925cd-2096-463c-bc92-8c75c6612954"
-      ],
-      "covers": [],
-      "tasks": [
-        {
-          "id": 1,
-          "short_title": "I test rossi dei tre guard",
-          "full_description": "In test/plugin-issue-manager.test.mjs: FORBIDDEN_ROLE sulla spunta di validation.tasks da worker, spunta dei propri tasks permessa, in_progress senza task su insert e update, aggiornamento non appaiato, le tre esenzioni. node --test test/plugin-issue-manager.test.mjs: rossi.",
-          "checked": true
-        },
-        {
-          "id": 2,
-          "short_title": "Il guard di ruolo si estende a validation.tasks",
-          "full_description": "In enforceRolePolicy, dopo il blocco su state pass: rifiuta FORBIDDEN_ROLE se il payload porta una voce di validation.tasks con checked true. Aggiornare il paragrafo Role guard nell'intestazione e in showHelp.",
-          "checked": true
-        },
-        {
-          "id": 3,
-          "short_title": "enforceTasksForProgress sulla transizione",
-          "full_description": "Nuovo helper: in_progress con tasks vuoto fallisce INVALID_INPUT. Su insert sempre; su update SOLO quando il payload porta status, non sullo stato risultante. Leggere lo stato risultante rifiuterebbe ogni update a una issue gia' in volo senza task, comprese quelle scritte prima del campo: record non piu' modificabili, che non e' cio' che significa dichiarare i passi prima di partire. I task invece si leggono dal merge, cosi' chi li ha gia' parte senza rispedirli.",
-          "checked": true
-        },
-        {
-          "id": 4,
-          "short_title": "decompositionOf e enforcePairedUpdate",
-          "full_description": "Il fingerprint ignora checked (id, short_title, full_description). Il guard salta se la decomposizione corrente e' vuota, e sul lato validazione vale solo a state unknown e non su validation null. Rifiuto INVALID_INPUT che nomina quale lato si e' mosso da solo.",
-          "checked": true
-        },
-        {
-          "id": 5,
-          "short_title": "Il flag --decomposition-unchanged",
-          "full_description": "Booleano in parseArgs, passato a updateIssue come terzo argomento, chiamato dopo aver trovato existing. Documentarlo in showHelp: riga d'uso di --update e blocco dei payload.",
-          "checked": true
-        },
-        {
-          "id": 6,
-          "short_title": "Suite verde e passaggio a in_review",
-          "full_description": "npm run test verde. Dodici test esistenti hanno dovuto adattarsi: nove usavano in_progress di passaggio e ora usano blocked, uno lo usa davvero e porta i task, uno svuota validation.tasks e passa il flag, e il fixture del worker esterno nasce con un task.",
-          "checked": true
-        }
-      ],
-      "validation": {
-        "criteria": [
-          "VERDETTO pass (seconda verifica, dopo il fail su intestazione stale). Gate: npm run test -> tests 347, pass 347, fail 0, cancelled 0, skipped 0, todo 0, duration_ms 48985.",
-          "DELTA RI-VERIFICATO: solo commenti in scripts/issue-manager.mjs. git diff -U0 aggiunge due soli hunk rispetto alla verifica precedente, @@ -39,2 +39,4 @@ e @@ -42,0 +45,5 @@, entrambi di sole righe //. L elenco delle righe aggiunte non-commento e non-vuote (120) e delle righe rimosse non-commento e IDENTICO riga per riga a quello gia verificato: enforceRolePolicy, enforceTasksForProgress, decompositionOf, enforcePairedUpdate, le stringhe di showHelp, decomposition-unchanged in parseArgs, updateIssue(issueId, issueData, declaredUnchanged), tasks: mergedTasks. Zero righe eseguibili cambiate. test/plugin-issue-manager.test.mjs e test/plugin-worker.test.mjs invariati (295 e 9 righe nel diffstat, come prima).",
-          "INTESTAZIONE ORA CORRETTA (era il motivo del fail): righe 37-44 nominano il terzo rifiuto — validation.state === pass, status === done, o checked === true su una voce di validation.tasks -> FORBIDDEN_ROLE, con la ragione (checking a criterion that measures your own work is self-validation with a different syntax) e cosa il worker puo ancora fare (in_review, unknown, e spuntare i propri tasks). Righe 46-49: capoverso separato per il rifiuto non di ruolo, in_progress con tasks vuoto, con la precisazione che il controllo e sulla transizione e mai su un update non correlato a una issue gia in volo. Ogni affermazione dell intestazione corrisponde al comportamento provato sotto.",
-          "C1 ok: HARNESS_ROLE=worker + update con validation.tasks[0].checked=true -> ok:false FORBIDDEN_ROLE; stesso payload senza ruolo -> ok:true, checked=true.",
-          "C2 ok: HARNESS_ROLE=worker + update dei propri tasks con checked=true -> ok:true.",
-          "C3 ok: insert {status:in_progress} -> INVALID_INPUT; insert {status:in_progress,tasks:[]} -> INVALID_INPUT; update {status:in_progress} su issue senza task -> INVALID_INPUT; update {status:in_progress,tasks:[]} --decomposition-unchanged -> INVALID_INPUT (il flag non aggira il guard).",
-          "C4 ok: issue con tasks gia presenti, update {status:in_progress} -> ok:true, status=in_progress, tasks=[1] conservati.",
-          "C5 ok: description da sola -> INVALID_INPUT; tasks da soli -> INVALID_INPUT; validation.criteria da soli a state unknown -> INVALID_INPUT; validation.tasks da soli a state unknown -> INVALID_INPUT; description+tasks insieme senza flag -> ok:true.",
-          "C6 ok: gli stessi payload con --decomposition-unchanged -> ok:true. Tre esenzioni senza flag: spunta di validation.tasks a criteria invariati -> ok:true e spunta di tasks a description invariata -> ok:true; prima materializzazione di tasks e di validation -> ok:true; chiusura {status:done, state:pass} -> ok:true e {status:blocked, state:fail} -> ok:true.",
-          "C7 ok: npm run test verde, 347/347.",
-          "DEVIAZIONE DAL PIANO (guard sulla transizione invece che sullo stato risultante): confermata giustificata, e ora anche dichiarata nell intestazione. Nessuna via porta una issue A in_progress senza task.",
-          "OSSERVAZIONE FUORI SCOPE, non blocca e confermata tale: resta possibile svuotare i tasks di una issue gia in_progress con --update {tasks:[]} --decomposition-unchanged (provato: ok:true, status=in_progress, tasks=[]). Il coordinatore la porta come passo di documentazione nella issue 56f1b32c (contratto in references/issues.md); concordo, il flag e un gesto deliberato e non serve un guard in piu.",
-          "LINE ENDING e LARGHEZZA: file interamente LF prima e dopo (CRLF count 0 su HEAD e sul working tree); righe dell intestazione al massimo 99 colonne, dentro la convenzione del file.",
-          "COLLATERALI: git status --short -> solo issues.json, scripts/issue-manager.mjs, test/plugin-issue-manager.test.mjs, test/plugin-worker.test.mjs. Tutte le prove CLI su tracker temporaneo con --project-dir esplicito; nessun record di prova in issues.json del progetto; nessun commit."
-        ],
-        "tasks": [],
-        "state": "pass"
-      },
-      "created_at": "2026-08-12T09:27:25Z",
-      "updated_at": "2026-08-12T10:19:49Z"
-    },
-    {
-      "id": "56f1b32c-a073-4743-b85e-6a06762a885c",
-      "title": "references/issues.md: il contratto dei due array di task",
-      "description": "La reference che possiede lo schema guadagna i due array: forma, limiti, tabella dei campi accettati in input, codici di errore e il flag nuovo.\n\nPiano: docs/superpowers/plans/2026-08-12-harness-continuita-del-lavoro.md, Task 3. Spec: docs/superpowers/specs/2026-08-10-harness-continuita-del-lavoro-design.md, §2.1, §2.2, §7.\n\nIl contratto dei campi nuovi va qui e il flusso va in SKILL.md: e' la lezione di P2 applicata subito, e nulla di tutto questo va dentro un comando.\n\nIl rischio vero e' un numero che diverge da LIMITS: nessun test confronta la reference col codice, e chi legge crede alla reference.\n\nPasso aggiunto dopo la verifica di cf74ee9d: va scritto cosa il guard su in_progress garantisce davvero. Nessuna issue ENTRA in in_progress senza passi dichiarati; che non possa esserne svuotata dopo, da chi passa un array vuoto esplicito piu' il flag, non e' garantito ed e' voluto.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [
-        "cf74ee9d-14b4-4463-bb6d-e03df0da004b"
-      ],
-      "covers": [
-        "23de92d",
-        "ca403c4"
-      ],
-      "tasks": [
-        {
-          "id": 1,
-          "short_title": "Schema e paragrafo dei due array",
-          "full_description": "In references/issues.md: il blocco JSON dello schema con tasks e validation.tasks, e il paragrafo che spiega decomposizione, indicizzazione, perche' i task di validazione stanno dentro validation, i due momenti in cui nascono, e la conservazione in --update.",
-          "checked": true
-        },
-        {
-          "id": 2,
-          "short_title": "Limiti e tabella dei campi in input",
-          "full_description": "Due righe nella tabella dei limiti (60 e 1200) piu' la prosa su caratteri-non-parole e sul tetto generoso. Riga tasks nella tabella dei campi accettati, e riga validation aggiornata. Verificare che 60 e 1200 coincidano con LIMITS.taskTitle e LIMITS.taskDescription.",
-          "checked": true
-        },
-        {
-          "id": 3,
-          "short_title": "Aggiornamento appaiato e le sue tre esenzioni",
-          "full_description": "Il paragrafo del guard appaiato con --decomposition-unchanged, e le tre cose che non rifiuta: spunta, prima materializzazione, chiusura. Sono la definizione del guard, non eccezioni.",
-          "checked": true
-        },
-        {
-          "id": 4,
-          "short_title": "Codici di errore",
-          "full_description": "Estendere le righe INVALID_INPUT, LIMIT_EXCEEDED e FORBIDDEN_ROLE della tabella dei codici coi casi nuovi, e la frase finale su FORBIDDEN_ROLE con la spunta dei validation.tasks.",
-          "checked": true
-        },
-        {
-          "id": 5,
-          "short_title": "Cosa il guard su in_progress garantisce",
-          "full_description": "Scrivere che il tracker garantisce che nessuna issue ENTRI in in_progress senza passi dichiarati, non che non possa esserne svuotata: serve un array vuoto esplicito piu' --decomposition-unchanged, cioe' due gesti deliberati. Emerso dalla verifica di cf74ee9d.",
-          "checked": true
-        },
-        {
-          "id": 6,
-          "short_title": "Comandi, --upgrade, e rilettura del diff",
-          "full_description": "Esempio del flag nella sezione Comandi, migrazione 2 -> 3 nella sezione --upgrade. Poi npm run test verde e rilettura del diff cercando prosa rivolta a chi esegue il piano invece che al lettore.",
-          "checked": true
-        }
-      ],
-      "validation": {
-        "criteria": "npm run test: 347/347 pass (incl. plugin-skill.test.mjs). Numeri: LIMITS.taskTitle=60, LIMITS.taskDescription=1200 in scripts/issue-manager.mjs righe 128,133, coincidono con la tabella Limiti (righe 465-466 di issues.md). Probe CLI su directory temporanea (--project-dir), mai su issues.json reale: (1) tick di un task senza flag e senza toccare description -> accettato (esenzione 'spunta'); (2) description sola senza flag con tasks non vuoti -> INVALID_INPUT; (3) prima materializzazione (tasks:[] -> tasks non vuoto insieme a description) senza flag -> accettata, e descrizione sola con tasks ancora vuoti -> accettata senza flag; (4) chiusura (state unknown->pass con criteria cambiati, validation.tasks invariati) senza flag -> accettata, e validation.tasks non nominato nel payload di chiusura risulta conservato nel --get successivo; (5) --update {status:in_progress} su issue con tasks:[] con --decomposition-unchanged -> rifiutato INVALID_INPUT (il flag non aggira il guard sulla transizione); (6) issue gia' in_progress con tasks non vuoti: {tasks:[]} senza flag -> INVALID_INPUT (guard appaiato), stesso payload con --decomposition-unchanged -> accettato (svuotamento post-ingresso richiede i due gesti deliberati, come dice il paragrafo del task 5). FORBIDDEN_ROLE su spunta di validation.tasks verificato per lettura del codice (issue-manager.mjs righe 755-770) e coincide con la riga aggiunta alla tabella codici e alla prosa finale. Nessun riferimento a 'Task N'/'Step N'/piano-spec specifici di questo sviluppo nel file; le due occorrenze di 'piano' (righe 399, 478) sono terminologia generica gia' usata anche in SKILL.md:190,195, non prosa rivolta al worker del piano di harness. git status --short mostra solo issues.json e skills/harness/references/issues.md modificati, nessun danno collaterale. Nessun file modificato da questo verificatore oltre alla chiusura della issue.",
-        "tasks": [],
-        "state": "pass"
-      },
-      "created_at": "2026-08-12T09:27:25Z",
-      "updated_at": "2026-08-12T10:26:52Z"
-    },
-    {
-      "id": "9fc8151f-450b-49f9-89a7-9552d3a97e4d",
-      "title": "I due lettori dei task: la colonna di status-cli e le card del board",
-      "description": "Le due superfici che leggono i task e non li scrivono mai: la riga IN CORSO del riepilogo guadagna il conteggio, e la card del board guadagna una riga di riepilogo per array con i task visibili solo espandendo.\n\nPiano: docs/superpowers/plans/2026-08-12-harness-continuita-del-lavoro.md, Task 4 e Task 5. Spec: docs/superpowers/specs/2026-08-10-harness-continuita-del-lavoro-design.md, §5.1 e §5.2.\n\nIl conteggio è l'unico dato che mancava a chi riprende, e compare dove il riepilogo gira davvero: a un confine di sessione. Il troncamento del titolo scende da 45 a 38 colonne per fargli posto.\n\nSul board l'espansione è una capacità nuova della pagina, non un ritocco: oggi la card non nasconde niente, e dodici task sempre visibili le farebbero riempire lo schermo da sole. Il board resta in sola lettura: il guard anti-self-validation vive nell'environment del processo, e un click nel browser non porta nessun ruolo.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [
-        "d56925cd-2096-463c-bc92-8c75c6612954"
-      ],
-      "covers": [
-        "168d659"
-      ],
-      "tasks": [
-        {
-          "id": 1,
-          "short_title": "Test rossi di status-cli",
-          "full_description": "In test/plugin-status-cli.test.mjs: conteggio spuntati/totali nella riga IN CORSO, trattino senza task, nessuna riga oltre 80 colonne con titolo lungo e conteggio a due cifre, taskProgress come funzione pura. Importare taskProgress in testa al file.",
-          "checked": true
-        },
-        {
-          "id": 2,
-          "short_title": "La colonna in status-cli.mjs",
-          "full_description": "Esportare taskProgress; TASKS_COL a 5, TITLE_MAX da 45 a 38; inserire la colonna in inFlightRow fra tier e titolo. Aritmetica: 2+1+1+8+2+11+2+3+2+5+2+38 = 77.",
-          "checked": true
-        },
-        {
-          "id": 3,
-          "short_title": "references/status.md",
-          "full_description": "Descrivere la colonna nuova, il trattino, il fatto che non compare fra le lavorabili perche' una issue in backlog non ha ancora task. Aggiornare ogni esempio o citazione del troncamento a 45 colonne.",
-          "checked": true
-        },
-        {
-          "id": 4,
-          "short_title": "Test rossi del board",
-          "full_description": "In test/plugin-board.test.mjs, via extractFunctions: progressBar piena solo a lavoro finito, renderTaskBlock vuoto su array assente, escaping di short_title e full_description, attributo open solo se espanso, e nessun metodo HTTP che modifichi issues.json.",
-          "checked": true
-        },
-        {
-          "id": 5,
-          "short_title": "progressBar e renderTaskBlock in board.html",
-          "full_description": "Le due funzioni prendono tutto per argomento, expanded compreso, perche' il test le estrae dalla pagina e le esegue dove i global non esistono. details/summary con barra e conteggio; il blocco di esecuzione dopo la description, quello di validazione dentro il riquadro Validazione.",
-          "checked": true
-        },
-        {
-          "id": 6,
-          "short_title": "L'espansione sopravvive al re-render",
-          "full_description": "state.expanded come Set di chiavi issueId:kind, e un listener unico in cattura sull'evento toggle, che non fa bubbling. Senza, ogni push del server richiuderebbe i blocchi, cioe' di continuo mentre si lavora.",
-          "checked": true
-        },
-        {
-          "id": 7,
-          "short_title": "references/board.md, la pagina vera, suite verde",
-          "full_description": "Le due righe, l espansione, la sola lettura riconfermata col motivo del ruolo che un click non porta. Board avviato su un progetto temporaneo con task di entrambi i tipi e guardato davvero: la card sta in un colpo d occhio, e la riga dentro il riquadro Validazione si chiama task e non validazione, che si leggeva come una seconda cosa. npm run test verde.",
-          "checked": true
-        }
-      ],
-      "validation": {
-        "criteria": "npm run test: 359/359 pass (incluse tutte le nuove: taskProgress, riga IN CORSO col conteggio, larghezza <=80, progressBar, renderTaskBlock, escaping, espansione persistente, nessuna scrittura HTTP). Verificato a mano: inFlightRow con tier reasoning + titolo 38 char + 99/99 task resta a 77 colonne; l'esempio in references/status.md riprodotto byte-per-byte con buildSnapshot/renderSnapshot reali (stesso identico output salvo l'ora locale). Escaping stress-test manuale su renderTaskBlock con issueId/kind/short_title/full_description contenenti '\"><img onerror=...>' e '<script>': nessun tag crudo in output, data-issue/data-kind escapati. Nessun endpoint di scrittura: board-server.mjs non toccato dal diff, test 'the board never writes' verde. references/status.md e references/board.md aggiornate (38 colonne ovunque, nessun residuo a 45; riquadro Validazione ora dice 'task'). git diff limitato a scripts/status-cli.mjs, scripts/board.html, skills/harness/references/{status,board}.md, i due file di test e il proprio record in issues.json (tasks + status + updated_at); nessun danno collaterale.",
-        "tasks": [],
-        "state": "pass"
-      },
-      "created_at": "2026-08-12T09:27:25Z",
-      "updated_at": "2026-08-12T10:41:17Z"
-    },
-    {
-      "id": "19dd7fa4-c230-42cd-a33a-a6620bc90315",
-      "title": "L'invariante si sposta dal commit alla pubblicazione",
-      "description": "Il secondo invariante di harness diventa: niente raggiunge il ramo condiviso prima del pass. Il commit locale su un ramo di lavoro è un punto fermo, non una pubblicazione; è il push, o il merge, che il pass autorizza.\n\nPiano: docs/superpowers/plans/2026-08-12-harness-continuita-del-lavoro.md, Task 6. Spec: docs/superpowers/specs/2026-08-10-harness-continuita-del-lavoro-design.md, §1.\n\nNon è una regola ammorbidita: è una contraddizione sciolta. Un criterio formulato su una revisione non è controllabile prima che la revisione esista, la regola sulle prove fuori portata ne chiede di committate, e covers nomina revisioni che devono esistere. Chi lavorava la scioglieva come poteva, in silenzio, ogni volta.\n\nVa scritto il caso fail, che è l'obiezione principale: una issue bloccata lascia commit sul ramo, si corregge con altri commit e si pubblica dopo il pass. Non dirlo lascerebbe credere che serva riscrivere la storia, e qualcuno lo farebbe.",
-      "status": "done",
-      "tier": "reasoning",
-      "depends_on": [],
-      "covers": [],
-      "tasks": [
-        {
-          "id": 1,
-          "short_title": "Riformulare il secondo invariante",
-          "full_description": "In SKILL.md, lista Invarianti non negoziabili: da commit SOLO dopo il pass a niente raggiunge il ramo condiviso prima del pass.",
-          "checked": true
-        },
-        {
-          "id": 2,
-          "short_title": "Gate sul commit diventa Gate sulla pubblicazione",
-          "full_description": "Riscrivere il capitolo: perche' la regola vecchia si contraddiceva (un criterio su una revisione non e' controllabile prima che la revisione esista), cosa ci guadagna il verificatore, il caso fail coi commit che restano sul ramo, la caduta della corrispondenza uno-a-uno e il legame con covers array.",
-          "checked": true
-        },
-        {
-          "id": 3,
-          "short_title": "Le occorrenze residue altrove",
-          "full_description": "Cercare in TUTTO il repository, non solo le frasi che ti aspetti: skills/, commands/, agents/, README, CONTRIBUTING, CLAUDE, e i commenti negli script. Aggiornate commands/verify.md (diceva Nessun commit sul fail, l opposto della regola nuova), SKILL.md, references/issues.md, README, CONTRIBUTING, CLAUDE. Il gate documentale resta com era: guarda i commit, ed e giusto cosi.",
-          "checked": true
-        },
-        {
-          "id": 4,
-          "short_title": "references/git.md: il confine",
-          "full_description": "Commit locali liberi sul ramo di lavoro, push o merge come confine, il caso fail senza riscrivere la storia, e la checklist prima di fondere che chiede il pass di ogni issue rappresentata.",
-          "checked": true
-        },
-        {
-          "id": 5,
-          "short_title": "Suite verde e rilettura",
-          "full_description": "npm run test verde, plugin-skill.test.mjs compreso. Rileggere il diff cercando prosa rivolta a chi esegue il piano.",
-          "checked": true
-        }
-      ],
-      "validation": {
-        "criteria": "Ri-verifica dopo il fix del criterio 6. Tutti e 7 i criteri soddisfatti. (1) skills/harness/SKILL.md:141 'niente raggiunge il ramo condiviso prima del pass assegnato dal verificatore'. (2) SKILL.md:286-288 caso fail: 'Una issue bloccata lascia commit sul ramo: restano li', si corregge con altri commit, e si pubblica dopo il pass ... nessuna storia da riscrivere'. (3) SKILL.md:289-291 'Cade la corrispondenza uno-a-uno fra issue e commit ... Per lo stesso motivo covers e' un array'. (4) references/git.md:24-29 'Sul ramo di lavoro i commit sono liberi' + 'Il confine e' la pubblicazione - push sul ramo condiviso, o merge'. (5) references/git.md:53, prima voce di 'Revisione prima di fondere': 'ogni issue rappresentata nei commit che stai per pubblicare ha il suo pass'. (6) Sweep concettuale (non solo le stringhe attese) su skills/ commands/ agents/ README CONTRIBUTING CLAUDE scripts/ .github/ test/ con rg su 'gate sul commit|commit gate', 'committare|committato', 'nessun commit', 'one issue per commit', 'before its commit', 'commit .. dopo/prima .. pass': ZERO occorrenze residue che contraddicano il nuovo invariante. Le sopravvissute sono estranee alla regola - config.md:15-16 e issues.md:401 (cosa si tiene tracciato), git.md:72 ed external-worker.md:114 (settings.local non committato), docs-gate.mjs:201 e docs-gate.md:119 (stringa di output 'nessun commit di codice scoperto'), external-worker.md:105 (divieto di commit del worker esterno, piu' stretto dell'invariante, non in conflitto). Le sei correzioni sono in diff: commands/verify.md:44-46 ora dice 'Solo adesso il suo lavoro puo' raggiungere il ramo condiviso' e sul fail 'Niente pubblicazione, e i commit gia' fatti sul ramo di lavoro restano dove sono: si corregge con altri commit'; SKILL.md:306 'gate sulla pubblicazione come qualsiasi altra'; references/issues.md:386-391 la motivazione di covers non poggia piu' sulla premessa rovesciata e spiega l'array; README.md:28 'nothing reaches the shared branch' e README.md:61 'Publication gate'; CONTRIBUTING.md:37 'before it is published'; CLAUDE.md:12 'niente sul ramo condiviso prima del pass'. (7) Gate `npm run test`: tests 359, pass 359, fail 0, duration_ms 32391. Controlli extra: gate documentale intatto - SKILL.md:299-309 conserva titolo 'Dopo il commit: gate documentale', 'Subito dopo ogni commit' e 'Non blocca mai il commit'; nessuna prosa rivolta a chi esegue il piano nei file spediti (nessun 'Task N'/'Step N'/rimando a plans/ o specs/; l'unico 'spec' e' dentro un esempio generico di criterio in SKILL.md:277); git status --short elenca solo i 9 file di documentazione dichiarati piu' issues.json, nessun file estraneo, nessun segreto. Il verificatore non ha modificato nessun file.",
-        "tasks": [],
-        "state": "pass"
-      },
-      "created_at": "2026-08-12T09:27:25Z",
-      "updated_at": "2026-08-12T10:52:01Z"
-    },
-    {
-      "id": "1b61adf1-df07-446c-aff1-e814b22b31a9",
-      "title": "SKILL.md: il flusso dei task, la verifica e i due comandi",
-      "description": "Il contratto dei campi sta nella reference; qui sta il flusso: quando i due array nascono, chi può spuntare cosa, e l'ancoraggio al commit che rende il congelamento un sottoprodotto del lavorare.\n\nPiano: docs/superpowers/plans/2026-08-12-harness-continuita-del-lavoro.md, Task 7. Spec: docs/superpowers/specs/2026-08-10-harness-continuita-del-lavoro-design.md, §2.1, §3, §4, §5.3, §5.4.\n\nDipende dalla issue sulla pubblicazione non per logica ma per file: entrambe riscrivono SKILL.md, e due agenti in parallelo sullo stesso documento collidono.\n\nVa detto esplicitamente che i task non contraddicono la bussola, perché a prima vista sembra di sì: la bussola governa dove scatta la verifica indipendente, cioè dove si spende un agente intero, e una checklist dentro la issue non crea nessun giro di verificatore in più.",
-      "status": "done",
-      "tier": "standard",
-      "depends_on": [
-        "56f1b32c-a073-4743-b85e-6a06762a885c",
-        "19dd7fa4-c230-42cd-a33a-a6620bc90315"
-      ],
-      "covers": [],
-      "tasks": [
-        {
-          "id": 1,
-          "short_title": "Il capitolo dei task in SKILL.md",
-          "full_description": "Dopo Verifica leggera e prima di Verifica indipendente: perche' esistono (l albero ricostruito a runtime che moriva con la sessione), che indicizzano e non sostituiscono, che non contraddicono la bussola perche' non creano nessun giro di verificatore in piu'.",
-          "checked": true
-        },
-        {
-          "id": 2,
-          "short_title": "I due momenti e chi spunta cosa",
-          "full_description": "validation.tasks nascono con la issue, tasks li materializza chi la prende e la CLI lo impone. Il worker spunta i propri, mai quelli di giudizio, e non li cancella ne' li riscrive. Prosa e task si toccano insieme, col flag come unica via d uscita.",
-          "checked": true
-        },
-        {
-          "id": 3,
-          "short_title": "L ancoraggio al commit e il congelamento",
-          "full_description": "Prima di ogni commit i task si allineano; e' una prescrizione, non una garanzia, e il danno quando salta e' un tracker indietro di un commit, non sbagliato. Al clock-out e a un congelamento richiesto l allineamento e' un atto dichiarato. La decisione aperta e' un task non spuntato; lo stato git non entra nel tracker.",
-          "checked": true
-        },
-        {
-          "id": 4,
-          "short_title": "Clock-in e clock-out",
-          "full_description": "Il passo 5 del clock-in chiede di materializzare i tasks prima di portare una issue a in_progress. Il clock-out chiede l allineamento esplicito prima di chiudere.",
-          "checked": true
-        },
-        {
-          "id": 5,
-          "short_title": "references/verification.md",
-          "full_description": "Il verificatore spunta i validation.tasks che ha verificato davvero; un payload di chiusura che non li nomina li conserva; un task di validazione non spuntato su una issue chiusa pass e' una contraddizione da risolvere prima di chiudere.",
-          "checked": true
-        },
-        {
-          "id": 6,
-          "short_title": "Il worker esterno e la tabella dei ruoli",
-          "full_description": "Emerso dalla verifica di 19dd7fa4: la tabella dei ruoli dice che il worker non puo' pubblicare, external-worker.md vieta al worker esterno qualunque git commit. Sono conciliabili ma un lettore trova due gradi di liberta' per lo stesso ruolo: renderlo esplicito dove sta il divieto piu' stretto e perche'.",
-          "checked": true
-        },
-        {
-          "id": 7,
-          "short_title": "commands/issue.md e commands/verify.md",
-          "full_description": "issue.md: chi scrive i validation.tasks alla creazione e chi materializza i tasks al clock-in. verify.md: la spunta fra i passi del verificatore. Il test plugin-commands impone ai comandi meno di 4000 caratteri di corpo: la prima stesura ha sforato di 99 e le aggiunte sono state accorciate, non il limite alzato. npm run test verde.",
-          "checked": true
-        }
-      ],
-      "validation": {
-        "criteria": "PASS (ri-verifica dopo il delta). Criteri recuperati da `git show HEAD:issues.json` (la chiusura precedente ne aveva sostituito l'array con l'evidenza). Gate `npm run test`: tests 359 / pass 359 / fail 0, 32s. (1) Capitolo dei task: SKILL.md:251-318 — «I due momenti» 268-278, «Chi puo' spuntare cosa» 280-299, «L'ancoraggio al commit» 301-318 con il congelamento. (2) Bussola: SKILL.md:262-266; il capitolo «Cosa diventa una issue» (179-218) resta byte-identico, gli hunk di `git diff` sono tre: @@-38 clock-in, @@-247 capitolo nuovo, @@-327 clock-out. (3) Clock-in SKILL.md:41-42, clock-out SKILL.md:400-402. (4) verification.md passo 2 (spunta dei validation.tasks, non spuntati quelli non verificati) e righe 52-53 sul payload di chiusura che li conserva. (5) commands/issue.md:55-57. (6) commands/verify.md:38-41. (7) `npm run test` verde e nessuna parola di piano: `grep -rnwE 'Task|Step|Tasks|Steps' skills/ commands/ agents/` -> solo commands/verify.md:4 `allowed-tools: Bash, Task` (nome di tool, riga non toccata); `grep -rnE 'Task [0-9]|Step [0-9]|passo [0-9]|plans/|specs/|docs/superpowers'` -> nessun match. DELTA verificato punto per punto. (a) SKILL.md:290-299 non e' piu' assoluto: nomina il lato validation.criteria/validation.tasks a `state unknown` ed elenca i tre casi che non chiedono il flag, rimandando a references/issues.md per le condizioni esatte — la doppia verita' segnalata e' chiusa: la skill descrive, la reference possiede. Ogni ramo provato su tracker usa-e-getta (`--init --project-dir` in scratchpad, tracker reale mai toccato): criteria cambiati senza validation.tasks a state unknown -> INVALID_INPUT «'validation.criteria' changed while 'validation.tasks' stayed as they were»; stesso payload con --decomposition-unchanged -> accettato; spunta di un task di esecuzione e spunta di un validation.task a criteria invariati -> accettati senza flag; prima materializzazione (tasks su issue che non ne aveva) -> accettata; chiusura {criteria:evidenza,state:pass} senza flag -> accettata. Coerente con enforcePairedUpdate/decompositionOf (issue-manager.mjs:801-879). (b) commands/verify.md:38-41 riavvolto: `awk 'length>100'` non lo riporta piu'. (c) verification.md:137-139 idem; le righe >100 rimaste in quei file sono frontmatter e righe di tabella preesistenti. Danni collaterali: `git status --short` elenca i 5 documenti della issue piu' issues.json; confronto record-per-record con HEAD -> un solo record diverso (1b61adf1), nessuno aggiunto o rimosso, chiavi di root invariate. Osservazione fuori contratto: la riapertura ha rimesso `status: in_review` lasciando `validation.state: pass` — coppia incoerente finche' questa chiusura non la risolve, e i 7 criteri originali sopravvivevano solo in HEAD. Restano aperte, come osservazioni non bloccanti gia' riportate: external-worker.md:112 («chi committa e' l'orchestratore, dopo il pass») lascia il verificatore di una issue lavorata da worker esterno senza commit su cui usare git show, che e' il beneficio rivendicato dal capitolo «Gate sulla pubblicazione» — candidata a issue propria. Nessun file modificato dal verificatore: l'unica scrittura e' questa chiusura.",
-        "tasks": [],
-        "state": "pass"
-      },
-      "created_at": "2026-08-12T09:27:26Z",
-      "updated_at": "2026-08-12T11:09:19Z"
-    },
-    {
-      "id": "10a757b4-666a-4b1c-80cb-1f81e23170c1",
-      "title": "Il processo del board muore senza che nessuno lo sappia",
-      "description": "Il board e' morto tre volte in una sessione - 50, 25 e 16 minuti, quindi non un timeout fisso - lasciando ogni volta un URL annunciato come attivo e gia' morto. In una sessione successiva ha retto 55 minuti. L'instabilita' non e' sistematica, che e' la cosa peggiore: non se ne puo' nemmeno diffidare sempre.\n\nDichiarata fuori scope da P1 e da P2, e destinata a una issue di questo tracker da entrambe le spec.\n\nVerificata contro il codice ed e' viva: il watch() di scripts/board-server.mjs non ha handler d'errore, il try/catch finale copre solo l'avvio sincrono, e dopo lo startup nessun errore raggiunge il chiamante. La issue ac6892cb ha chiuso solo la morte da path 8.3, che e' istantanea e non spiega i 50 minuti.\n\nRiformulazione dei criteri firmata dal committente il 2026-08-12. I criteri originali chiedevano di provare che l'envelope arrivi sullo stdout su una morte imprevista: per provarlo servirebbe un innesco di crash nel codice di produzione a uso dei test, peggiore del problema. La prova si limita ora ai casi raggiungibili dal test; il gestore di ultima istanza resta nel codice senza pretendere una dimostrazione end-to-end.",
-      "status": "done",
-      "tier": "reasoning",
-      "depends_on": [],
-      "covers": [
-        "14f7ab6"
-      ],
-      "tasks": [
-        {
-          "id": 1,
-          "short_title": "La diagnosi, scritta",
-          "full_description": "Due difetti distinti: 1) il fan-out SSE scrive verso response che nessuno protegge, e un client svanito senza close fa alzare un error non gestito dentro un timer, che abbatte il processo; 2) se la directory osservata sparisce, fs.watch non emette error ma una tempesta infinita di eventi rename - provata: 1,8 MB di output in un secondo a CPU piena.",
-          "checked": true
-        },
-        {
-          "id": 2,
-          "short_title": "Il fan-out SSE non abbatte piu' il processo",
-          "full_description": "Scrittura in try/catch, client rimosso dal Set al primo errore, e un listener error su ogni response cosi' un socket rotto non diventa un throw non gestito.",
-          "checked": true
-        },
-        {
-          "id": 3,
-          "short_title": "La perdita del watcher e' annunciata",
-          "full_description": "watcher.on(error) e controllo che la directory esista quando arriva un evento che non riguarda issues.json: se e' sparita, il board non puo' piu' seguire il progetto e lo dichiara sullo stdout con l'envelope ok:false, poi esce. Girare a vuoto servendo dati che non si aggiornano piu' sarebbe il dato stantio con l aria di essere fresco.",
-          "checked": true
-        },
-        {
-          "id": 4,
-          "short_title": "Il gestore di ultima istanza",
-          "full_description": "process.on uncaughtException e unhandledRejection: stessa riga di envelope sullo stdout, poi uscita non zero. Non lo prova un test - e' la firma dell imprevisto - ma toglie il caso in cui il processo sparisce senza dire niente.",
-          "checked": true
-        },
-        {
-          "id": 5,
-          "short_title": "I test",
-          "full_description": "In test/plugin-board.test.mjs: cancellare la directory osservata e leggere la riga di envelope sullo stdout del figlio; distruggere una connessione SSE a livello di socket e provare che il server risponde ancora dopo una scrittura; SIGTERM con SSE aperte, dove si asserisce che il processo esca e non il codice d uscita: Windows non ha un vero SIGTERM e Node lo emula terminando il processo, quindi il gestore che uscirebbe 0 non gira.",
-          "checked": true
-        },
-        {
-          "id": 6,
-          "short_title": "references/board.md",
-          "full_description": "Come ci si accorge che il board e' morto: la riga di envelope sullo stdout del processo, e cosa significano i code nuovi. Il board resta un processo da fermare col pid.",
-          "checked": true
-        }
-      ],
-      "validation": {
-        "criteria": [
-          "Causa identificata e scritta: la tempesta di fs.watch e' stata riprodotta in modo indipendente (probe Node: directory osservata cancellata -> 31373 eventi in 1,5 s, 0 eventi 'error'), quindi la diagnosi di board-server.mjs:181-192 e' esatta. Scritta in scripts/board-server.mjs:24-29,181-185 e in skills/harness/references/board.md (sezione 'Come ci si accorge che e' morto'). RISERVA riportata al referto: la prima meta' della diagnosi (fan-out SSE che alza un error non gestito) non e' stata riprodotta in 3 probe su Node 26.6.0, incluso un race con 300 client resettati a meta' scrittura: 0 emissioni di 'error' sulla response.",
-          "Directory sparita annunciata ed uscita: probe indipendente sul server reale -> stdout '{\"ok\":false,\"error\":\"The project directory ... is gone: the board cannot follow it any more.\",\"code\":\"WATCH_LOST\"}' e exit code 1, non gira a vuoto. Il test 'the project directory disappearing is announced on stdout' passa sul codice nuovo e FALLISCE sul codice pre-fix (HEAD:scripts/board-server.mjs eseguito in copia temporanea: 'Error: no further line on stdout'), quindi e' un test discriminante.",
-          "Client SSE sparito: test 'an SSE client that vanishes without closing does not take the process with it' verde, asserisce 200 su / e payload di api/issues dopo la scrittura di issues.json. Nel codice ci sono sia il try/catch sul fan-out (board-server.mjs:198-205) sia res.on('error') (board-server.mjs:160). OSSERVAZIONE: quel test passa identico anche contro il server pre-fix, quindi verifica l'esito richiesto ma non dimostra la protezione aggiunta.",
-          "Gestore di ultima istanza esercitato sul server reale senza toccare il codice di produzione (node --import <trigger> scripts/board-server.mjs): eccezione tardiva -> '{\"ok\":false,\"error\":\"Unexpected error after startup: simulated late death\",\"code\":\"ERROR\"}' exit 1; rejection tardiva -> '{\"ok\":false,\"error\":\"Unhandled rejection after startup: simulated stray rejection\",\"code\":\"ERROR\"}' exit 1.",
-          "SIGTERM con SSE aperta: test verde; inoltre probe indipendente che fa girare davvero shutdown() su Windows (SIGTERM emesso dentro il figlio, connessione /events aperta) -> 'child exited code=0', nessun hang. La rinuncia al codice d'uscita nel test del repo e' onesta e documentata (Windows termina il processo, il gestore non gira).",
-          "skills/harness/references/board.md: nuova sezione 'Come ci si accorge che e' morto' con la riga di envelope, la riga WATCH_LOST in tabella e ERROR esteso a 'all'avvio o dopo'.",
-          "Gate npm run test verde: 'tests 362, pass 362, fail 0'. test/plugin-board.test.mjs: git diff --numstat = '94 0' (sole aggiunte, nessuna riga rimossa); i 29 test board preesistenti passano invariati. Nessun endpoint di scrittura aggiunto: le rotte restano /, /index.html, /api/issues, /events, 404 (board-server.mjs:131-166) e il test 'the board never writes: no HTTP method mutates issues.json' e' verde. git status --short limitato ai 4 file dichiarati."
-        ],
-        "tasks": [],
-        "state": "pass"
-      },
-      "created_at": "2026-08-12T09:27:26Z",
-      "updated_at": "2026-08-12T12:43:50Z"
-    },
-    {
-      "id": "c6425692-a90d-40ab-96ba-8804befe45c9",
-      "title": "Verifica documentale del commit 62e9bd3 su --upgrade",
-      "description": "Il gate documentale cumulativo ha trovato 62e9bd3 scoperto: ha toccato scripts/issue-manager.mjs e nessuna issue lo dichiara in covers. Il promemoria post-commit era saltato, e questo e' il ritardo che il gate trasforma in recupero invece che in perdita.\n\nIl commit fa scrivere a --upgrade lo schema_version dove la reference lo promette: primo campo della radice, come dopo --init, invece che in coda dove finiva l'assegnazione diretta.\n\nControlla che references/issues.md descriva il comportamento come e' adesso. Se lo dice gia' correttamente, la issue si chiude dichiarandolo: una verifica che non trova niente da cambiare e' comunque una verifica, e senza di essa il commit resta scoperto per sempre.",
-      "status": "done",
-      "tier": "economy",
-      "depends_on": [],
-      "covers": [
-        "62e9bd3"
-      ],
-      "tasks": [
-        {
-          "id": 1,
-          "short_title": "Rileggere references/issues.md contro il codice",
-          "full_description": "Sezione schema_version: confrontare ogni affermazione con --init e --upgrade in scripts/issue-manager.mjs, come il commit 62e9bd3 chiedeva di fare.",
-          "checked": true
-        },
-        {
-          "id": 2,
-          "short_title": "Correggere cio' che il tempo ha reso falso",
-          "full_description": "Due cose: la costante dichiarata oggi 2 mentre SCHEMA_VERSION e' 3, e la frase che cita issues.json di questo repository come esempio di chiave in coda, non piu' vera dopo l upgrade a schema 3 che ha ricostruito la radice.",
-          "checked": true
-        },
-        {
-          "id": 3,
-          "short_title": "Il gate non elenca piu' 62e9bd32",
-          "full_description": "node scripts/docs-gate.mjs: il commit risulta coperto dalla issue. npm run test verde.",
-          "checked": true
-        }
-      ],
-      "validation": {
-        "criteria": "1) node scripts/docs-gate.mjs -> '29 commit nella finestra . 7 toccano codice . 0 non coperti', NON COPERTI: 'nessun commit di codice scoperto' (62e9bd3 non compare). 2) skills/harness/references/issues.md riga 23: 'la costante SCHEMA_VERSION (oggi 3)' corrisponde a scripts/issue-manager.mjs:153 'const SCHEMA_VERSION = 3'. 3) righe 30-34: rimossa la frase che citava issues.json di questo repo come esempio di chiave in coda, sostituita con la spiegazione che il primo --upgrade che migra ricostruisce la radice (confermato in scripts/issue-manager.mjs:1008-1018, righe 1016-1017 fanno const {schema_version, ...rest} = data; writeIssuesFile({schema_version, ...rest})); verificato anche che issues.json reale ha oggi schema_version come prima chiave (upgrade a schema 3 nel commit 2232ec0). 4) Il resto della sezione (righe 41-49: chiave assente=versione 0, writer preserva quello che trova, --compact la legge per timbrare l'archivio) resta coerente col codice (issue-manager.mjs righe 922-924, 1214, 1338), nessuna altra correzione necessaria. 5) npm run test -> 359/359 pass, 0 fail. 6) git status --short mostra solo issues.json (aggiornamento tasks/status della issue stessa) e skills/harness/references/issues.md; nessun file fuori scope toccato.",
-        "tasks": [],
-        "state": "pass"
-      },
-      "created_at": "2026-08-12T09:51:17Z",
-      "updated_at": "2026-08-12T11:15:44Z"
-    },
     {
       "id": "663a70ae-48ba-4e41-b48d-27af3dc7843b",
       "title": "Il blocco task della card parla la lingua del board",
@@ -1319,6 +127,164 @@
       },
       "created_at": "2026-08-12T14:04:29Z",
       "updated_at": "2026-08-12T14:23:38Z"
+    },
+    {
+      "id": "a462e703-942f-40d8-92e7-2831499e44df",
+      "title": "Il tracker: schema, CLI e guard contro la self-validation",
+      "description": "Il nucleo del tracker, dalla prima CLI ai guard che la difendono. Comandi di ciclo di vita e schema della issue; i campi arrivati dopo, con le rispettive migrazioni: covers (1 -> 2) e i due array di task (2 -> 3). I tre guard sui task piu' il flag --decomposition-unchanged, che impedisce a prosa e decomposizione di divergere in silenzio. Il guard di ruolo che rifiuta a HARNESS_ROLE=worker di chiudere la propria issue. E le due correzioni che tolgono il giudizio dalle primitive per lasciarlo ai comandi.",
+      "status": "done",
+      "tier": null,
+      "depends_on": [],
+      "covers": [],
+      "tasks": [],
+      "validation": {
+        "tasks": [],
+        "criteria": [
+          "Archived originals: .harness/archive/2026-08-12T14-32-54Z.json",
+          "da623851-f187-4956-a428-7341f6b747e1 - CLI del tracker: schema, campi e comandi di ciclo di vita",
+          "aa9a07bf-0611-400e-b22a-fd0a9ff6cb40 - covers nello schema della issue, e la migrazione 1 -> 2",
+          "d56925cd-2096-463c-bc92-8c75c6612954 - I due array di task nello schema, e la migrazione 2 -> 3",
+          "cf74ee9d-14b4-4463-bb6d-e03df0da004b - I tre guard sui task, e il flag --decomposition-unchanged",
+          "56f1b32c-a073-4743-b85e-6a06762a885c - references/issues.md: il contratto dei due array di task",
+          "f83f71ff-8832-44b3-895b-308b69e80ac7 - Guard di ruolo contro la self-validation",
+          "f0b83088-eb29-4e3e-8ebc-7f43a316befc - /harness:compact legge le issue intere per usarne solo id e titolo",
+          "8d3f4db5-fffb-4d13-9804-990ebd2da31d - Il giudizio esce da /harness:issue e /harness:compact"
+        ],
+        "state": "pass"
+      },
+      "created_at": "2026-08-12T14:32:54Z",
+      "updated_at": "2026-08-12T14:32:54Z"
+    },
+    {
+      "id": "b4aeec33-63b4-42b7-9872-aa16ff7d9212",
+      "title": "Il riepilogo del tracker a riga di comando",
+      "description": "status-cli.mjs per intero, dal contratto della riga di comando alla resa. Codici d'uscita e canali; costanti, conteggi e sezione delle issue in corso; intestazione, barra proporzionale e legenda; sezioni con troncamento a 45 colonne. Le allerte su cicli, dipendenze fantasma e stallo, e la correzione dei due denominatori diversi nell'intestazione LAVORABILI. Piu' i due punti in cui il riepilogo e' entrato nel workflow: il passo di clock-in e clock-out e lo slash command /harness:status, e il gate documentale dei nove commit che lo hanno prodotto.",
+      "status": "done",
+      "tier": null,
+      "depends_on": [],
+      "covers": [],
+      "tasks": [],
+      "validation": {
+        "tasks": [],
+        "criteria": [
+          "Archived originals: .harness/archive/2026-08-12T14-32-54Z.json",
+          "74d2b630-f4de-4b94-99da-741562328fbe - status-cli: contratto della riga di comando e codici d'uscita",
+          "6a53d9c8-f41e-44f0-9536-279de693e938 - status-cli: costanti, conteggi e sezione delle issue in corso",
+          "9c45bfd7-977f-4e00-84b6-9c42545ae0c1 - status-cli: intestazione, barra proporzionale e legenda degli stati",
+          "f2595673-a499-4185-b86d-33034431560f - status-cli: sezioni in corso e lavorabili, con troncamento a 45 colonne",
+          "59819a08-06da-481c-9a4f-ba948c5432ec - status-cli: allerte su cicli, dipendenze fantasma e stallo",
+          "0fe39c8a-a84b-466b-9e39-b3d7912dcaf5 - status-cli: issue lavorabili e dipendenze fantasma",
+          "aa07fb72-713c-4d65-bba9-6e1399652813 - Stallo e intestazione LAVORABILI: 'N di M' con due denominatori diversi",
+          "b6b848b9-26e4-49c1-9037-71207f958c5c - status-cli: resa delle allerte e dei casi vuoti",
+          "90048eaf-d5bc-42d5-a7d9-f41dc3c40a56 - Riepilogo del tracker a clock-in e a clock-out",
+          "8718f44a-2a45-40f5-9735-7ee3501cccf4 - Slash command /harness:status",
+          "1b7587bf-a25d-4caa-bd63-810dde5fef2e - Gate documentale dei nove commit di status-cli"
+        ],
+        "state": "pass"
+      },
+      "created_at": "2026-08-12T14:32:54Z",
+      "updated_at": "2026-08-12T14:32:54Z"
+    },
+    {
+      "id": "b20bfcc0-378a-4f1b-82b0-740b25a72cae",
+      "title": "Il board delle issue e le tre volte che e' morto",
+      "description": "Il board live: la pagina, il server locale che la serve e i dati letti dal progetto. La decisione di toglierlo dal clock-in - si avvia su richiesta, mai di iniziativa propria - presa dopo tre morti in una sessione. Le due cause affrontate: fs.watch su una directory in forma 8.3, che faceva abortire il processo da dentro libuv, e il silenzio con cui il processo moriva, sostituito da una riga che lo dichiara sullo stesso stdout. Piu' la documentazione della canonicalizzazione e la prima resa dei task sulle card.",
+      "status": "done",
+      "tier": null,
+      "depends_on": [],
+      "covers": [],
+      "tasks": [],
+      "validation": {
+        "tasks": [],
+        "criteria": [
+          "Archived originals: .harness/archive/2026-08-12T14-32-54Z.json",
+          "d40ff6ad-a83b-457b-a9b5-dab45cb26497 - Board delle issue",
+          "11e3060d-6efa-45b0-8b43-f0057015c46d - Il board esce dal clock-in: si avvia su richiesta, non da solo",
+          "ac6892cb-b314-4fa1-93c0-25066808d550 - Il board muore se la directory del progetto e' un path 8.3",
+          "7619689e-c007-4f0a-a94a-d253da55bcea - board.md non dice che il server canonicalizza la directory del progetto",
+          "10a757b4-666a-4b1c-80cb-1f81e23170c1 - Il processo del board muore senza che nessuno lo sappia",
+          "9fc8151f-450b-49f9-89a7-9552d3a97e4d - I due lettori dei task: la colonna di status-cli e le card del board"
+        ],
+        "state": "pass"
+      },
+      "created_at": "2026-08-12T14:32:54Z",
+      "updated_at": "2026-08-12T14:32:54Z"
+    },
+    {
+      "id": "2c3dbb50-a29d-459b-a62b-8cb33713ee96",
+      "title": "Il gate documentale: dallo hook git allo script cumulativo",
+      "description": "Il gate che segnala i commit di codice che nessuna issue dichiara in covers. Prima come hook git, poi - caduti gli hook col modello plugin - come docs-gate.mjs: il guscio che legge configurazione, git e finestra, e la parte che decide cosa e' coperto. La finestra autocalibrata sulla piu' vecchia revisione dichiarata, che trasforma il costo di dimenticarsene in un ritardo invece che in una perdita. Piu' references/docs-gate.md, il richiamo in SKILL.md e le issue di verifica documentale che il gate stesso ha generato.",
+      "status": "done",
+      "tier": null,
+      "depends_on": [],
+      "covers": [],
+      "tasks": [],
+      "validation": {
+        "tasks": [],
+        "criteria": [
+          "Archived originals: .harness/archive/2026-08-12T14-32-54Z.json",
+          "4faa2ce8-0857-47cc-b512-7df93fca3d93 - Hook git e gate documentale",
+          "76e83448-44df-4cd6-a655-c0503f4c92d7 - Il guscio di docs-gate.mjs: config, git, finestra, uscite",
+          "3c56866d-6515-49f5-b13f-2b3152409067 - La parte che decide di docs-gate.mjs",
+          "c8cce222-371d-4a3b-9e3e-a23627f5ced0 - references/docs-gate.md e il comando che ci rimanda",
+          "718823d6-c12d-433b-93aa-c593bcefb793 - Issue di verifica documentale generate dal gate post-commit",
+          "d88b2b87-fea7-4535-95a0-24775cfeb163 - SKILL.md: il gate nomina covers e lo script, e nessuno script resta orfano",
+          "a741fbbe-9bde-4777-bebf-75f8516bac33 - Gate documentale dei quattro commit di codice di docs-gate, covers e board",
+          "2f76be67-521f-425c-b6f7-1fe41c72c321 - docs: verifica documentazione per commit cbde0b2",
+          "c6425692-a90d-40ab-96ba-8804befe45c9 - Verifica documentale del commit 62e9bd3 su --upgrade"
+        ],
+        "state": "pass"
+      },
+      "created_at": "2026-08-12T14:32:54Z",
+      "updated_at": "2026-08-12T14:32:54Z"
+    },
+    {
+      "id": "b36693fa-ce38-462c-aabc-04a8d41993d3",
+      "title": "Le regole del workflow: bussola, verifica, pubblicazione",
+      "description": "Le regole che harness impone, e le correzioni che le hanno rese applicabili. La verifica indipendente su ogni issue, la regola 1-WIP per catena di dipendenza e i tier. La bussola che decide quale lavoro diventa una issue - costoso e invisibile - con il livello a grana fine che le sta sotto. Lo spostamento dell'invariante dal commit alla pubblicazione, che ha sciolto una contraddizione fra due regole di harness. Il vincolo che un criterio sia controllabile con gli accessi del verificatore. E il setaccio dei documenti, con la pagina che lo descrive.",
+      "status": "done",
+      "tier": null,
+      "depends_on": [],
+      "covers": [],
+      "tasks": [],
+      "validation": {
+        "tasks": [],
+        "criteria": [
+          "Archived originals: .harness/archive/2026-08-12T14-32-54Z.json",
+          "13f1bc2a-2844-40fc-b399-6ae50a9c3f45 - Regole del workflow: verifica indipendente, 1-WIP, tier",
+          "5a1636cd-6379-4c14-b14f-fd75fd5becaa - La bussola: harness dice quale lavoro diventa una issue",
+          "19dd7fa4-c230-42cd-a33a-a6620bc90315 - L'invariante si sposta dal commit alla pubblicazione",
+          "1b61adf1-df07-446c-aff1-e814b22b31a9 - SKILL.md: il flusso dei task, la verifica e i due comandi",
+          "5b994254-c97b-425f-bef3-76c72154c037 - Un criterio dev'essere controllabile con gli accessi del verificatore",
+          "958f86ae-a66a-497d-99da-1ec1194e9b97 - references/sweep.md e il comando che ci rimanda"
+        ],
+        "state": "pass"
+      },
+      "created_at": "2026-08-12T14:32:54Z",
+      "updated_at": "2026-08-12T14:32:54Z"
+    },
+    {
+      "id": "1ed3a712-1a42-4d18-9513-1e71b5db4039",
+      "title": "Impacchettamento: da pacchetto npm a plugin Claude Code",
+      "description": "Il passaggio di harness da pacchetto npm installato nel progetto a plugin di Claude Code, che ha tolto di mezzo il template da rigenerare e la copia materializzata da tenere in sincrono. Le trappole del modello precedente e il secondo numero di versione che non esiste piu'. La decisione di non scrivere nessun .gitignore: cosa versionare di .harness/ lo decide il progetto. Piu' la configurazione locale e la delega opt-in a un worker esterno.",
+      "status": "done",
+      "tier": null,
+      "depends_on": [],
+      "covers": [],
+      "tasks": [],
+      "validation": {
+        "tasks": [],
+        "criteria": [
+          "Archived originals: .harness/archive/2026-08-12T14-32-54Z.json",
+          "a4fdd64f-b648-4ed9-b4c9-4d27b68b2675 - Migrazione da pacchetto npm a plugin Claude Code",
+          "3a030d2b-e1d4-45e1-9075-6b9e55568b20 - Il modello npm non lascia trappole ne' un secondo numero di versione",
+          "63406cce-2d07-4863-9329-0abe5bb10cf5 - .harness/ non si auto-ignora piu': cosa versionare lo decide il progetto",
+          "d269c9ff-461f-477b-a1f6-4c7e5e11a020 - Worker esterno e configurazione locale"
+        ],
+        "state": "pass"
+      },
+      "created_at": "2026-08-12T14:32:54Z",
+      "updated_at": "2026-08-12T14:32:54Z"
     }
   ]
 }
