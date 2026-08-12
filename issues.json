@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-12T11:15:44Z",
+  "last_updated": "2026-08-12T12:42:23Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1112,27 +1112,64 @@
     {
       "id": "10a757b4-666a-4b1c-80cb-1f81e23170c1",
       "title": "Il processo del board muore senza che nessuno lo sappia",
-      "description": "Il board è morto tre volte in una sessione — 50, 25 e 16 minuti, quindi non un timeout fisso — lasciando ogni volta un URL annunciato come attivo e già morto. In una sessione successiva ha retto 55 minuti. L'instabilità non è sistematica, che è la cosa peggiore: non se ne può nemmeno diffidare sempre.\n\nDichiarata fuori scope da P1 e da P2, e destinata a una issue di questo tracker da entrambe le spec. Lasciarla in un paragrafo sarebbe il difetto che il deliverable sulle perdite esiste per chiudere.\n\nVerificata contro il codice ed è viva: il watch() di scripts/board-server.mjs non ha handler d'errore, il try/catch finale copre solo l'avvio sincrono, e dopo lo startup nessun errore raggiunge il chiamante. La issue ac6892cb ha chiuso soltanto la morte da path 8.3, che è istantanea e non spiega i 50 minuti.\n\nIl lavoro comincia dalla diagnosi: la correzione senza una causa identificata sarebbe un rimedio a caso.",
-      "status": "backlog",
+      "description": "Il board e' morto tre volte in una sessione - 50, 25 e 16 minuti, quindi non un timeout fisso - lasciando ogni volta un URL annunciato come attivo e gia' morto. In una sessione successiva ha retto 55 minuti. L'instabilita' non e' sistematica, che e' la cosa peggiore: non se ne puo' nemmeno diffidare sempre.\n\nDichiarata fuori scope da P1 e da P2, e destinata a una issue di questo tracker da entrambe le spec.\n\nVerificata contro il codice ed e' viva: il watch() di scripts/board-server.mjs non ha handler d'errore, il try/catch finale copre solo l'avvio sincrono, e dopo lo startup nessun errore raggiunge il chiamante. La issue ac6892cb ha chiuso solo la morte da path 8.3, che e' istantanea e non spiega i 50 minuti.\n\nRiformulazione dei criteri firmata dal committente il 2026-08-12. I criteri originali chiedevano di provare che l'envelope arrivi sullo stdout su una morte imprevista: per provarlo servirebbe un innesco di crash nel codice di produzione a uso dei test, peggiore del problema. La prova si limita ora ai casi raggiungibili dal test; il gestore di ultima istanza resta nel codice senza pretendere una dimostrazione end-to-end.",
+      "status": "done",
       "tier": "reasoning",
       "depends_on": [],
       "covers": [],
+      "tasks": [
+        {
+          "id": 1,
+          "short_title": "La diagnosi, scritta",
+          "full_description": "Due difetti distinti: 1) il fan-out SSE scrive verso response che nessuno protegge, e un client svanito senza close fa alzare un error non gestito dentro un timer, che abbatte il processo; 2) se la directory osservata sparisce, fs.watch non emette error ma una tempesta infinita di eventi rename - provata: 1,8 MB di output in un secondo a CPU piena.",
+          "checked": true
+        },
+        {
+          "id": 2,
+          "short_title": "Il fan-out SSE non abbatte piu' il processo",
+          "full_description": "Scrittura in try/catch, client rimosso dal Set al primo errore, e un listener error su ogni response cosi' un socket rotto non diventa un throw non gestito.",
+          "checked": true
+        },
+        {
+          "id": 3,
+          "short_title": "La perdita del watcher e' annunciata",
+          "full_description": "watcher.on(error) e controllo che la directory esista quando arriva un evento che non riguarda issues.json: se e' sparita, il board non puo' piu' seguire il progetto e lo dichiara sullo stdout con l'envelope ok:false, poi esce. Girare a vuoto servendo dati che non si aggiornano piu' sarebbe il dato stantio con l aria di essere fresco.",
+          "checked": true
+        },
+        {
+          "id": 4,
+          "short_title": "Il gestore di ultima istanza",
+          "full_description": "process.on uncaughtException e unhandledRejection: stessa riga di envelope sullo stdout, poi uscita non zero. Non lo prova un test - e' la firma dell imprevisto - ma toglie il caso in cui il processo sparisce senza dire niente.",
+          "checked": true
+        },
+        {
+          "id": 5,
+          "short_title": "I test",
+          "full_description": "In test/plugin-board.test.mjs: cancellare la directory osservata e leggere la riga di envelope sullo stdout del figlio; distruggere una connessione SSE a livello di socket e provare che il server risponde ancora dopo una scrittura; SIGTERM con SSE aperte, dove si asserisce che il processo esca e non il codice d uscita: Windows non ha un vero SIGTERM e Node lo emula terminando il processo, quindi il gestore che uscirebbe 0 non gira.",
+          "checked": true
+        },
+        {
+          "id": 6,
+          "short_title": "references/board.md",
+          "full_description": "Come ci si accorge che il board e' morto: la riga di envelope sullo stdout del processo, e cosa significano i code nuovi. Il board resta un processo da fermare col pid.",
+          "checked": true
+        }
+      ],
       "validation": {
         "criteria": [
-          "La causa della morte del processo è identificata e scritta nella issue o nella reference, non solo mitigata",
-          "Un errore del watcher provocato dal test non abbatte il processo: il server risponde ancora 200 su / e su api/issues",
-          "Se il processo muore comunque, lo dichiara sullo stdout con lo stesso envelope degli altri script del plugin, ok:false e un code",
-          "Il test prova che quella riga arriva davvero sullo stdout del processo avviato",
-          "SIGTERM continua a chiudere il server anche con connessioni SSE aperte",
-          "references/board.md dice come ci si accorge che il board è morto",
-          "npm run test verde, con i test esistenti del board invariati"
+          "Causa identificata e scritta: la tempesta di fs.watch e' stata riprodotta in modo indipendente (probe Node: directory osservata cancellata -> 31373 eventi in 1,5 s, 0 eventi 'error'), quindi la diagnosi di board-server.mjs:181-192 e' esatta. Scritta in scripts/board-server.mjs:24-29,181-185 e in skills/harness/references/board.md (sezione 'Come ci si accorge che e' morto'). RISERVA riportata al referto: la prima meta' della diagnosi (fan-out SSE che alza un error non gestito) non e' stata riprodotta in 3 probe su Node 26.6.0, incluso un race con 300 client resettati a meta' scrittura: 0 emissioni di 'error' sulla response.",
+          "Directory sparita annunciata ed uscita: probe indipendente sul server reale -> stdout '{\"ok\":false,\"error\":\"The project directory ... is gone: the board cannot follow it any more.\",\"code\":\"WATCH_LOST\"}' e exit code 1, non gira a vuoto. Il test 'the project directory disappearing is announced on stdout' passa sul codice nuovo e FALLISCE sul codice pre-fix (HEAD:scripts/board-server.mjs eseguito in copia temporanea: 'Error: no further line on stdout'), quindi e' un test discriminante.",
+          "Client SSE sparito: test 'an SSE client that vanishes without closing does not take the process with it' verde, asserisce 200 su / e payload di api/issues dopo la scrittura di issues.json. Nel codice ci sono sia il try/catch sul fan-out (board-server.mjs:198-205) sia res.on('error') (board-server.mjs:160). OSSERVAZIONE: quel test passa identico anche contro il server pre-fix, quindi verifica l'esito richiesto ma non dimostra la protezione aggiunta.",
+          "Gestore di ultima istanza esercitato sul server reale senza toccare il codice di produzione (node --import <trigger> scripts/board-server.mjs): eccezione tardiva -> '{\"ok\":false,\"error\":\"Unexpected error after startup: simulated late death\",\"code\":\"ERROR\"}' exit 1; rejection tardiva -> '{\"ok\":false,\"error\":\"Unhandled rejection after startup: simulated stray rejection\",\"code\":\"ERROR\"}' exit 1.",
+          "SIGTERM con SSE aperta: test verde; inoltre probe indipendente che fa girare davvero shutdown() su Windows (SIGTERM emesso dentro il figlio, connessione /events aperta) -> 'child exited code=0', nessun hang. La rinuncia al codice d'uscita nel test del repo e' onesta e documentata (Windows termina il processo, il gestore non gira).",
+          "skills/harness/references/board.md: nuova sezione 'Come ci si accorge che e' morto' con la riga di envelope, la riga WATCH_LOST in tabella e ERROR esteso a 'all'avvio o dopo'.",
+          "Gate npm run test verde: 'tests 362, pass 362, fail 0'. test/plugin-board.test.mjs: git diff --numstat = '94 0' (sole aggiunte, nessuna riga rimossa); i 29 test board preesistenti passano invariati. Nessun endpoint di scrittura aggiunto: le rotte restano /, /index.html, /api/issues, /events, 404 (board-server.mjs:131-166) e il test 'the board never writes: no HTTP method mutates issues.json' e' verde. git status --short limitato ai 4 file dichiarati."
         ],
-        "state": "unknown",
-        "tasks": []
+        "tasks": [],
+        "state": "pass"
       },
       "created_at": "2026-08-12T09:27:26Z",
-      "updated_at": "2026-08-12T09:27:26Z",
-      "tasks": []
+      "updated_at": "2026-08-12T12:42:23Z"
     },
     {
       "id": "c6425692-a90d-40ab-96ba-8804befe45c9",

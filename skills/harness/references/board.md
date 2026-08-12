@@ -52,7 +52,36 @@ occupata, l'avvio fallisce con `PORT_IN_USE` invece di restare a metà.
 | `INVALID_ARGUMENT_VALUE` | un flag dichiarato ma usato male: `--port` o `--project-dir` senza valore |
 | `FILE_NOT_FOUND` | `--project-dir` non esiste |
 | `PORT_IN_USE` | la porta richiesta è occupata |
-| `ERROR` | errore imprevisto all'avvio |
+| `WATCH_LOST` | la directory del progetto è sparita, o il watcher è fallito: il board non può più seguire il progetto |
+| `ERROR` | errore imprevisto, all'avvio o dopo |
+
+## Come ci si accorge che è morto
+
+La riga di avvio non è più l'unica che il processo stampa. Se muore, lo **dichiara**, con lo stesso
+envelope e sullo stesso stdout:
+
+```json
+{"ok":false,"error":"The project directory '…' is gone: the board cannot follow it any more.","code":"WATCH_LOST"}
+```
+
+Vale la pena sapere perché esiste. Il board è morto tre volte in una sessione — a 50, 25 e 16
+minuti — lasciando ogni volta un URL annunciato come attivo e già morto, e nessuna traccia: la
+diffidenza verso la pagina è nata lì. Un processo che muore in silenzio è peggio di uno che muore.
+
+Due cose lo tengono in piedi, e una lo fa parlare quando non basta:
+
+- **un browser che sparisce non lo abbatte.** Una scheda chiusa male, un portatile sospeso, una
+  rete caduta lasciano una connessione che fallisce alla scrittura successiva invece di chiudersi
+  prima: quel client viene semplicemente dimenticato;
+- **la perdita della directory è una morte annunciata.** Se il progetto sparisce sotto il board,
+  `fs.watch` non segnala un errore: continua a emettere eventi per un path che non c'è più, per
+  sempre. Continuare a servire da lì significherebbe rispondere con un tracker che nessuno segue
+  più — un dato stantio con l'aria di essere fresco — quindi il board lo dichiara ed esce;
+- **il resto passa da un gestore di ultima istanza**, che annuncia l'eccezione non catturata con
+  `code: "ERROR"` prima di uscire.
+
+Se stai guardando la pagina e non si aggiorna più, la risposta è sullo stdout del processo: se lo
+hai avviato in background redirigendo l'output, è in quel file.
 
 ## Ciclo di vita
 

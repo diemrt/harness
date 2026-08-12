@@ -18,7 +18,15 @@
 //   {"ok":true,"data":{"url":"...","port":1234,"pid":999,"projectDir":"..."}}
 //   {"ok":false,"error":"<message>","code":"<CODE>"}
 //
-// Error codes: UNKNOWN_ARGUMENT, INVALID_ARGUMENT_VALUE, FILE_NOT_FOUND, PORT_IN_USE, ERROR.
+// Error codes: UNKNOWN_ARGUMENT, INVALID_ARGUMENT_VALUE, FILE_NOT_FOUND, PORT_IN_USE, WATCH_LOST,
+// ERROR.
+//
+// That line is printed at startup and then, at most, once more: when the server dies. A board that
+// dies quietly leaves the caller holding an URL it believes is live, which is how this process
+// spent its first weeks — three deaths in one session, at 50, 25 and 16 minutes, each one silent.
+// WATCH_LOST is the case that can be provoked and therefore tested: the project directory
+// disappears, and fs.watch answers not with an error but with an endless storm of rename events
+// for the vanished path. The rest is caught by a last-resort handler on uncaughtException.
 
 import { createServer } from "node:http";
 import { existsSync, readFileSync, realpathSync, statSync, watch } from "node:fs";
@@ -144,6 +152,12 @@ function main() {
       res.write("retry: 1000\n\n");
       clients.add(res);
       req.on("close", () => clients.delete(res));
+      // A browser does not always leave politely: a tab killed, a laptop suspended, a network
+      // dropped leave a socket that errors on the next write instead of firing 'close' first.
+      // Without this listener that error has nowhere to go, and an unhandled 'error' event takes
+      // the whole process down — which is what "the URL was announced and is already dead" looks
+      // like from the outside.
+      res.on("error", () => clients.delete(res));
       return;
     }
 
@@ -164,14 +178,50 @@ function main() {
   let timer = null;
   const watcher = watch(projectDir, (_event, filename) => {
     if (filename !== "issues.json") {
+      // The watched directory disappearing does NOT raise an error: fs.watch keeps firing rename
+      // events for the vanished path, forever, at full speed. Serving on from there would mean
+      // answering with a tracker nobody is following any more — a stale reading that looks fresh,
+      // which is the one thing this board must never do. So the check runs on the events that are
+      // not about issues.json, which in normal life are rare and during that storm are all of them.
+      if (!existsSync(projectDir)) {
+        stopWatching();
+        writeFail(
+          `The project directory '${projectDir}' is gone: the board cannot follow it any more.`,
+          "WATCH_LOST"
+        );
+      }
       return;
     }
     clearTimeout(timer);
     timer = setTimeout(() => {
       for (const client of clients) {
-        client.write("event: issues\ndata: {}\n\n");
+        try {
+          client.write("event: issues\ndata: {}\n\n");
+        } catch {
+          // The client vanished between the check and the write. Dropping it is the whole
+          // remedy: what must not happen is that one dead browser tab ends the process every
+          // other tab is watching.
+          clients.delete(client);
+        }
       }
     }, DEBOUNCE_MS);
+  });
+
+  function stopWatching() {
+    clearTimeout(timer);
+    try {
+      watcher.close();
+    } catch {
+      // Closing a watcher that already broke is not a second failure worth reporting.
+    }
+  }
+
+  // Watchers do emit errors of their own on some platforms and filesystems. Losing the watcher
+  // means losing the only reason this process exists — the page would keep answering with a
+  // tracker it no longer follows — so it is a death, and a death is announced.
+  watcher.on("error", (error) => {
+    stopWatching();
+    writeFail(`The watcher on '${projectDir}' failed: ${error.message}`, "WATCH_LOST");
   });
 
   function shutdown() {
@@ -185,6 +235,16 @@ function main() {
 
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
+
+  // Last resort, and deliberately not something a test can stage: whatever kills this process
+  // after startup, it must not go without saying so. The caller has an URL it believes is live —
+  // the one thing worse than the board dying is the board dying quietly.
+  process.on("uncaughtException", (error) => {
+    writeFail(`Unexpected error after startup: ${error && error.message ? error.message : String(error)}`, "ERROR");
+  });
+  process.on("unhandledRejection", (reason) => {
+    writeFail(`Unhandled rejection after startup: ${reason && reason.message ? reason.message : String(reason)}`, "ERROR");
+  });
 
   server.listen(Number.parseInt(values.port, 10), "127.0.0.1", () => {
     const { port } = server.address();

@@ -14,6 +14,7 @@ import {
   rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
+import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -834,6 +835,99 @@ test("the board never writes: no HTTP method mutates issues.json", async () => {
       "the board is read-only: the guard against self-validation lives in the process environment, " +
         "and a click in a browser carries no role"
     );
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Staying alive, and dying out loud. The board announced an URL and then died three times in one
+// session — 50, 25 and 16 minutes — without saying anything, which is worse than dying: the caller
+// keeps an URL it believes is live.
+// ---------------------------------------------------------------------------
+
+// Reads the child's stdout until a second JSON line shows up (the first is the startup line).
+function nextLine(child, timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    let buffer = "";
+    const timer = setTimeout(() => reject(new Error("no further line on stdout")), timeoutMs);
+    child.stdout.on("data", (chunk) => {
+      buffer += chunk;
+      const line = buffer.split("\n").find((l) => l.trim().length > 0);
+      if (line) {
+        clearTimeout(timer);
+        resolve(JSON.parse(line));
+      }
+    });
+  });
+}
+
+test("the project directory disappearing is announced on stdout, not spun on in silence", async () => {
+  const dir = tempProject(seed());
+  const { child } = await startServer(dir);
+  try {
+    const dying = nextLine(child);
+    rmSync(dir, { recursive: true, force: true });
+
+    const line = await dying;
+    assert.equal(line.ok, false);
+    assert.equal(line.code, "WATCH_LOST");
+    assert.match(line.error, /board cannot follow/);
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an SSE client that vanishes without closing does not take the process with it", async () => {
+  const dir = tempProject(seed());
+  const { child, url, port } = await startServer(dir);
+  try {
+    // A raw socket, destroyed mid-stream: a killed tab or a suspended laptop leaves exactly this,
+    // a connection the server still believes in.
+    const socket = net.connect(port, "127.0.0.1");
+    await new Promise((resolve) => socket.on("connect", resolve));
+    socket.write("GET /events HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    socket.destroy();
+
+    // The write lands while the server may still be holding the dead response.
+    writeFileSync(path.join(dir, "issues.json"), seed([issue("22222222-2222-2222-2222-222222222222")]), "utf8");
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    assert.equal((await fetch(url)).status, 200);
+    const payload = await (await fetch(new URL("api/issues", url))).json();
+    assert.equal(payload.issues.length, 1);
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("SIGTERM still closes the server with an open SSE connection", async () => {
+  const dir = tempProject(seed());
+  const { child, port } = await startServer(dir);
+  try {
+    const socket = net.connect(port, "127.0.0.1");
+    // The server going away resets this socket, and an unhandled 'error' here would fail the test
+    // for the very thing it is checking happens.
+    socket.on("error", () => {});
+    await new Promise((resolve) => socket.on("connect", resolve));
+    socket.write("GET /events HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // What matters is that it exits rather than hanging on the open stream. The exit code is not
+    // asserted: Windows has no real SIGTERM, and Node emulates it by terminating the process
+    // outright, so the handler that would exit 0 never runs there.
+    const exited = new Promise((resolve) => child.on("exit", () => resolve(true)));
+    child.kill("SIGTERM");
+    const closed = await Promise.race([
+      exited,
+      new Promise((resolve) => setTimeout(() => resolve(false), 5000)),
+    ]);
+    assert.equal(closed, true, "an open SSE connection must not keep the server alive after SIGTERM");
+    socket.destroy();
   } finally {
     stop(child);
     rmSync(dir, { recursive: true, force: true });
