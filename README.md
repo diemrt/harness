@@ -25,8 +25,8 @@ project but `issues.json`.**
 
 An agent left to its own devices decides what "done" means and then agrees with itself.
 Harness takes both halves of that away: every piece of work is a tracked issue, every issue is
-verified by an agent **other** than the one that did it, and nothing is committed before that
-verification passes.
+verified by an agent **other** than the one that did it, and nothing reaches the shared branch
+before that verification passes.
 
 Earlier versions shipped those rules as files copied into each repository, then as an npm
 package that kept the copies in sync. The plugin removes the copies entirely — rules, scripts
@@ -58,7 +58,8 @@ writing anything.
 - **Independent verification** — the worker leaves the issue in review; a separate
   `harness-verifier` agent runs the project's verification command against the real artifacts
   and is the only one allowed to close the issue.
-- **Commit gate** — one issue per commit, only after that verification passes.
+- **Publication gate** — a local commit on a work branch is a foothold, not a publication. It
+  is the push, or the merge, that the pass authorises.
 
 The workflow itself is the plugin's `harness` skill, which Claude loads on its own when a
 project has an `issues.json`. [`skills/harness/SKILL.md`](skills/harness/SKILL.md) and its

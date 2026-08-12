@@ -1,14 +1,14 @@
 ---
 name: harness
-description: Usa quando lavori allo sviluppo di un progetto con il workflow harness — issue tracciate su issues.json, una sola issue in corso per catena di dipendenza, verifica indipendente obbligatoria prima di ogni commit. Si attiva su "clock in", "clock out", "lavora la issue", "apri una issue", "board delle issue", o quando il progetto contiene un issues.json.
+description: Usa quando lavori allo sviluppo di un progetto con il workflow harness — issue tracciate su issues.json, una sola issue in corso per catena di dipendenza, verifica indipendente obbligatoria prima di pubblicare. Si attiva su "clock in", "clock out", "lavora la issue", "apri una issue", "board delle issue", o quando il progetto contiene un issues.json.
 ---
 
 # Harness
 
 Harness impone un modo di lavorare, non una libreria: il lavoro che vale la pena far guardare a
 qualcun altro è una issue tracciata — quale sia, lo dice il capitolo «Cosa diventa una issue» —,
-ogni issue viene verificata da un agente **diverso** da chi l'ha svolta, e si committa solo dopo
-quella verifica.
+ogni issue viene verificata da un agente **diverso** da chi l'ha svolta, e niente raggiunge il
+ramo condiviso prima di quella verifica.
 
 **Cosa harness scrive nel progetto:** `issues.json` alla radice (i dati del tracker) e
 `.harness/` (configurazione, archivi di `--compact`, log dei worker). Nient'altro: script,
@@ -138,7 +138,7 @@ restano parallele fra loro. Anche con `mode: "inline"`: `inline` non si legge ma
 ### Invarianti, non negoziabili
 
 - **verifica indipendente su OGNI issue** — mai auto-verifica;
-- **commit SOLO dopo `validation.state = pass`** assegnato dal verificatore;
+- **niente raggiunge il ramo condiviso prima del `pass`** assegnato dal verificatore;
 - **nessun `pass` auto-assegnato** da chi ha svolto il lavoro.
 
 Questi tre punti valgono qualunque sia il grado di parallelismo e qualunque sia il tipo di
@@ -268,14 +268,33 @@ capacità di giudicare davvero. Il verificatore:
   l'evidenza; fallita → `status = blocked`, `validation.state = fail`, `criteria` con il
   motivo.
 
-## Gate sul commit
+## Gate sulla pubblicazione
 
-Committa **una issue alla volta**, come snapshot, **solo** dopo il `pass` del verificatore.
-Nessun commit di una issue `done`/`pass` non verificata da un altro agente, né di una issue
-`blocked`. Se la verifica fallisce: nessun commit finché la issue non viene ripresa,
+**Niente raggiunge il ramo condiviso prima del `pass`.** Il commit locale su un ramo di lavoro è
+un punto fermo, non una pubblicazione: è il `push` — o il merge — che il `pass` autorizza.
+
+L'invariante stava sul commit, e in quella forma contraddiceva il modello di verifica. Un criterio
+come «`git show <sha> --numstat` sulla spec madre: 67 aggiunte, 0 cancellazioni» **non è
+controllabile prima che la revisione esista**; la regola sulle prove fuori portata ne chiede di
+committate ([references/verification.md](references/verification.md)); `covers` nomina revisioni
+che devono esistere. Non era distrazione di chi lavorava: erano due regole di harness in conflitto,
+e ognuno la scioglieva come poteva, in silenzio, ogni volta. Spostata al confine di pubblicazione
+la regola smette di contraddirsi, e il verificatore lavora su un commit che c'è — può usare
+`git show` e `git diff --stat`, che è esattamente quello che i verificatori reali facevano senza
+poterlo dichiarare legittimo.
+
+- **Il caso `fail` non chiede niente di speciale.** Una issue bloccata lascia commit sul ramo:
+  restano lì, si corregge con altri commit, e si pubblica dopo il `pass`. È il funzionamento
+  normale di git — nessuna storia da riscrivere.
+- **Cade la corrispondenza uno-a-uno fra issue e commit.** Harness non prescrive di schiacciare la
+  storia: prescrive che niente attraversi quel confine senza `pass`. Per lo stesso motivo `covers`
+  è un array — una issue docs può coprire i sei commit locali di un tratto di lavoro, non uno solo.
+
+Resta vietato pubblicare una issue `done`/`pass` che nessun altro agente ha verificato, o una
+issue `blocked`. Se la verifica fallisce: nessuna pubblicazione finché la issue non viene ripresa,
 corretta e riverificata.
 
-Convenzioni di branch e messaggi: [references/git.md](references/git.md).
+Convenzioni di branch, messaggi e confine: [references/git.md](references/git.md).
 
 ## Dopo il commit: gate documentale
 
@@ -284,7 +303,7 @@ codice** (secondo `docsGate.include`/`exclude` in `.harness/config.json`), apri 
 docs con `--insert`, **dichiarando in `covers` la revisione che copre**: quello SHA esiste già —
 la issue docs nasce dopo il commit che deve documentare — e senza di lui il commit resta scoperto
 anche se la issue c'è. La issue verrà lavorata poi col workflow normale: clock-in, verifica
-indipendente, gate sul commit come qualsiasi altra.
+indipendente, gate sulla pubblicazione come qualsiasi altra.
 
 Non blocca mai il commit: è un promemoria tracciato, non un veto. Nel modello plugin questo
 controllo lo fai tu, non un hook `post-commit` — e per questo è saltabile.
@@ -308,7 +327,7 @@ e propone solo ciò che passa la bussola qui sopra.
 ## Clock out (fine sessione)
 
 Per ogni issue lavorata: lavoro concluso → `in_review` → verifica indipendente → `pass` →
-commit dedicato. Se durante la sessione hai avviato il board, fermalo adesso col `pid` della
+pubblicazione. Se durante la sessione hai avviato il board, fermalo adesso col `pid` della
 riga di avvio.
 
 Chiudi ristampando il riepilogo (`node "$SCRIPTS/status-cli.mjs"`, verbatim in un blocco di

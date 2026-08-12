@@ -383,11 +383,12 @@ semplicemente non risolve, e il gate lo **riporta come irrisolto** invece di ign
 validazione stretta rifiuterebbe tag e riferimenti simbolici legittimi per difendere da un errore
 che si vede comunque.
 
-**Quando si scrive.** All'`--insert`, mai dopo. Una issue non può registrare il **proprio**
-commit: quello nasce dopo il `pass` del verificatore, e servirebbe un update post-commit, cioè un
-altro passo dimenticabile. Una issue docs invece nasce **dopo** il commit di codice che deve
-documentare: quello SHA esiste già nel momento in cui la issue si apre. È questo che rende il
-campo praticabile invece che teorico.
+**Quando si scrive.** All'`--insert`, mai dopo. Una issue non può registrare il **proprio** lavoro
+mentre lo sta ancora facendo: i suoi commit non esistono nel momento in cui la issue si apre, e
+inseguirli chiederebbe un update dopo ogni commit, cioè un altro passo dimenticabile. Una issue
+docs invece nasce **dopo** i commit di codice che deve documentare: quegli SHA esistono già quando
+la issue si apre. È questo che rende il campo praticabile invece che teorico, ed è anche perché è
+un **array**: un tratto di lavoro sono più commit, non uno.
 
 **`tasks` e `validation.tasks`** sono la **decomposizione** della prosa alla grana a cui l'agente
 lavora: una voce per passo, `{ id, short_title, full_description, checked }`. `description` e

@@ -34,7 +34,7 @@ of anything: what you edit is what ships.
 
 `ci.yml` runs on every push and pull request: `npm ci`, `npm test`, then a read of this
 repository's own tracker through the shipped CLI. `.harness/config.json` declares `npm run
-test` as the verification command, so that is the gate every issue must pass before its commit.
+test` as the verification command, so that is the gate every issue must pass before it is published.
 
 ## Releasing
 

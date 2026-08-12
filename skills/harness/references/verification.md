@@ -7,8 +7,8 @@ buono.** Un agente che verifica sé stesso trova quello che si aspetta di trovar
 
 | Ruolo | Può | Non può |
 |---|---|---|
-| **Orchestratore** | assegnare il lavoro, committare dopo il `pass` | dichiarare `pass` su lavoro proprio |
-| **Worker** | implementare, portare la issue a `in_review` | chiudere la issue, committare |
+| **Orchestratore** | assegnare il lavoro, pubblicare dopo il `pass` | dichiarare `pass` su lavoro proprio |
+| **Worker** | implementare, portare la issue a `in_review` | chiudere la issue, pubblicare |
 | **Verificatore** | eseguire il gate, chiudere la issue `done`/`blocked` | correggere il lavoro |
 
 Tre ruoli, tre agenti distinti. Se il worker è un worker esterno
@@ -62,8 +62,8 @@ La chiusura porta `validation` da `null` a oggetto popolato — `state` più l'e
 come su una issue con criteri. Una issue che resta a `validation: null` dopo la chiusura non è
 stata verificata, è stata archiviata.
 
-Nessuno dei tre invarianti cambia: verifica indipendente su ogni issue, commit solo dopo il
-`pass`, nessun `pass` auto-assegnato.
+Nessuno dei tre invarianti cambia: verifica indipendente su ogni issue, niente sul ramo condiviso
+prima del `pass`, nessun `pass` auto-assegnato.
 
 ## Cosa rende una verifica reale
 

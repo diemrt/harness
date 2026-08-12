@@ -21,8 +21,15 @@ chore/update-dependencies
 
 ## Commit
 
-In inglese, piccoli, leggibili, legati a una modifica coerente. Un commit per issue, come
-snapshot, **solo dopo il `pass` del verificatore**.
+In inglese, piccoli, leggibili, legati a una modifica coerente. **Sul ramo di lavoro i commit sono
+liberi**: sono punti fermi, e un tratto lungo ne merita più di uno.
+
+Il confine è la **pubblicazione** — `push` sul ramo condiviso, o merge — e niente lo attraversa
+prima del `pass` del verificatore. Una issue che fallisce lascia i suoi commit sul ramo: si
+corregge con altri commit e si pubblica dopo, senza riscrivere niente.
+
+Non c'è nessuna corrispondenza obbligata fra una issue e un commit. Harness non chiede di
+schiacciare la storia: chiede che al confine ogni issue rappresentata di là abbia il suo `pass`.
 
 ```text
 tipo: descrizione breve
@@ -43,6 +50,7 @@ riassume le righe cambiate.
 
 Anche lavorando da soli, prima di un merge controlla:
 
+- ogni issue rappresentata nei commit che stai per pubblicare ha il suo `pass`;
 - la modifica risponde allo scopo dichiarato nella issue;
 - non sono stati toccati file estranei alla richiesta;
 - il progetto si costruisce (il comando di verifica di `.harness/config.json` passa);

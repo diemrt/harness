@@ -9,7 +9,7 @@ I file del plugin sono l'unica copia autorata: non esiste un template da cui rig
 una copia materializzata da tenere in sincrono. Allo stesso tempo questo progetto è il primo
 consumer di harness — il suo sviluppo è tracciato in `issues.json` alla radice e procede col
 workflow che il plugin impone (clock-in, una issue in corso per catena, verifica indipendente,
-commit solo dopo il `pass`).
+niente sul ramo condiviso prima del `pass`).
 
 Conseguenza operativa: **ogni modifica al plugin va provata qui prima di essere rilasciata.**
 Averla scritta e committata non basta, e nemmeno `npm test` basta: una skill, un agent o un

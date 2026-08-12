@@ -41,7 +41,8 @@ il motivo. Non chiuderla tu, né prima né dopo di lui.
 
 ## 3. Riporta l'esito
 
-- `pass` → la issue è `done`. Solo adesso è lecito committarla, da sola, come snapshot.
-- `fail` → la issue è `blocked`. **Nessun commit.** Riporta il motivo così com'è: non
+- `pass` → la issue è `done`. Solo adesso il suo lavoro può raggiungere il ramo condiviso.
+- `fail` → la issue è `blocked`. **Niente pubblicazione**, e i commit già fatti sul ramo di
+  lavoro restano dove sono: si corregge con altri commit. Riporta il motivo così com'è: non
   discuterlo, non correggere al volo il difetto dentro questo comando, non rilanciare la
   verifica sperando in un esito diverso. Si riprende la issue, si corregge, si riverifica.

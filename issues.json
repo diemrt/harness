@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-12T10:41:17Z",
+  "last_updated": "2026-08-12T10:52:01Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1002,26 +1002,49 @@
       "id": "19dd7fa4-c230-42cd-a33a-a6620bc90315",
       "title": "L'invariante si sposta dal commit alla pubblicazione",
       "description": "Il secondo invariante di harness diventa: niente raggiunge il ramo condiviso prima del pass. Il commit locale su un ramo di lavoro è un punto fermo, non una pubblicazione; è il push, o il merge, che il pass autorizza.\n\nPiano: docs/superpowers/plans/2026-08-12-harness-continuita-del-lavoro.md, Task 6. Spec: docs/superpowers/specs/2026-08-10-harness-continuita-del-lavoro-design.md, §1.\n\nNon è una regola ammorbidita: è una contraddizione sciolta. Un criterio formulato su una revisione non è controllabile prima che la revisione esista, la regola sulle prove fuori portata ne chiede di committate, e covers nomina revisioni che devono esistere. Chi lavorava la scioglieva come poteva, in silenzio, ogni volta.\n\nVa scritto il caso fail, che è l'obiezione principale: una issue bloccata lascia commit sul ramo, si corregge con altri commit e si pubblica dopo il pass. Non dirlo lascerebbe credere che serva riscrivere la storia, e qualcuno lo farebbe.",
-      "status": "backlog",
+      "status": "done",
       "tier": "reasoning",
       "depends_on": [],
       "covers": [],
+      "tasks": [
+        {
+          "id": 1,
+          "short_title": "Riformulare il secondo invariante",
+          "full_description": "In SKILL.md, lista Invarianti non negoziabili: da commit SOLO dopo il pass a niente raggiunge il ramo condiviso prima del pass.",
+          "checked": true
+        },
+        {
+          "id": 2,
+          "short_title": "Gate sul commit diventa Gate sulla pubblicazione",
+          "full_description": "Riscrivere il capitolo: perche' la regola vecchia si contraddiceva (un criterio su una revisione non e' controllabile prima che la revisione esista), cosa ci guadagna il verificatore, il caso fail coi commit che restano sul ramo, la caduta della corrispondenza uno-a-uno e il legame con covers array.",
+          "checked": true
+        },
+        {
+          "id": 3,
+          "short_title": "Le occorrenze residue altrove",
+          "full_description": "Cercare in TUTTO il repository, non solo le frasi che ti aspetti: skills/, commands/, agents/, README, CONTRIBUTING, CLAUDE, e i commenti negli script. Aggiornate commands/verify.md (diceva Nessun commit sul fail, l opposto della regola nuova), SKILL.md, references/issues.md, README, CONTRIBUTING, CLAUDE. Il gate documentale resta com era: guarda i commit, ed e giusto cosi.",
+          "checked": true
+        },
+        {
+          "id": 4,
+          "short_title": "references/git.md: il confine",
+          "full_description": "Commit locali liberi sul ramo di lavoro, push o merge come confine, il caso fail senza riscrivere la storia, e la checklist prima di fondere che chiede il pass di ogni issue rappresentata.",
+          "checked": true
+        },
+        {
+          "id": 5,
+          "short_title": "Suite verde e rilettura",
+          "full_description": "npm run test verde, plugin-skill.test.mjs compreso. Rileggere il diff cercando prosa rivolta a chi esegue il piano.",
+          "checked": true
+        }
+      ],
       "validation": {
-        "criteria": [
-          "Il secondo invariante di SKILL.md dice che niente raggiunge il ramo condiviso prima del pass del verificatore",
-          "Il capitolo Gate sulla pubblicazione spiega il caso fail: i commit restano sul ramo e si corregge con altri commit, senza riscrivere la storia",
-          "Il capitolo dichiara caduta la corrispondenza uno-a-uno fra issue e commit, e lega la scelta all'array covers",
-          "references/git.md dice che i commit locali sul ramo di lavoro sono liberi e che il confine è il push o il merge",
-          "La checklist di revisione prima di fondere chiede il pass di ogni issue rappresentata nei commit da pubblicare",
-          "Una ricerca di 'Gate sul commit' e 'commit solo dopo' su skills/, commands/ e agents/ non trova occorrenze residue che contraddicano il nuovo invariante",
-          "npm run test verde"
-        ],
-        "state": "unknown",
-        "tasks": []
+        "criteria": "Ri-verifica dopo il fix del criterio 6. Tutti e 7 i criteri soddisfatti. (1) skills/harness/SKILL.md:141 'niente raggiunge il ramo condiviso prima del pass assegnato dal verificatore'. (2) SKILL.md:286-288 caso fail: 'Una issue bloccata lascia commit sul ramo: restano li', si corregge con altri commit, e si pubblica dopo il pass ... nessuna storia da riscrivere'. (3) SKILL.md:289-291 'Cade la corrispondenza uno-a-uno fra issue e commit ... Per lo stesso motivo covers e' un array'. (4) references/git.md:24-29 'Sul ramo di lavoro i commit sono liberi' + 'Il confine e' la pubblicazione - push sul ramo condiviso, o merge'. (5) references/git.md:53, prima voce di 'Revisione prima di fondere': 'ogni issue rappresentata nei commit che stai per pubblicare ha il suo pass'. (6) Sweep concettuale (non solo le stringhe attese) su skills/ commands/ agents/ README CONTRIBUTING CLAUDE scripts/ .github/ test/ con rg su 'gate sul commit|commit gate', 'committare|committato', 'nessun commit', 'one issue per commit', 'before its commit', 'commit .. dopo/prima .. pass': ZERO occorrenze residue che contraddicano il nuovo invariante. Le sopravvissute sono estranee alla regola - config.md:15-16 e issues.md:401 (cosa si tiene tracciato), git.md:72 ed external-worker.md:114 (settings.local non committato), docs-gate.mjs:201 e docs-gate.md:119 (stringa di output 'nessun commit di codice scoperto'), external-worker.md:105 (divieto di commit del worker esterno, piu' stretto dell'invariante, non in conflitto). Le sei correzioni sono in diff: commands/verify.md:44-46 ora dice 'Solo adesso il suo lavoro puo' raggiungere il ramo condiviso' e sul fail 'Niente pubblicazione, e i commit gia' fatti sul ramo di lavoro restano dove sono: si corregge con altri commit'; SKILL.md:306 'gate sulla pubblicazione come qualsiasi altra'; references/issues.md:386-391 la motivazione di covers non poggia piu' sulla premessa rovesciata e spiega l'array; README.md:28 'nothing reaches the shared branch' e README.md:61 'Publication gate'; CONTRIBUTING.md:37 'before it is published'; CLAUDE.md:12 'niente sul ramo condiviso prima del pass'. (7) Gate `npm run test`: tests 359, pass 359, fail 0, duration_ms 32391. Controlli extra: gate documentale intatto - SKILL.md:299-309 conserva titolo 'Dopo il commit: gate documentale', 'Subito dopo ogni commit' e 'Non blocca mai il commit'; nessuna prosa rivolta a chi esegue il piano nei file spediti (nessun 'Task N'/'Step N'/rimando a plans/ o specs/; l'unico 'spec' e' dentro un esempio generico di criterio in SKILL.md:277); git status --short elenca solo i 9 file di documentazione dichiarati piu' issues.json, nessun file estraneo, nessun segreto. Il verificatore non ha modificato nessun file.",
+        "tasks": [],
+        "state": "pass"
       },
       "created_at": "2026-08-12T09:27:25Z",
-      "updated_at": "2026-08-12T09:27:25Z",
-      "tasks": []
+      "updated_at": "2026-08-12T10:52:01Z"
     },
     {
       "id": "1b61adf1-df07-446c-aff1-e814b22b31a9",
