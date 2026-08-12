@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-12T08:51:03Z",
+  "last_updated": "2026-08-12T09:28:56Z",
   "rules": {
     "single_active_issue": false
   },
@@ -713,6 +713,176 @@
       },
       "created_at": "2026-08-12T08:38:54Z",
       "updated_at": "2026-08-12T08:51:03Z"
+    },
+    {
+      "id": "d56925cd-2096-463c-bc92-8c75c6612954",
+      "title": "I due array di task nello schema, e la migrazione 2 -> 3",
+      "description": "Lo schema della issue guadagna due array: `tasks` per l'esecuzione e `validation.tasks` dentro `validation` per il giudizio. Sono la decomposizione della prosa alla grana a cui l'agente lavora davvero; `description` e `validation.criteria` restano invariati e restano prosa.\n\nPiano: docs/superpowers/plans/2026-08-12-harness-continuita-del-lavoro.md, Task 1. Spec: docs/superpowers/specs/2026-08-10-harness-continuita-del-lavoro-design.md, §2 e §7.\n\nSCHEMA_VERSION va a 3 e la migrazione si accoda a MIGRATIONS senza rinumerare le voci esistenti. Entrambi gli array si materializzano a [] come depends_on e covers; una validation a null non ne guadagna uno, perché non c'è dove metterli.\n\nUn --update che non nomina validation.tasks li conserva: il payload di chiusura è {criteria, state}, e senza questa regola ogni chiusura cancellerebbe la checklist che ha appena giudicato. Per svuotarli si passa \"tasks\": [] esplicito.",
+      "status": "in_progress",
+      "tier": "standard",
+      "depends_on": [],
+      "covers": [],
+      "validation": {
+        "criteria": [
+          "--insert con tasks e validation.tasks memorizza i due array verbatim, e --get li rilegge identici",
+          "tasks assente all'insert vale [] e non una chiave mancante; una validation a null resta null e non guadagna un array",
+          "id non intero, id duplicato, checked non booleano, campo extra o array mancante sono rifiutati con INVALID_INPUT",
+          "short_title oltre 60 caratteri e full_description oltre 1200 sono rifiutati con LIMIT_EXCEEDED; il numero di task non ha tetto",
+          "--upgrade da schema_version 2 a 3 materializza i due array, riporta migrated pari alle issue toccate, e un secondo giro lascia il file identico ai byte",
+          "--compact archivia gli originali coi loro task e scrive tasks vuoti sul blocco",
+          "npm run test verde, con i test nuovi in test/plugin-issue-manager.test.mjs"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-12T09:27:25Z",
+      "updated_at": "2026-08-12T09:28:56Z"
+    },
+    {
+      "id": "cf74ee9d-14b4-4463-bb6d-e03df0da004b",
+      "title": "I tre guard sui task, e il flag --decomposition-unchanged",
+      "description": "I tre punti in cui questa spec smette di consigliare e rende impossibile: un worker non spunta ciò che lo giudica, una issue in volo dichiara come ci arriva, e la prosa non si allontana dalla propria decomposizione.\n\nPiano: docs/superpowers/plans/2026-08-12-harness-continuita-del-lavoro.md, Task 2. Spec: docs/superpowers/specs/2026-08-10-harness-continuita-del-lavoro-design.md, §3.1, §3.2, §3.3.\n\nIl confronto dell'aggiornamento appaiato guarda id, short_title e full_description, mai checked: spuntare un task è avanzamento, non una nuova decomposizione, e una regola che chiedesse il flag a ogni spunta verrebbe risposta col flag a ogni chiamata. Per lo stesso motivo la prima materializzazione è esente (non c'è ancora una decomposizione da cui divergere) e sul lato validazione il guard vale solo finché state è unknown, perché alla chiusura criteria porta l'evidenza e non più il contratto.",
+      "status": "backlog",
+      "tier": "reasoning",
+      "depends_on": [
+        "d56925cd-2096-463c-bc92-8c75c6612954"
+      ],
+      "covers": [],
+      "validation": {
+        "criteria": [
+          "Con HARNESS_ROLE=worker un update che porta a true un validation.tasks[].checked è rifiutato con FORBIDDEN_ROLE; lo stesso payload da un non-worker passa",
+          "Con HARNESS_ROLE=worker spuntare una voce dei propri tasks resta permesso",
+          "status in_progress con tasks vuoto è rifiutato con INVALID_INPUT su --insert e su --update",
+          "Una issue che ha già i task passa a in_progress senza rispedirli",
+          "Un --update che cambia description senza toccare la decomposizione dei tasks, o il contrario, è rifiutato con INVALID_INPUT; idem per validation.criteria e validation.tasks a state unknown",
+          "--decomposition-unchanged accetta lo stesso payload; spunta, prima materializzazione e chiusura pass o fail non chiedono mai il flag",
+          "npm run test verde"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-12T09:27:25Z",
+      "updated_at": "2026-08-12T09:27:25Z"
+    },
+    {
+      "id": "56f1b32c-a073-4743-b85e-6a06762a885c",
+      "title": "references/issues.md: il contratto dei due array di task",
+      "description": "La reference che possiede lo schema guadagna i due array: forma, limiti, tabella dei campi accettati in input, codici di errore e il flag nuovo.\n\nPiano: docs/superpowers/plans/2026-08-12-harness-continuita-del-lavoro.md, Task 3. Spec: docs/superpowers/specs/2026-08-10-harness-continuita-del-lavoro-design.md, §2.1, §2.2, §7.\n\nIl contratto dei campi nuovi va qui e il flusso va in SKILL.md: è la lezione di P2 applicata subito, e nulla di tutto questo va dentro un comando.\n\nIl rischio vero è un numero che diverge da LIMITS: nessun test confronta la reference col codice, e chi legge crede alla reference.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [
+        "cf74ee9d-14b4-4463-bb6d-e03df0da004b"
+      ],
+      "covers": [],
+      "validation": {
+        "criteria": [
+          "Lo schema in references/issues.md mostra tasks e validation.tasks nella forma { id, short_title, full_description, checked }",
+          "I limiti 60 e 1200 scritti nella tabella coincidono con LIMITS.taskTitle e LIMITS.taskDescription in scripts/issue-manager.mjs",
+          "La tabella dei campi accettati in input ha la riga tasks, e la riga validation nomina i task e la loro conservazione in update",
+          "Le righe INVALID_INPUT, LIMIT_EXCEEDED e FORBIDDEN_ROLE della tabella dei codici nominano i casi nuovi",
+          "Sono scritte le tre cose che il guard appaiato non rifiuta: la spunta, la prima materializzazione, la chiusura",
+          "--decomposition-unchanged è documentato fra i comandi, e la migrazione 2 -> 3 nella sezione --upgrade",
+          "npm run test verde, plugin-skill.test.mjs compreso"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-12T09:27:25Z",
+      "updated_at": "2026-08-12T09:27:25Z"
+    },
+    {
+      "id": "9fc8151f-450b-49f9-89a7-9552d3a97e4d",
+      "title": "I due lettori dei task: la colonna di status-cli e le card del board",
+      "description": "Le due superfici che leggono i task e non li scrivono mai: la riga IN CORSO del riepilogo guadagna il conteggio, e la card del board guadagna una riga di riepilogo per array con i task visibili solo espandendo.\n\nPiano: docs/superpowers/plans/2026-08-12-harness-continuita-del-lavoro.md, Task 4 e Task 5. Spec: docs/superpowers/specs/2026-08-10-harness-continuita-del-lavoro-design.md, §5.1 e §5.2.\n\nIl conteggio è l'unico dato che mancava a chi riprende, e compare dove il riepilogo gira davvero: a un confine di sessione. Il troncamento del titolo scende da 45 a 38 colonne per fargli posto.\n\nSul board l'espansione è una capacità nuova della pagina, non un ritocco: oggi la card non nasconde niente, e dodici task sempre visibili le farebbero riempire lo schermo da sole. Il board resta in sola lettura: il guard anti-self-validation vive nell'environment del processo, e un click nel browser non porta nessun ruolo.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [
+        "d56925cd-2096-463c-bc92-8c75c6612954"
+      ],
+      "covers": [],
+      "validation": {
+        "criteria": [
+          "Una riga IN CORSO di status-cli porta spuntati/totali fra il tier e il titolo, e un trattino quando la issue non ha task",
+          "Nessuna riga del riepilogo supera 80 colonne con un titolo lungo e un conteggio a due cifre; TITLE_MAX vale 38",
+          "progressBar del board è piena solo quando ogni task è spuntato",
+          "renderTaskBlock non produce niente su un array vuoto o assente, ed escapa short_title e full_description",
+          "Un blocco espanso resta espanso dopo un nuovo render della lista",
+          "Nessun metodo HTTP fra POST, PUT, PATCH e DELETE modifica issues.json",
+          "references/status.md e references/board.md aggiornate; npm run test verde"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-12T09:27:25Z",
+      "updated_at": "2026-08-12T09:27:25Z"
+    },
+    {
+      "id": "19dd7fa4-c230-42cd-a33a-a6620bc90315",
+      "title": "L'invariante si sposta dal commit alla pubblicazione",
+      "description": "Il secondo invariante di harness diventa: niente raggiunge il ramo condiviso prima del pass. Il commit locale su un ramo di lavoro è un punto fermo, non una pubblicazione; è il push, o il merge, che il pass autorizza.\n\nPiano: docs/superpowers/plans/2026-08-12-harness-continuita-del-lavoro.md, Task 6. Spec: docs/superpowers/specs/2026-08-10-harness-continuita-del-lavoro-design.md, §1.\n\nNon è una regola ammorbidita: è una contraddizione sciolta. Un criterio formulato su una revisione non è controllabile prima che la revisione esista, la regola sulle prove fuori portata ne chiede di committate, e covers nomina revisioni che devono esistere. Chi lavorava la scioglieva come poteva, in silenzio, ogni volta.\n\nVa scritto il caso fail, che è l'obiezione principale: una issue bloccata lascia commit sul ramo, si corregge con altri commit e si pubblica dopo il pass. Non dirlo lascerebbe credere che serva riscrivere la storia, e qualcuno lo farebbe.",
+      "status": "backlog",
+      "tier": "reasoning",
+      "depends_on": [],
+      "covers": [],
+      "validation": {
+        "criteria": [
+          "Il secondo invariante di SKILL.md dice che niente raggiunge il ramo condiviso prima del pass del verificatore",
+          "Il capitolo Gate sulla pubblicazione spiega il caso fail: i commit restano sul ramo e si corregge con altri commit, senza riscrivere la storia",
+          "Il capitolo dichiara caduta la corrispondenza uno-a-uno fra issue e commit, e lega la scelta all'array covers",
+          "references/git.md dice che i commit locali sul ramo di lavoro sono liberi e che il confine è il push o il merge",
+          "La checklist di revisione prima di fondere chiede il pass di ogni issue rappresentata nei commit da pubblicare",
+          "Una ricerca di 'Gate sul commit' e 'commit solo dopo' su skills/, commands/ e agents/ non trova occorrenze residue che contraddicano il nuovo invariante",
+          "npm run test verde"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-12T09:27:25Z",
+      "updated_at": "2026-08-12T09:27:25Z"
+    },
+    {
+      "id": "1b61adf1-df07-446c-aff1-e814b22b31a9",
+      "title": "SKILL.md: il flusso dei task, la verifica e i due comandi",
+      "description": "Il contratto dei campi sta nella reference; qui sta il flusso: quando i due array nascono, chi può spuntare cosa, e l'ancoraggio al commit che rende il congelamento un sottoprodotto del lavorare.\n\nPiano: docs/superpowers/plans/2026-08-12-harness-continuita-del-lavoro.md, Task 7. Spec: docs/superpowers/specs/2026-08-10-harness-continuita-del-lavoro-design.md, §2.1, §3, §4, §5.3, §5.4.\n\nDipende dalla issue sulla pubblicazione non per logica ma per file: entrambe riscrivono SKILL.md, e due agenti in parallelo sullo stesso documento collidono.\n\nVa detto esplicitamente che i task non contraddicono la bussola, perché a prima vista sembra di sì: la bussola governa dove scatta la verifica indipendente, cioè dove si spende un agente intero, e una checklist dentro la issue non crea nessun giro di verificatore in più.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [
+        "56f1b32c-a073-4743-b85e-6a06762a885c",
+        "19dd7fa4-c230-42cd-a33a-a6620bc90315"
+      ],
+      "covers": [],
+      "validation": {
+        "criteria": [
+          "SKILL.md ha il capitolo dei task: i due momenti in cui nascono, chi spunta cosa, l'ancoraggio al commit, il congelamento",
+          "Il capitolo dice perché i task non contraddicono la bussola, e che indicizzano il livello a grana fine invece di sostituirlo",
+          "Il clock-in chiede di materializzare i tasks prima di portare una issue a in_progress; il clock-out chiede l'allineamento esplicito",
+          "references/verification.md dice che il verificatore spunta i validation.tasks, e che un payload di chiusura che li omette li conserva",
+          "commands/issue.md distingue chi scrive i validation.tasks alla creazione da chi materializza i tasks al clock-in",
+          "commands/verify.md nomina la spunta dei validation.tasks fra i passi del verificatore",
+          "npm run test verde, e nessuna parola di piano (Task, Step) finita nei file spediti come documentazione"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-12T09:27:26Z",
+      "updated_at": "2026-08-12T09:27:26Z"
+    },
+    {
+      "id": "10a757b4-666a-4b1c-80cb-1f81e23170c1",
+      "title": "Il processo del board muore senza che nessuno lo sappia",
+      "description": "Il board è morto tre volte in una sessione — 50, 25 e 16 minuti, quindi non un timeout fisso — lasciando ogni volta un URL annunciato come attivo e già morto. In una sessione successiva ha retto 55 minuti. L'instabilità non è sistematica, che è la cosa peggiore: non se ne può nemmeno diffidare sempre.\n\nDichiarata fuori scope da P1 e da P2, e destinata a una issue di questo tracker da entrambe le spec. Lasciarla in un paragrafo sarebbe il difetto che il deliverable sulle perdite esiste per chiudere.\n\nVerificata contro il codice ed è viva: il watch() di scripts/board-server.mjs non ha handler d'errore, il try/catch finale copre solo l'avvio sincrono, e dopo lo startup nessun errore raggiunge il chiamante. La issue ac6892cb ha chiuso soltanto la morte da path 8.3, che è istantanea e non spiega i 50 minuti.\n\nIl lavoro comincia dalla diagnosi: la correzione senza una causa identificata sarebbe un rimedio a caso.",
+      "status": "backlog",
+      "tier": "reasoning",
+      "depends_on": [],
+      "covers": [],
+      "validation": {
+        "criteria": [
+          "La causa della morte del processo è identificata e scritta nella issue o nella reference, non solo mitigata",
+          "Un errore del watcher provocato dal test non abbatte il processo: il server risponde ancora 200 su / e su api/issues",
+          "Se il processo muore comunque, lo dichiara sullo stdout con lo stesso envelope degli altri script del plugin, ok:false e un code",
+          "Il test prova che quella riga arriva davvero sullo stdout del processo avviato",
+          "SIGTERM continua a chiudere il server anche con connessioni SSE aperte",
+          "references/board.md dice come ci si accorge che il board è morto",
+          "npm run test verde, con i test esistenti del board invariati"
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-12T09:27:26Z",
+      "updated_at": "2026-08-12T09:27:26Z"
     }
   ],
   "schema_version": 2
