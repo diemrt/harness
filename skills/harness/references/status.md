@@ -59,9 +59,9 @@ una per ciascuno degli altri stati e 8 in backlog, di cui una con una dipendenza
 
  IN CORSO
  ───────────────────────────────────────────────────────────────────────────────
-  + 4f2a1b8c  in_progress  $$   vista albero delle catene
-  ~ 9c31e07d  in_review    $    filtri per tier nel board, con scorciatoie...
-  ! a47813e7  blocked      $$$  corsie lunghe contro archi corti
+  + 4f2a1b8c  in_progress  $$   4/7    vista albero delle catene
+  ~ 9c31e07d  in_review    $    3/3    filtri per tier nel board, con scor...
+  ! a47813e7  blocked      $$$  2/5    corsie lunghe contro archi corti
 
  LAVORABILI · 3 di 7
  ───────────────────────────────────────────────────────────────────────────────
@@ -128,6 +128,19 @@ in quella schermata non compare.
 mette per prima la issue toccata più di recente (`updated_at` decrescente). **Non si tronca
 mai:** dodici righe qui sono un problema di WIP da vedere, non da riassumere.
 
+Ogni riga porta il **conteggio dei task di esecuzione**, `spuntati/totali`, fra il tier e il
+titolo. È l'unico dato che mancava a chi riprende il lavoro dopo un'interruzione, e compare nel
+punto e nel momento in cui il riepilogo gira davvero: a un confine di sessione, che è dove ogni
+ripresa comincia.
+
+Un `-` al posto del conteggio dice che la issue non ha task. Su una issue `blocked` scritta prima
+del campo è la normalità; su una `in_progress` non può succedere, perché la CLI rifiuta quel
+passaggio di stato senza almeno un task. Un conteggio a tre cifre allunga la riga invece di essere
+troncato: un numero tagliato mente, una riga lunga no.
+
+Il conteggio **non** compare fra le lavorabili, e non è una dimenticanza: una issue in `backlog`
+non ha ancora task, perché i passi li materializza chi la prende.
+
 `LAVORABILI · 3 di 7` significa **tre righe mostrate su sette issue lavorabili**, dalla più
 vecchia (`created_at` crescente). Lavorabile è una issue in `backlog` le cui dipendenze sono
 tutte `done`; una senza `depends_on` lo è per definizione. Una dipendenza che punta a un id
@@ -136,7 +149,7 @@ dipende dal nulla è il modo di partire dalla parte sbagliata.
 
 Il numero a destra non è il totale del backlog — quello compare nell'allerta di stallo.
 
-I titoli si troncano a **45 caratteri** con tre punti ASCII (`...`, mai `…`, per la stessa
+I titoli si troncano a **38 caratteri** con tre punti ASCII (`...`, mai `…`, per la stessa
 ragione di larghezza ambigua), e gli spazi interni si normalizzano prima: un a capo dentro un
 titolo non può aggiungere una riga alla tabella. Gli id sono troncati a **8 caratteri**:
 bastano a riconoscere una issue, non a passarla a `issue-manager.mjs`, che vuole il GUID intero.

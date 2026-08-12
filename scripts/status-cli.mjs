@@ -38,7 +38,12 @@ export const BAR_ORDER = ["done", "in_progress", "in_review", "blocked", "backlo
 
 export const WIDTH = 80;
 export const BAR_INNER = 77; // WIDTH minus the leading space and the two brackets
-export const TITLE_MAX = 45;
+// Narrower than it was: the count column took seven columns, and a title that runs past the edge
+// breaks the table for every row, not just its own.
+export const TITLE_MAX = 38;
+// Five columns fit "12/34". A three-digit count makes the row longer instead of being truncated:
+// a cut number lies, a long row does not.
+export const TASKS_COL = 5;
 export const WORKABLE_SHOWN = 3;
 
 function emptyCounts() {
@@ -213,10 +218,23 @@ function tierIcon(tier) {
   return TIER_ICON[tier] ?? "-";
 }
 
+// How far the execution tasks of an issue have got. A dash where there are none, exactly like an
+// undeclared tier: "none" is a normal state here, not a hole to fill. A backlog issue has none by
+// design — the steps are materialized by whoever takes it — which is why this column belongs to
+// the in-flight table and to no other.
+export function taskProgress(issue) {
+  const tasks = Array.isArray(issue.tasks) ? issue.tasks : [];
+  if (tasks.length === 0) {
+    return "-";
+  }
+  return `${tasks.filter((task) => task && task.checked === true).length}/${tasks.length}`;
+}
+
 function inFlightRow(issue) {
   return (
     `  ${STATUS_ICON[issue.status]} ${shortId(issue.id).padEnd(8)}  ` +
     `${issue.status.padEnd(11)}  ${tierIcon(issue.tier).padEnd(3)}  ` +
+    `${taskProgress(issue).padEnd(TASKS_COL)}  ` +
     truncate(issue.title, TITLE_MAX)
   );
 }

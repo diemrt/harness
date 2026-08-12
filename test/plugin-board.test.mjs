@@ -4,7 +4,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, realpathSync, writeFileSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -692,6 +700,142 @@ test("a busy port is reported, not silently swallowed", async () => {
     );
   } finally {
     stop(first.child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// The tasks on the card: one summary row per array, and the tasks themselves only on expansion.
+// The card hides nothing today and has no collapse mechanism at all, so twelve execution tasks
+// always visible would fill the screen and the board would lose the thing it exists for.
+// ---------------------------------------------------------------------------
+
+function boardTask(id, overrides = {}) {
+  return { id, short_title: `task ${id}`, full_description: `do the thing ${id}`, checked: false, ...overrides };
+}
+
+test("progressBar fills only when the work is actually finished", async () => {
+  const dir = tempProject(seed());
+  const { child, url } = await startServer(dir);
+  try {
+    const html = await (await fetch(url)).text();
+    const { progressBar } = extractFunctions(html, ["progressBar"]);
+
+    assert.equal(progressBar(0, 0), "");
+    assert.equal(progressBar(0, 4).length, 10);
+    assert.equal(progressBar(4, 4), "▓".repeat(10));
+    // Nine of ten is not ten of ten: rounding up would show a finished row for work that is not,
+    // which is the fresh-looking stale datum this design refuses everywhere else.
+    assert.ok(progressBar(9, 10).endsWith("░"));
+    assert.ok(!progressBar(0, 4).includes("▓"));
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a task block summarises in one row and keeps the tasks collapsed", async () => {
+  const dir = tempProject(seed());
+  const { child, url } = await startServer(dir);
+  try {
+    const html = await (await fetch(url)).text();
+    const { renderTaskBlock } = extractFunctions(html, ["renderTaskBlock", "escapeHtml", "progressBar"]);
+
+    const rendered = renderTaskBlock([boardTask(1, { checked: true }), boardTask(2)], {
+      issueId: "abc",
+      kind: "exec",
+      label: "task",
+      expanded: new Set(),
+    });
+
+    assert.match(rendered, /<details/);
+    assert.ok(!/<details[^>]*\sopen/.test(rendered), "a collapsed block must not carry the open attribute");
+    assert.match(rendered, /1\/2/);
+    assert.match(rendered, /task 1/);
+    assert.match(rendered, /do the thing 1/);
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an expanded block comes back expanded after a re-render", async () => {
+  const dir = tempProject(seed());
+  const { child, url } = await startServer(dir);
+  try {
+    const html = await (await fetch(url)).text();
+    const { renderTaskBlock } = extractFunctions(html, ["renderTaskBlock", "escapeHtml", "progressBar"]);
+
+    // Every push from the server rebuilds the list through innerHTML, and that happens constantly
+    // while the work is going on: a block that closed itself on every write would be unusable.
+    const rendered = renderTaskBlock([boardTask(1)], {
+      issueId: "abc",
+      kind: "exec",
+      label: "task",
+      expanded: new Set(["abc:exec"]),
+    });
+    assert.match(rendered, /<details[^>]*\sopen/);
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a card with no tasks renders no block at all", async () => {
+  const dir = tempProject(seed());
+  const { child, url } = await startServer(dir);
+  try {
+    const html = await (await fetch(url)).text();
+    const { renderTaskBlock } = extractFunctions(html, ["renderTaskBlock", "escapeHtml", "progressBar"]);
+
+    const options = { issueId: "abc", kind: "exec", label: "task", expanded: new Set() };
+    assert.equal(renderTaskBlock([], options), "");
+    assert.equal(renderTaskBlock(null, options), "");
+    assert.equal(renderTaskBlock(undefined, options), "");
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("task text is escaped like every other field on the card", async () => {
+  const dir = tempProject(seed());
+  const { child, url } = await startServer(dir);
+  try {
+    const html = await (await fetch(url)).text();
+    const { renderTaskBlock } = extractFunctions(html, ["renderTaskBlock", "escapeHtml", "progressBar"]);
+
+    const rendered = renderTaskBlock(
+      [{ id: 1, short_title: "<script>alert(1)</script>", full_description: '"><img onerror=x>', checked: false }],
+      { issueId: '"><script>alert(2)</script>', kind: "exec", label: "task", expanded: new Set() }
+    );
+    assert.equal(rendered.includes("<script>"), false);
+    assert.equal(rendered.includes("<img onerror"), false);
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the board never writes: no HTTP method mutates issues.json", async () => {
+  const dir = tempProject(seed([issue("11111111-1111-1111-1111-111111111111")]));
+  const { child, url } = await startServer(dir);
+  try {
+    const before = readFileSync(path.join(dir, "issues.json"), "utf8");
+    for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
+      await fetch(new URL("api/issues", url), {
+        method,
+        body: method === "DELETE" ? undefined : '{"issues":[]}',
+      });
+    }
+    assert.equal(
+      readFileSync(path.join(dir, "issues.json"), "utf8"),
+      before,
+      "the board is read-only: the guard against self-validation lives in the process environment, " +
+        "and a click in a browser carries no role"
+    );
+  } finally {
+    stop(child);
     rmSync(dir, { recursive: true, force: true });
   }
 });

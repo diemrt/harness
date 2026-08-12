@@ -135,6 +135,41 @@ Da cui le due regole che restano:
 Il riepilogo testuale (`status-cli.mjs`, [status.md](status.md)) resta la fonte che non dipende
 da nessun processo, ed è per questo che è lui, e non il board, il passo del clock-in.
 
+## La card e i task
+
+Ogni card riassume i **task** della issue in una riga per array — una barra da dieci celle e il
+conteggio `spuntati/totali` — e mostra i task veri solo **espandendo**. I task di esecuzione
+stanno sotto la description; quelli di validazione dentro il riquadro *Validazione*, che è dove
+vive tutto ciò che riguarda il giudizio.
+
+```text
+┌───────────────────────────────────┐
+│ Hop Angular 18 → 19               │
+│ in_progress   reasoning           │
+│                                   │
+│ Porta il frontend dalla 18 alla   │
+│ 19 con ng update, senza toccare…  │
+│                                   │
+│ ▸ task  ▓▓▓▓▓░░░░░  2/4           │
+└───────────────────────────────────┘
+```
+
+L'espansione è una capacità **nuova** della pagina, non un ritocco: fino a qui la card non
+nascondeva niente — description intera, tutti i criteri, un chip per dipendenza — e dodici task di
+esecuzione più sei di validazione sempre visibili avrebbero prodotto card che riempiono lo schermo
+da sole, facendo perdere al board la cosa per cui esiste.
+
+La barra è piena **solo** quando ogni task è spuntato: arrotondare per eccesso mostrerebbe come
+finito un lavoro che non lo è, ed è lo stesso motivo per cui il tracker non tiene dati che sembrano
+freschi senza esserlo.
+
+Quali blocchi hai aperto se lo ricorda finché la pagina resta aperta. Non è un vezzo: il server
+spinge un aggiornamento a ogni scrittura di `issues.json` — cioè di continuo, mentre si lavora — e
+ogni push ricostruisce la lista da capo. Senza memoria, un blocco aperto si richiuderebbe da solo
+ogni pochi secondi.
+
+Una issue senza task non mostra nessuna riga: niente da riassumere, nessuno spazio occupato.
+
 ## Cosa non fa
 
 - Non scrive niente nel progetto.
@@ -143,6 +178,11 @@ da nessun processo, ed è per questo che è lui, e non il board, il passo del cl
   compreso `issues.json` chiesto per path.
 - Non è un'interfaccia di modifica: le issue si cambiano con la CLI
   ([issues.md](issues.md)), così ogni scrittura passa dalle stesse validazioni.
+- **Non si spuntano i task dal browser**, e non è una funzione che manca. Il guard
+  anti-self-validation vive nell'**environment del processo**: rifiuta perché chi invoca ha
+  `HARNESS_ROLE=worker`. Un click nel browser non porta con sé nessun ruolo, quindi per
+  rispettarlo il server dovrebbe deciderlo per conto proprio — cioè reimplementare in un secondo
+  posto l'unica difesa tecnica che harness possiede.
 
 ## Dipendenze della pagina
 

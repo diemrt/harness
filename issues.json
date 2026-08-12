@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-12T10:26:52Z",
+  "last_updated": "2026-08-12T10:40:14Z",
   "rules": {
     "single_active_issue": false
   },
@@ -938,28 +938,63 @@
       "id": "9fc8151f-450b-49f9-89a7-9552d3a97e4d",
       "title": "I due lettori dei task: la colonna di status-cli e le card del board",
       "description": "Le due superfici che leggono i task e non li scrivono mai: la riga IN CORSO del riepilogo guadagna il conteggio, e la card del board guadagna una riga di riepilogo per array con i task visibili solo espandendo.\n\nPiano: docs/superpowers/plans/2026-08-12-harness-continuita-del-lavoro.md, Task 4 e Task 5. Spec: docs/superpowers/specs/2026-08-10-harness-continuita-del-lavoro-design.md, §5.1 e §5.2.\n\nIl conteggio è l'unico dato che mancava a chi riprende, e compare dove il riepilogo gira davvero: a un confine di sessione. Il troncamento del titolo scende da 45 a 38 colonne per fargli posto.\n\nSul board l'espansione è una capacità nuova della pagina, non un ritocco: oggi la card non nasconde niente, e dodici task sempre visibili le farebbero riempire lo schermo da sole. Il board resta in sola lettura: il guard anti-self-validation vive nell'environment del processo, e un click nel browser non porta nessun ruolo.",
-      "status": "backlog",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
         "d56925cd-2096-463c-bc92-8c75c6612954"
       ],
       "covers": [],
+      "tasks": [
+        {
+          "id": 1,
+          "short_title": "Test rossi di status-cli",
+          "full_description": "In test/plugin-status-cli.test.mjs: conteggio spuntati/totali nella riga IN CORSO, trattino senza task, nessuna riga oltre 80 colonne con titolo lungo e conteggio a due cifre, taskProgress come funzione pura. Importare taskProgress in testa al file.",
+          "checked": true
+        },
+        {
+          "id": 2,
+          "short_title": "La colonna in status-cli.mjs",
+          "full_description": "Esportare taskProgress; TASKS_COL a 5, TITLE_MAX da 45 a 38; inserire la colonna in inFlightRow fra tier e titolo. Aritmetica: 2+1+1+8+2+11+2+3+2+5+2+38 = 77.",
+          "checked": true
+        },
+        {
+          "id": 3,
+          "short_title": "references/status.md",
+          "full_description": "Descrivere la colonna nuova, il trattino, il fatto che non compare fra le lavorabili perche' una issue in backlog non ha ancora task. Aggiornare ogni esempio o citazione del troncamento a 45 colonne.",
+          "checked": true
+        },
+        {
+          "id": 4,
+          "short_title": "Test rossi del board",
+          "full_description": "In test/plugin-board.test.mjs, via extractFunctions: progressBar piena solo a lavoro finito, renderTaskBlock vuoto su array assente, escaping di short_title e full_description, attributo open solo se espanso, e nessun metodo HTTP che modifichi issues.json.",
+          "checked": true
+        },
+        {
+          "id": 5,
+          "short_title": "progressBar e renderTaskBlock in board.html",
+          "full_description": "Le due funzioni prendono tutto per argomento, expanded compreso, perche' il test le estrae dalla pagina e le esegue dove i global non esistono. details/summary con barra e conteggio; il blocco di esecuzione dopo la description, quello di validazione dentro il riquadro Validazione.",
+          "checked": true
+        },
+        {
+          "id": 6,
+          "short_title": "L'espansione sopravvive al re-render",
+          "full_description": "state.expanded come Set di chiavi issueId:kind, e un listener unico in cattura sull'evento toggle, che non fa bubbling. Senza, ogni push del server richiuderebbe i blocchi, cioe' di continuo mentre si lavora.",
+          "checked": true
+        },
+        {
+          "id": 7,
+          "short_title": "references/board.md, la pagina vera, suite verde",
+          "full_description": "Le due righe, l espansione, la sola lettura riconfermata col motivo del ruolo che un click non porta. Board avviato su un progetto temporaneo con task di entrambi i tipi e guardato davvero: la card sta in un colpo d occhio, e la riga dentro il riquadro Validazione si chiama task e non validazione, che si leggeva come una seconda cosa. npm run test verde.",
+          "checked": true
+        }
+      ],
       "validation": {
-        "criteria": [
-          "Una riga IN CORSO di status-cli porta spuntati/totali fra il tier e il titolo, e un trattino quando la issue non ha task",
-          "Nessuna riga del riepilogo supera 80 colonne con un titolo lungo e un conteggio a due cifre; TITLE_MAX vale 38",
-          "progressBar del board è piena solo quando ogni task è spuntato",
-          "renderTaskBlock non produce niente su un array vuoto o assente, ed escapa short_title e full_description",
-          "Un blocco espanso resta espanso dopo un nuovo render della lista",
-          "Nessun metodo HTTP fra POST, PUT, PATCH e DELETE modifica issues.json",
-          "references/status.md e references/board.md aggiornate; npm run test verde"
-        ],
-        "state": "unknown",
-        "tasks": []
+        "criteria": "npm run test: 359/359 pass (incluse tutte le nuove: taskProgress, riga IN CORSO col conteggio, larghezza <=80, progressBar, renderTaskBlock, escaping, espansione persistente, nessuna scrittura HTTP). Verificato a mano: inFlightRow con tier reasoning + titolo 38 char + 99/99 task resta a 77 colonne; l'esempio in references/status.md riprodotto byte-per-byte con buildSnapshot/renderSnapshot reali (stesso identico output salvo l'ora locale). Escaping stress-test manuale su renderTaskBlock con issueId/kind/short_title/full_description contenenti '\"><img onerror=...>' e '<script>': nessun tag crudo in output, data-issue/data-kind escapati. Nessun endpoint di scrittura: board-server.mjs non toccato dal diff, test 'the board never writes' verde. references/status.md e references/board.md aggiornate (38 colonne ovunque, nessun residuo a 45; riquadro Validazione ora dice 'task'). git diff limitato a scripts/status-cli.mjs, scripts/board.html, skills/harness/references/{status,board}.md, i due file di test e il proprio record in issues.json (tasks + status + updated_at); nessun danno collaterale.",
+        "tasks": [],
+        "state": "pass"
       },
       "created_at": "2026-08-12T09:27:25Z",
-      "updated_at": "2026-08-12T09:27:25Z",
-      "tasks": []
+      "updated_at": "2026-08-12T10:40:14Z"
     },
     {
       "id": "19dd7fa4-c230-42cd-a33a-a6620bc90315",

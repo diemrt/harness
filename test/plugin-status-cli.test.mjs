@@ -12,6 +12,7 @@ import {
   WIDTH,
   BAR_INNER,
   TITLE_MAX,
+  taskProgress,
 } from "../scripts/status-cli.mjs";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
@@ -384,7 +385,23 @@ test("no line is wider than eighty columns, even with three-digit counts", () =>
   }
 });
 
-test("an in-flight row carries icon, short id, status word, tier and title", () => {
+test("an in-flight row carries icon, short id, status word, tier, task count and title", () => {
+  const out = render([
+    issue("aaaaaaaa-1111-2222-3333-444444444444", {
+      status: "in_progress",
+      tier: "standard",
+      title: "vista albero delle catene",
+      tasks: [
+        { id: 1, short_title: "one", full_description: "d", checked: true },
+        { id: 2, short_title: "two", full_description: "d", checked: false },
+      ],
+    }),
+  ]);
+  const row = lines(out).find((l) => l.includes("vista albero"));
+  assert.equal(row, "  + aaaaaaaa  in_progress  $$   1/2    vista albero delle catene");
+});
+
+test("the same row with no tasks keeps its shape and shows a dash", () => {
   const out = render([
     issue("aaaaaaaa-1111-2222-3333-444444444444", {
       status: "in_progress",
@@ -393,7 +410,7 @@ test("an in-flight row carries icon, short id, status word, tier and title", () 
     }),
   ]);
   const row = lines(out).find((l) => l.includes("vista albero"));
-  assert.equal(row, "  + aaaaaaaa  in_progress  $$   vista albero delle catene");
+  assert.equal(row, "  + aaaaaaaa  in_progress  $$   -      vista albero delle catene");
 });
 
 test("a workable row drops the status word: every one of them is backlog", () => {
@@ -613,4 +630,77 @@ test("stdout is text, not the one-line JSON the other scripts print", () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// ---------------------------------------------------------------------------
+// The count of execution tasks: the one datum whoever resumes the work was missing. It shows up
+// where the summary actually runs — at a session boundary, which is where every resumption starts.
+// ---------------------------------------------------------------------------
+
+function withTasks(count, checked) {
+  return Array.from({ length: count }, (_, i) => ({
+    id: i + 1,
+    short_title: `task ${i + 1}`,
+    full_description: "d",
+    checked: i < checked,
+  }));
+}
+
+test("taskProgress counts checked over total, and says nothing rather than zero when there are none", () => {
+  assert.equal(taskProgress({ tasks: [] }), "-");
+  assert.equal(taskProgress({}), "-");
+  assert.equal(taskProgress({ tasks: withTasks(2, 1) }), "1/2");
+  assert.equal(taskProgress({ tasks: withTasks(1, 1) }), "1/1");
+  assert.equal(taskProgress({ tasks: withTasks(3, 0) }), "0/3");
+});
+
+test("an in-flight row carries the count of its execution tasks", () => {
+  const rendered = renderSnapshot(
+    buildSnapshot([
+      issue("aaaaaaaa-0000-0000-0000-000000000000", {
+        status: "in_progress",
+        title: "Hop Angular 18 -> 19",
+        tier: "reasoning",
+        tasks: withTasks(7, 4),
+      }),
+    ]),
+    { project: "P", lastUpdated: null }
+  );
+  const row = rendered.split("\n").find((line) => line.includes("Hop Angular"));
+  assert.match(row, /4\/7/);
+});
+
+test("an issue with no tasks shows a dash, exactly like an undeclared tier", () => {
+  const rendered = renderSnapshot(
+    buildSnapshot([issue("bbbbbbbb-0000-0000-0000-000000000000", { status: "blocked", tasks: [] })]),
+    { project: "P", lastUpdated: null }
+  );
+  const row = rendered.split("\n").find((line) => line.includes("bbbbbbbb"));
+  assert.match(row, / - /, `a task-less row must show a dash: ${JSON.stringify(row)}`);
+});
+
+test("the count column does not push any row off the screen", () => {
+  const rendered = renderSnapshot(
+    buildSnapshot([
+      issue("cccccccc-0000-0000-0000-000000000000", {
+        status: "in_progress",
+        title: "x".repeat(200),
+        tier: "reasoning",
+        tasks: withTasks(12, 9),
+      }),
+    ]),
+    { project: "P", lastUpdated: null }
+  );
+  for (const line of rendered.split("\n")) {
+    assert.ok(line.length <= WIDTH, `row wider than ${WIDTH}: ${JSON.stringify(line)}`);
+  }
+});
+
+test("the workable rows carry no count: a backlog issue has no tasks yet, by design", () => {
+  const rendered = renderSnapshot(
+    buildSnapshot([issue("dddddddd-0000-0000-0000-000000000000", { status: "backlog", tasks: [] })]),
+    { project: "P", lastUpdated: null }
+  );
+  const row = rendered.split("\n").find((line) => line.includes("dddddddd"));
+  assert.ok(!/\d\/\d/.test(row), `a workable row must not carry a count: ${JSON.stringify(row)}`);
 });
