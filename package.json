@@ -1,7 +1,7 @@
 {
   "name": "@diemrt/harness",
-  "version": "0.5.1",
-  "description": "DEPRECATED — harness is a Claude Code plugin now, not an npm package: https://github.com/diemrt/harness",
+  "private": true,
+  "description": "Not an npm package: harness is a Claude Code plugin, installed from git. This file exists for the test runner. https://github.com/diemrt/harness",
   "type": "module",
   "license": "MIT",
   "author": "diemrt",
@@ -18,20 +18,12 @@
     "ai-agent",
     "issue-tracker",
     "claude-code",
-    "plugin",
-    "deprecated"
+    "plugin"
   ],
   "engines": {
     "node": ">=18"
   },
-  "files": [
-    "README.md",
-    "LICENSE"
-  ],
   "scripts": {
     "test": "node --test"
-  },
-  "publishConfig": {
-    "access": "public"
   }
 }

@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-12T08:26:29Z",
+  "last_updated": "2026-08-12T08:51:03Z",
   "rules": {
     "single_active_issue": false
   },
@@ -698,6 +698,21 @@
       },
       "created_at": "2026-08-12T08:11:30Z",
       "updated_at": "2026-08-12T08:26:29Z"
+    },
+    {
+      "id": "3a030d2b-e1d4-45e1-9075-6b9e55568b20",
+      "title": "Il modello npm non lascia trappole ne' un secondo numero di versione",
+      "description": "publish.yml e' stato cancellato in ec832c6: nessun workflow reagisce ai tag v* e taggare non pubblica niente. Restano tre residui, e il primo e' quello che costa: CONTRIBUTING.md avverte ancora di una pubblicazione npm al tag, spaventando chi rilascia con un pericolo inesistente.\n\nGli altri due in package.json: version 0.5.1 accanto ai manifest che dicono 0.6.0, cioe' due numeri di versione di cui uno non significa niente; e files piu' publishConfig, la superficie di pubblicazione di un pacchetto che nessuno pubblica. Togliere version e' sicuro, nulla lo legge. Il lucchetto e' private: true.\n\nIl test 'every path listed in files exists on disk' legge proprio il campo files: va sostituito, non cancellato, altrimenti la pulizia fa sparire un test invece di rimpiazzarlo.\n\nFirma del committente, 2026-08-12: il criterio 'npm publish --dry-run rifiuta perche' il pacchetto e' privato' e' stato RIMOSSO su sua decisione, perche' inverificabile. Su npm 11.8.0 --dry-run ignora private: costruisce il tarball, stampa 'Publishing to registry (dry-run)' ed esce 0, e il controllo scatta solo alla pubblicazione vera. Nel repository esce 1, ma per il version assente. Restano quattro criteri.",
+      "status": "done",
+      "tier": "standard",
+      "depends_on": [],
+      "covers": [],
+      "validation": {
+        "state": "pass",
+        "criteria": "Verifica indipendente 2026-08-12, branch chore/close-the-npm-chapter, lavoro nel working tree (4 file: CONTRIBUTING.md, package.json, test/smoke.test.mjs, issues.json). [1] package.json non contiene piu' version, files ne' publishConfig (letto il file: campi assenti, aggiunto private: true); `npm ci` esce 0 ('up to date, audited 1 package'), poi `npm run test` esce 0. PASS. [2] .github/workflows/ contiene solo ci.yml (`ls`), che ha `on: push:` + `pull_request:` e nessun trigger su tag ne' step di publish; publish.yml assente. CONTRIBUTING.md non avverte piu' di pubblicazione npm al tag: il blocco WARNING su publish.yml e' rimosso e sostituito da 'Tagging publishes nothing.' (CONTRIBUTING.md:50-53). PASS. Osservazione fuori criterio: un `on: push:` senza filtri in GitHub Actions scatta anche sul push di un tag, quindi la frase 'it runs on pushes and pull requests, not on tags' (CONTRIBUTING.md:50-51) e' imprecisa; ci.yml esegue solo test, non pubblica, quindi 'Tagging publishes nothing' resta vero. [3] Conteggio test: baseline 62e9bd3 estratto con `git archive 62e9bd3 | tar -x` in directory temporanea e eseguito `node --test` -> tests 323 / pass 323. Working tree corrente -> tests 323 / pass 323 / fail 0. Nessun calo. Il test 'every path listed in files exists on disk' e' stato sostituito da 'package.json declares no npm publishing surface' (test/smoke.test.mjs:39), che asserisce private === true e version/files/publishConfig === undefined; i nomi dei test restano 5 prima e dopo. PASS. [4] Gate .harness/config.json verify = 'npm run test': exit 0, 'tests 323, pass 323, fail 0, duration_ms 22099'. PASS. Danni collaterali: `git status --short --untracked-files=all` mostra solo i 4 file attesi, nessun untracked; il diff di issues.json contiene solo il record di questa issue e last_updated; nessun segreto nel diff. Corroborato in directory temporanea (mai nel repo, mai senza --dry-run) il fatto alla base della rimozione del quinto criterio: su npm 11.8.0 `npm publish --dry-run` con private: true costruisce il tarball, stampa 'Publishing to registry ... (dry-run)' ed esce 0."
+      },
+      "created_at": "2026-08-12T08:38:54Z",
+      "updated_at": "2026-08-12T08:51:03Z"
     }
   ],
   "schema_version": 2

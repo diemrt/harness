@@ -38,15 +38,16 @@ test` as the verification command, so that is the gate every issue must pass bef
 
 ## Releasing
 
-`plugin.json` and `marketplace.json` both carry the version and must agree. Consumers install
-from git, so the release is the tag.
+`plugin.json` and `marketplace.json` both carry the version and must agree. They are the only
+version numbers in the repository — `package.json` deliberately has none, since nothing is
+published from it. Consumers install from git, so the release is the tag.
 
 ```sh
 # set the same version in both files, commit, then:
 git tag v0.6.0 && git push && git push --tags
 ```
 
-> [!WARNING]
-> `.github/workflows/publish.yml` still triggers on `v*` tags and publishes the deprecated
-> `@diemrt/harness` npm package. It is a leftover of the pre-plugin distribution model: until
-> it is removed, tagging a release also pushes a version to npm.
+**Tagging publishes nothing.** `ci.yml` is the only workflow, and it runs on pushes and pull
+requests, not on tags. The npm workflow that used to publish `@diemrt/harness` on every `v*` tag
+was removed with the rest of the pre-plugin distribution model, and `package.json` is `private`
+so `npm publish` refuses even if run by hand.

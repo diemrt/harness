@@ -1,8 +1,8 @@
 // Packaging smoke test. The v1 harness shipped an npm CLI, so this file used to guard
 // `bin`, `files` and the template seed. The repository is a Claude Code plugin now: what
 // has to stay honest is the plugin manifest and the marketplace entry that points at it,
-// plus the leftovers of package.json that are still real (the test script CI runs, and a
-// `files` list that must not name paths the demolition removed).
+// plus the one thing package.json is still for — the test script CI runs. Everything else
+// npm-shaped is asserted ABSENT, so the publishing surface cannot grow back unnoticed.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -36,15 +36,26 @@ test("package.json parses and only declares what still exists", () => {
   }
 });
 
-test("every path listed in files exists on disk", () => {
+test("package.json declares no npm publishing surface", () => {
   const pkg = readJson("package.json");
 
-  assert.ok(Array.isArray(pkg.files) && pkg.files.length > 0, "files must be a non-empty array");
+  // This replaces a test that walked the `files` list. publish.yml was deleted in ec832c6, so no
+  // workflow reacts to a v* tag any more — but a deleted file protects today, not the decision.
+  // `private: true` is the lock that outlives it, and it bites on a REAL publish only: measured on
+  // npm 11.8.0, `npm publish --dry-run` ignores `private` entirely — it builds the tarball, says
+  // "Publishing to registry (dry-run)" and exits 0. So do not read a green dry-run as proof of
+  // anything here; this assertion is the check, not npm's own behaviour.
+  assert.equal(pkg.private, true, "the package must be private so a real npm publish refuses");
 
-  for (const entry of pkg.files) {
-    const stripped = entry.endsWith("/") ? entry.slice(0, -1) : entry;
-    const fullPath = path.resolve(rootDir, stripped);
-    assert.ok(existsSync(fullPath), `files entry must exist on disk: ${entry} (${fullPath})`);
+  // A `version` here would be a SECOND version number beside .claude-plugin/, which is the only
+  // one consumers ever see; `files` and `publishConfig` describe a tarball nobody builds. Each is
+  // harmless on its own and misleading together, which is why they go as a set.
+  for (const field of ["version", "files", "publishConfig"]) {
+    assert.equal(
+      pkg[field],
+      undefined,
+      `${field} belongs to publishing a package this repository does not publish`
+    );
   }
 });
 
