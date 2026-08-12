@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-11T15:59:00Z",
+  "last_updated": "2026-08-12T08:02:43Z",
   "rules": {
     "single_active_issue": false
   },
@@ -48,7 +48,8 @@
         "state": "pass"
       },
       "created_at": "2026-08-03T07:32:09Z",
-      "updated_at": "2026-08-03T07:32:09Z"
+      "updated_at": "2026-08-03T07:32:09Z",
+      "covers": []
     },
     {
       "id": "da623851-f187-4956-a428-7341f6b747e1",
@@ -76,7 +77,8 @@
         "state": "pass"
       },
       "created_at": "2026-08-03T07:32:09Z",
-      "updated_at": "2026-08-03T07:32:09Z"
+      "updated_at": "2026-08-03T07:32:09Z",
+      "covers": []
     },
     {
       "id": "f83f71ff-8832-44b3-895b-308b69e80ac7",
@@ -97,7 +99,8 @@
         "state": "pass"
       },
       "created_at": "2026-08-03T07:32:09Z",
-      "updated_at": "2026-08-03T07:32:09Z"
+      "updated_at": "2026-08-03T07:32:09Z",
+      "covers": []
     },
     {
       "id": "4faa2ce8-0857-47cc-b512-7df93fca3d93",
@@ -125,7 +128,8 @@
         "state": "pass"
       },
       "created_at": "2026-08-03T07:32:09Z",
-      "updated_at": "2026-08-03T07:32:09Z"
+      "updated_at": "2026-08-03T07:32:09Z",
+      "covers": []
     },
     {
       "id": "d40ff6ad-a83b-457b-a9b5-dab45cb26497",
@@ -154,7 +158,8 @@
         "state": "pass"
       },
       "created_at": "2026-08-03T07:32:09Z",
-      "updated_at": "2026-08-03T07:32:09Z"
+      "updated_at": "2026-08-03T07:32:09Z",
+      "covers": []
     },
     {
       "id": "d269c9ff-461f-477b-a1f6-4c7e5e11a020",
@@ -176,7 +181,8 @@
         "state": "pass"
       },
       "created_at": "2026-08-03T07:32:09Z",
-      "updated_at": "2026-08-03T07:32:09Z"
+      "updated_at": "2026-08-03T07:32:09Z",
+      "covers": []
     },
     {
       "id": "13f1bc2a-2844-40fc-b399-6ae50a9c3f45",
@@ -207,7 +213,8 @@
         "state": "pass"
       },
       "created_at": "2026-08-03T07:32:09Z",
-      "updated_at": "2026-08-03T07:32:09Z"
+      "updated_at": "2026-08-03T07:32:09Z",
+      "covers": []
     },
     {
       "id": "718823d6-c12d-433b-93aa-c593bcefb793",
@@ -233,7 +240,8 @@
         "state": "pass"
       },
       "created_at": "2026-08-03T07:32:09Z",
-      "updated_at": "2026-08-03T07:32:09Z"
+      "updated_at": "2026-08-03T07:32:09Z",
+      "covers": []
     },
     {
       "id": "f0b83088-eb29-4e3e-8ebc-7f43a316befc",
@@ -247,7 +255,8 @@
         "state": "pass"
       },
       "created_at": "2026-08-03T07:33:06Z",
-      "updated_at": "2026-08-03T08:12:45Z"
+      "updated_at": "2026-08-03T08:12:45Z",
+      "covers": []
     },
     {
       "id": "63406cce-2d07-4863-9329-0abe5bb10cf5",
@@ -261,7 +270,8 @@
         "criteria": "Riverifica dopo il fix. Il residuo che avevo fatto fallire non c'e' piu': scripts/issue-manager.mjs sopra emptyIssuesData ora legge \"issues.json is the file every clone of the project reads\" (era \"the only file the harness ever puts in a shared repository\"). Il diff vs HEAD del file e' 40 righe contro 36 del giro precedente: +2/-2 sul solo commento, nessuna riga di codice toccata; --stat di tutti gli altri 10 file e' identico riga per riga a quello che avevo gia' verificato, quindi i sei criteri gia' soddisfatti restano tali senza rifare il lavoro.\n\nCriteri non annacquati: confronto byte per byte dei sette validation.criteria attuali contro quelli letti al mio primo --get -> 7/7 stringhe identiche, stesso ordine, nessuna aggiunta o rimozione (script node su issues.json: \"CRITERIA IDENTICAL byte-for-byte\"). status in_review, state unknown al momento della riverifica. git diff issues.json tocca solo last_updated e il record di questa issue.\n\nResidui della stessa famiglia, stessa severita' del giro precedente: grep -i su \"only file|unico file|the harness ever puts|adds to git|aggiunge al progetto|self-ignor|auto-ignor|ignores itself|si auto-ignora|invisibile a git|never reaches git|must never reach\" su tutto il repo (escluso node_modules) -> zero hit in scripts/, skills/, README.md, commands/, agents/. Restano solo: .harness/archive/2026-08-03T07-32-09Z.json e docs/superpowers/specs/ (storia congelata, esenti), i blocchi storici issues.json:162,174, il titolo e i criteri di questa issue stessa, e test/plugin-config.test.mjs:88, che e' il messaggio di un assert che pretende l'ASSENZA del file, non una promessa.\n\nCriteri, uno per uno. [1] PASS: rimossi il writeFileSync di .harness/.gitignore in initConfig e la funzione ensureHarnessDir + la sua chiamata; test riscritti in negativo, non cancellati (plugin-config.test.mjs:78-98, plugin-issue-manager.test.mjs:1915-1925 asseriscono existsSync===false). [2] PASS: plugin-config.test.mjs:115-131 confronta ancora il .gitignore byte per byte e pretende git diff -- .gitignore vuoto; :133-145 invariato. [3] PASS: initConfig fa solo mkdirSync(recursive)+config.json; coperto da plugin-config.test.mjs:147-174 (runs/, archive/ e un .gitignore preesistente restano identici) e :206-218 (CONFIG_EXISTS senza --force). [4] PASS: issue-manager.mjs:866-872, ordine mkdirSync(dirname(archivePath)) -> writeFileSync(archivePath) -> writeIssuesFile(data), invariato. [5] PASS: README.md, SKILL.md, config.md, git.md, issues.md riallineati; nessuna promessa residua. [6] PASS: ls .harness/ -> archive, board.cmd, board.sh, config.json, runs (nessun .gitignore); git ls-files .harness -> .harness/archive/2026-08-03T07-32-09Z.json e .harness/config.json; gli 8 blocchi puntano tutti a quell'archivio. [7] PASS: npm run test -> tests 222, pass 222, fail 0, exit=0.\n\nCollaterali: git status --porcelain -uall elenca esattamente i 13 path dello scope, nessun file nuovo rispetto al giro precedente, nessun segreto nel diff staged."
       },
       "created_at": "2026-08-03T08:23:46Z",
-      "updated_at": "2026-08-03T08:42:22Z"
+      "updated_at": "2026-08-03T08:42:22Z",
+      "covers": []
     },
     {
       "id": "2f76be67-521f-425c-b6f7-1fe41c72c321",
@@ -275,7 +285,8 @@
         "criteria": "Verifica indipendente, nessun documento modificato (diff = solo issues.json per lo stato di questa issue). Controllato con grep/lettura diretta: (1) `node scripts/harness-config.mjs --help` e `node scripts/issue-manager.mjs --help` non promettono che .harness/ si auto-ignori (harness-config.mjs --help dice esplicitamente 'Harness writes no .gitignore at all'). (2) grep case-insensitive su agents/, commands/, skills/harness/references/board.md, external-worker.md per 'issues.json|.gitignore|solo|only|mai in git|self-ignor' non trova nessuna ripetizione di 'harness aggiunge al progetto solo issues.json' ne' di '.harness/ non finisce mai in git'; board.md e external-worker.md nominano .harness/ solo per config.json e .harness/runs/<issueId>-<timestamp>.log, senza invarianti sul versionamento. (3) Verificato che l'elenco di .harness/ in README.md riga 72 e skills/harness/references/config.md righe 6-9 (config.json, archive/, runs/) e' completo rispetto a cio' che gli script scrivono davvero: harness-config.mjs scrive solo config.json (riga 354), issue-manager.mjs scrive solo archive/<timestamp>.json (riga 871), harness-worker.mjs scrive solo runs/<issueId>-<timestamp>.log (riga 237) piu' un promptFile temporaneo fuori da .harness/; nessun altro writeFileSync/mkdirSync tocca .harness/. (4) `npm run test` eseguito dal verificatore: 222/222 pass, exit code 0. Osservazione fuori scope (non blocca): .harness/board.cmd e .harness/board.sh sono relitti locali dell'harness v1, con path assoluti, aggiunti al .gitignore del progetto nel commit cbde0b2 invece che cancellati; non sono scritti da alcuno script del repository e non compaiono nell'elenco documentale, correttamente. Nessun file modificato dal verificatore oltre alla chiusura di questa issue."
       },
       "created_at": "2026-08-03T08:43:38Z",
-      "updated_at": "2026-08-03T08:48:21Z"
+      "updated_at": "2026-08-03T08:48:21Z",
+      "covers": []
     },
     {
       "id": "6a53d9c8-f41e-44f0-9536-279de693e938",
@@ -289,7 +300,8 @@
         "state": "pass"
       },
       "created_at": "2026-08-04T09:14:41Z",
-      "updated_at": "2026-08-04T09:24:14Z"
+      "updated_at": "2026-08-04T09:24:14Z",
+      "covers": []
     },
     {
       "id": "0fe39c8a-a84b-466b-9e39-b3d7912dcaf5",
@@ -305,7 +317,8 @@
         "state": "pass"
       },
       "created_at": "2026-08-04T09:14:41Z",
-      "updated_at": "2026-08-04T09:27:21Z"
+      "updated_at": "2026-08-04T09:27:21Z",
+      "covers": []
     },
     {
       "id": "59819a08-06da-481c-9a4f-ba948c5432ec",
@@ -321,7 +334,8 @@
         "state": "pass"
       },
       "created_at": "2026-08-04T09:14:41Z",
-      "updated_at": "2026-08-04T09:32:27Z"
+      "updated_at": "2026-08-04T09:32:27Z",
+      "covers": []
     },
     {
       "id": "9c45bfd7-977f-4e00-84b6-9c42545ae0c1",
@@ -337,7 +351,8 @@
         "state": "pass"
       },
       "created_at": "2026-08-04T09:14:41Z",
-      "updated_at": "2026-08-04T09:36:54Z"
+      "updated_at": "2026-08-04T09:36:54Z",
+      "covers": []
     },
     {
       "id": "f2595673-a499-4185-b86d-33034431560f",
@@ -353,7 +368,8 @@
         "state": "pass"
       },
       "created_at": "2026-08-04T09:14:41Z",
-      "updated_at": "2026-08-04T09:41:39Z"
+      "updated_at": "2026-08-04T09:41:39Z",
+      "covers": []
     },
     {
       "id": "b6b848b9-26e4-49c1-9037-71207f958c5c",
@@ -369,7 +385,8 @@
         "state": "pass"
       },
       "created_at": "2026-08-04T09:14:42Z",
-      "updated_at": "2026-08-04T09:48:07Z"
+      "updated_at": "2026-08-04T09:48:07Z",
+      "covers": []
     },
     {
       "id": "74d2b630-f4de-4b94-99da-741562328fbe",
@@ -385,7 +402,8 @@
         "state": "pass"
       },
       "created_at": "2026-08-04T09:14:42Z",
-      "updated_at": "2026-08-04T09:52:08Z"
+      "updated_at": "2026-08-04T09:52:08Z",
+      "covers": []
     },
     {
       "id": "8718f44a-2a45-40f5-9735-7ee3501cccf4",
@@ -401,7 +419,8 @@
         "state": "pass"
       },
       "created_at": "2026-08-04T09:14:42Z",
-      "updated_at": "2026-08-04T09:56:18Z"
+      "updated_at": "2026-08-04T09:56:18Z",
+      "covers": []
     },
     {
       "id": "90048eaf-d5bc-42d5-a7d9-f41dc3c40a56",
@@ -417,7 +436,8 @@
         "state": "pass"
       },
       "created_at": "2026-08-04T09:14:42Z",
-      "updated_at": "2026-08-04T09:59:07Z"
+      "updated_at": "2026-08-04T09:59:07Z",
+      "covers": []
     },
     {
       "id": "1b7587bf-a25d-4caa-bd63-810dde5fef2e",
@@ -431,7 +451,8 @@
         "criteria": "Settimo giro. Criterio 1 (riproducibilita' dell'esempio, difetto del sesto giro): ricostruito in una directory temporanea un tracker con esattamente i conteggi dichiarati (17 issue: 6 done, 1 in_progress, 1 in_review, 1 blocked, 8 backlog di cui una con depends_on verso un id inesistente ffffffff-...), project 'harness', last_updated 2026-08-04T10:00:00Z, stessi id/tier/titoli dell'esempio per un confronto diretto. Eseguito 'node scripts/status-cli.mjs --project-dir <tmp>' e diffato riga per riga (node -e con split su \n) contro il blocco annotato in skills/harness/references/status.md (righe 54-72, corpo del code fence 53-73): diff -u restituisce exit 0, zero differenze su tutte le 19 righe di contenuto, inclusa l'intestazione '17 issue' (non piu' incoerente come il 22-vs-12 del sesto giro), la barra a 77 colonne interne (### 27 + ++++ 4 + ~~~~ 4 + !!!! 4 + oooo 38, verificato via conteggio), la legenda con due spazi fra voci, il troncamento a 45 caratteri di 'filtri per tier nel board, con scorciatoie...', e la riga di allerta dangling singolare 'ffffffff'. Anche la riga dell'ora ha coinciso ('12:00'), pura coincidenza di fuso locale come la issue anticipa che puo' non accadere altrove: non e' un criterio di confronto. Il difetto del sesto giro (76 vs 77 colonne, spaziatura a 4 spazi, 22 vs 12) e' quindi chiuso e verificato con una ricostruzione indipendente, non con una rilettura del codice. Criterio 2 rifatto da zero: rilette tutte le 357 righe di scripts/status-cli.mjs ed enumerati autonomamente 51 comportamenti osservabili (canali stdout/stderr, formato solo testo mai JSON, niente ANSI/isTTY, STATUS_ICON x5, TIER_ICON x3, IN_FLIGHT_ORDER, BAR_ORDER, WIDTH=80, BAR_INNER=77, TITLE_MAX=45, WORKABLE_SHOWN=3, danglingDeps, isWorkable, shortId a 8, findCycle limitata alle issue non-done e la sua motivazione, alert ciclo, alert dangling singolare/plurale, alert stallo con denominatore backlog distinto da quello dell'intestazione sezione, ordinamento inFlight (IN_FLIGHT_ORDER poi updated_at desc) e workable (created_at asc) con relativo WORKABLE_SHOWN, formatWhen locale a minuto con fallback null, barSegments proporzionale con minimo 1 colonna e drift assorbito dal segmento piu' largo, renderBar, renderLegend con soli stati presenti, RULE (79 trattini), riga '='x80, TIER_LEGEND fissa, truncate con normalizzazione whitespace e '...' ASCII, tierIcon '-' per non dichiarato, formato riga inFlight/workable, alertLines con wrap a 80 colonne su continuazione indentata, renderSnapshot con caso tracker vuoto, intestazione con fallback nome progetto a basename, sezioni IN CORSO/LAVORABILI con casi vuoti dedicati e le due variabili di 'niente in backlog' distinte solo dall'allerta, USAGE/--help, fail() che scrive su stdout ed esce 1, resolveProjectDir, main() con parseArgs strict e messaggio d'errore per flag sconosciuto, gestione issues.json mancante/non-array/JSON invalido, project non stringa o vuoto, codici d'uscita 0/1, guardia import.meta.url, trailing newline). Cercati tutti fra skills/harness/references/status.md, commands/status.md, skills/harness/SKILL.md e README.md: tutti risultano documentati, nessun comportamento raggiungibile in condizioni legittime e' senza copertura. Un caso limite trovato durante l'enumerazione (issue con uno status fuori dai cinque valori validi scompare da conteggi/intestazione senza traccia, verificato con un probe in directory temporanea con status:'archived': intestazione mostra '1 issue' su un array di due) e' risultato NON raggiungibile attraverso l'unico percorso di scrittura ammesso: scripts/issue-manager.mjs valida lo status con validateStatus (righe 352-361, valori ammessi backlog/in_progress/in_review/blocked/done) e CLAUDE.md vieta esplicitamente la modifica a mano di issues.json; classificato come osservazione fuori scope, non come gap di documentazione, a differenza dei depends_on penzolanti che restano raggiungibili anche per via legittima (un archivio che rimuove una issue ancora referenziata) e sono infatti documentati. Gate: 'npm run test' (da .harness/config.json, campo verify) -> 278/278 pass, 0 fail. git status --short mostra solo commands/status.md, skills/harness/SKILL.md e issues.json modificati piu' skills/harness/references/status.md nuovo; git diff issues.json conferma che il solo cambiamento e' il record di questa issue (000 -> in_review, validation, updated_at) piu' il last_updated di root, nessun danno collaterale. Nessun file modificato da questo verificatore oltre alla chiusura della issue; ogni probe (rigenerazione tracker, tracker con status invalido) e' avvenuto in directory temporanee con --project-dir esplicito, mai contro l'issues.json reale."
       },
       "created_at": "2026-08-04T10:00:14Z",
-      "updated_at": "2026-08-04T11:13:07Z"
+      "updated_at": "2026-08-04T11:13:07Z",
+      "covers": []
     },
     {
       "id": "aa07fb72-713c-4d65-bba9-6e1399652813",
@@ -445,7 +466,8 @@
         "state": "pass"
       },
       "created_at": "2026-08-04T10:00:35Z",
-      "updated_at": "2026-08-04T11:20:59Z"
+      "updated_at": "2026-08-04T11:20:59Z",
+      "covers": []
     },
     {
       "id": "5a1636cd-6379-4c14-b14f-fd75fd5becaa",
@@ -459,7 +481,8 @@
         "criteria": "Verifica indipendente, 7/7 criteri soddisfatti. (1) skills/harness/SKILL.md:178 porta '## Cosa diventa una issue'; l'elenco degli heading e' Tier -> Cosa diventa una issue -> Verifica leggera (indexOf: compass < light). (2) grep della vecchia clausola 'ogni pezzo di lavoro e' una issue tracciata' su SKILL.md: nessuna occorrenza; la premessa e' quella nuova del piano. (3)(4) I tre blocchi markdown del Task 1 del piano (premessa nuova, capitolo, raccordo) sono presenti VERBATIM in SKILL.md (confronto programmatico blocco-per-blocco: true/true/true; il blocco della vecchia premessa: assente, come atteso): il capitolo enuncia 'costoso e invisibile' con entrambe le meta', i quattro passi numerati per il lavoro che emerge a meta', e il paragrafo 'Sotto il tracker c'e' un livello a grana fine ... Harness non prescrive come lo produci'. (5) Diff del solo capitolo 'Verifica leggera' fra HEAD e working tree: rimuovendo le due righe di raccordo il testo e' byte-identico a HEAD (28 -> 31 righe, nessuna riga riscritta o mangiata). (6) test/plugin-skill.test.mjs: test nuovo 'the skill says which work becomes an issue at all' aggiunto in fondo, verbatim rispetto al piano, nessun test esistente modificato (git diff: solo 30 righe aggiunte in coda). (7) Gate: npm run test -> exit 0, 282 tests / 282 pass / 0 fail; il test nuovo passa. Nessun file modificato dal verificatore; git status --short: solo issues.json, skills/harness/SKILL.md, test/plugin-skill.test.mjs. Fuori scope (non bloccante): il working tree di issues.json contiene anche la issue nuova 7619689e (gate documentale del commit board 06a2576), estranea a questo Task 1."
       },
       "created_at": "2026-08-10T13:43:55Z",
-      "updated_at": "2026-08-10T14:09:56Z"
+      "updated_at": "2026-08-10T14:09:56Z",
+      "covers": []
     },
     {
       "id": "5b994254-c97b-425f-bef3-76c72154c037",
@@ -473,7 +496,8 @@
         "criteria": "PASS su tutti e 7 i criteri. (1) skills/harness/references/issues.md:351-355 aggiunge il bullet «e dev'essere controllabile **con gli accessi che il verificatore ha**: il suo ambiente e' quello del worker, non di piu'... Si riformula su un artefatto che entra nel repository: [verification.md](verification.md);». Il link risolve: skills/harness/references/verification.md esiste su disco, e il test 'cross-links between reference files resolve too' (test/plugin-skill.test.mjs:59-69, che estrae i link .md relativi e ne fa existsSync) lo copre ed e' verde. (2) verification.md:76 ha l'heading esatto '## Quando la prova sta fuori dalla portata dell'agent'; i soli '## ' del file mostrano che il capitolo sta fra 'Cosa rende una verifica reale' (68) e 'Perche' non c'e' piu' un hook' (122), la posizione chiesta dal piano. (3) verification.md:78-81: «La prova e' *impossibile* da raccogliere dall'ambiente di lavoro - non soltanto scomoda. Se e' scomoda, si fa.» (4) verification.md:90-94, tabella con le tre proprieta': committato / dichiara su quale revisione e' stato misurato / porta le righe decisive verbatim, piu' un puntatore alla fonte. (5) verification.md:96-104, elenco numerato introdotto da 'ha quattro voci, tutte obbligatorie' con Cosa lanciare, Cosa serve indietro, Su cosa si prosegue intanto, Perche' non si puo' fare da qui. (6) verification.md:115-120: «La riformulazione la **firma il committente**, mai il worker a cui gioverebbe» e «E' l'**eccezione disciplinata** al divieto - scritto in [SKILL.md](../SKILL.md) - di declassare a posteriori i criteri»; il divieto referenziato esiste davvero (skills/harness/SKILL.md:241) e ../SKILL.md risolve. (7) test/plugin-skill.test.mjs:144-182 aggiunge 'a criterion must be checkable with the verifier's own access' che asserisce i criteri 1, 2, 5 e 6; nel run e' verde. GATE: npm run test -> EXIT=0, tests 283, pass 283, fail 0. FEDELTA' AL PIANO: i tre blocchi inseriti (bullet di issues.md, capitolo di verification.md, test) combaciano VERBATIM col testo atteso in docs/superpowers/plans/2026-08-10-harness-regole-e-default.md Task 2: confronto programmatico dei fenced block del piano contro i file, EXACT MATCH su tutti e tre. NIENTE TESTO MANGIATO: git diff --numstat da 5/0, 46/0, 40/0 sui tre file, sole aggiunte e zero righe rimosse. COLLATERALI: git status --short elenca solo issues.json piu' i tre file in scope; il diff di issues.json e' unicamente la transizione backlog->in_review e i timestamp. Il verificatore non ha modificato nessun file."
       },
       "created_at": "2026-08-10T13:43:55Z",
-      "updated_at": "2026-08-10T14:16:44Z"
+      "updated_at": "2026-08-10T14:16:44Z",
+      "covers": []
     },
     {
       "id": "11e3060d-6efa-45b0-8b43-f0057015c46d",
@@ -489,7 +513,8 @@
         "criteria": "npm run test: 284/284 pass, incluso 'the board is a tool you ask for, not a clock-in step' e i test di reference esistenti ('every reference link in SKILL.md resolves to a file that exists', 'every reference file is reachable from SKILL.md', ancora verdi con board.md linkato dal capitolo Reference a SKILL.md:310). SKILL.md: passo 4 'Board' rimosso da Clock in, passi 5/6 rinumerati 4/5 senza buchi (righe 29-40), passo 4 'Stato del tracker' aggiunge la frase attesa sull'essere l'unico passo di visibilita'. Clock out reso condizionale (righe 292-293). board.md: rimossa 'al clock-in, automaticamente' dal ciclo di vita, Avvio e Stop resi condizionali, aggiunta sezione '## Perche non parte da solo' (righe 104-123) con le durate 50/25/16/55 minuti, testo verbatim uguale al piano/spec §3. Diff confrontato riga per riga con Task 3 del piano 2026-08-10-harness-regole-e-default.md e con la spec §3: nessuna divergenza. Capitolo 'Cosa diventa una issue' (righe 178-218, fra Tier e Verifica leggera) confermato non toccato dal diff. git diff limitato a skills/harness/SKILL.md, skills/harness/references/board.md, test/plugin-skill.test.mjs, issues.json (solo transizione di stato via issue-manager)."
       },
       "created_at": "2026-08-10T13:44:30Z",
-      "updated_at": "2026-08-10T14:20:49Z"
+      "updated_at": "2026-08-10T14:20:49Z",
+      "covers": []
     },
     {
       "id": "ac6892cb-b314-4fa1-93c0-25066808d550",
@@ -503,7 +528,8 @@
         "criteria": "1) scripts/board-server.mjs:41-60 resolveProjectDir() ritorna realpathSync.native(dir) dopo existsSync/statSync, dentro un try/catch che ricade sul dir dato (normalizzazione non fatale); quel valore e' l'unico usato da watch(projectDir) alla riga 165, da issuesFilePath alla riga 117 e dalla riga di avvio alla riga 194. 2+3) Probe manuale su path 8.3 reale (qui os.tmpdir() e' gia' corto: C:/Users/DIEGO_~1/AppData/Local/Temp). Server avviato con --project-dir sulla forma corta .../DIEGO_~1/.../probe-board-V3s91v: la riga JSON di avvio riporta projectDir = C:/Users/diego_martignoni/AppData/Local/Temp/probe-board-V3s91v (forma lunga); dopo una scrittura su issues.json arriva l'evento SSE 'event: issues' (true) e il processo resta vivo (exitCode null). Stesso probe contro il board-server.mjs di HEAD (pre-fix): 'Assertion failed: !_wcsnicmp(filename, dir, dirlen), file src/win/fs-event.c, line 72', nessun evento, exitCode 3221226505 (0xC0000409). 4) test/plugin-board.test.mjs:245 \"a project directory given as an 8.3 short path does not kill the board\" gira davvero su questa macchina, non e' skipped: node --test --test-name-pattern -> tests 1, pass 1, skipped 0. Contro il sorgente pre-fix (copia del repo in tmp con scripts/board-server.mjs preso da git show HEAD:) fallisce: fail 1, AssertionError 'the announced path must be the canonical one', actual C:/Users/DIEGO_~1/AppData/Local/Temp/harness-board-e6kywr vs expected la forma lunga. 5) Gate `npm run test`: tests 281, pass 281, fail 0, cancelled 0, skipped 0, todo 0, duration_ms 17147, exit 0. Collaterali: git status --short elenca solo issues.json, scripts/board-server.mjs, test/plugin-board.test.mjs; nessun file untracked; nessun segreto nel diff. Verificatore: nessun file modificato oltre questa chiusura."
       },
       "created_at": "2026-08-10T13:56:55Z",
-      "updated_at": "2026-08-10T14:05:46Z"
+      "updated_at": "2026-08-10T14:05:46Z",
+      "covers": []
     },
     {
       "id": "7619689e-c007-4f0a-a94a-d253da55bcea",
@@ -519,7 +545,8 @@
         "criteria": "Criterio 1 (canonicalizzazione): board.md dichiara esplicitamente che il server canonicalizza la directory ricevuta e che projectDir puo' differire da quanto passato in --project-dir. Esempi dati: path 8.3 torna in forma lunga, link simbolici nella destinazione. Verificato nelle righe 30-35.\n\nCriterio 2 (abort libuv): la sezione 'Perche' non parte da solo' cita l'abort di libuv su path 8.3 come causa nota e chiusa, senza dichiararla l'unica. Il testo spiega che NON spiega le tre morti elencate (50, 25, 16 minuti) perche' l'abort scatta alla prima scrittura su issues.json, non dopo 50 minuti. Afferma che resta almeno una causa non identificata. Verificato nelle righe 122-127.\n\nCriterio 3 (controllo projectDir): il testo non contraddice il comando /harness:board. Dichiara esplicitamente 'Il controllo resta quello — guardare projectDir prima di annunciare l'URL — solo che si fa su un valore canonico'. Verificato nella riga 32-33.\n\nCriterio 4 (gate): npm run test eseguito. 284 test passati, exit code 0. Output completo: 'ℹ tests 284 / ℹ pass 284 / ℹ fail 0'.\n\nTutti i criteri soddisfatti. Nessuna modifica fuori scope del lavoro documentale."
       },
       "created_at": "2026-08-10T14:06:55Z",
-      "updated_at": "2026-08-10T14:25:25Z"
+      "updated_at": "2026-08-10T14:25:25Z",
+      "covers": []
     },
     {
       "id": "aa9a07bf-0611-400e-b22a-fd0a9ff6cb40",
@@ -645,5 +672,6 @@
       "created_at": "2026-08-11T14:53:29Z",
       "updated_at": "2026-08-11T15:59:00Z"
     }
-  ]
+  ],
+  "schema_version": 2
 }
