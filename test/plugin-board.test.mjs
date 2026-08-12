@@ -723,12 +723,26 @@ test("progressBar fills only when the work is actually finished", async () => {
     const { progressBar } = extractFunctions(html, ["progressBar"]);
 
     assert.equal(progressBar(0, 0), "");
-    assert.equal(progressBar(0, 4).length, 10);
-    assert.equal(progressBar(4, 4), "▓".repeat(10));
-    // Nine of ten is not ten of ten: rounding up would show a finished row for work that is not,
-    // which is the fresh-looking stale datum this design refuses everywhere else.
-    assert.ok(progressBar(9, 10).endsWith("░"));
-    assert.ok(!progressBar(0, 4).includes("▓"));
+
+    const empty = progressBar(0, 4);
+    assert.match(empty, /<progress\b/);
+    assert.match(empty, /value="0"/);
+    assert.match(empty, /max="4"/);
+    assert.ok(!empty.includes("progress-success"), "an empty bar is never the success tone");
+
+    // Nine of ten is not ten of ten. The tone is the whole message the colour carries, so it
+    // arrives only on the last task: a bar that went green at 90% would show as finished work
+    // that is not, which is the fresh-looking stale datum this design refuses everywhere else.
+    assert.ok(!progressBar(9, 10).includes("progress-success"));
+
+    const full = progressBar(4, 4);
+    assert.match(full, /value="4"/);
+    assert.match(full, /max="4"/);
+    assert.ok(full.includes("progress-success"));
+
+    // The bar is a component now, not a string of characters drawn by hand.
+    assert.ok(!full.includes("▓"), "no glyph bar survives");
+    assert.ok(!empty.includes("░"), "no glyph bar survives");
   } finally {
     stop(child);
     rmSync(dir, { recursive: true, force: true });

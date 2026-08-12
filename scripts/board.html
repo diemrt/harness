@@ -393,15 +393,17 @@
         </div>`;
     }
 
-    // Ten cells, and a full bar means finished. Rounding up at 95% would show a completed row for
-    // work that is not, which is exactly the fresh-looking stale datum this board refuses to
-    // display elsewhere: anything short of every task checked keeps at least one empty cell.
+    // A daisyUI progress and not a string of glyphs: everything else on this page is drawn with
+    // the design system, and this row was the only place speaking another alphabet.
+    //
+    // The invariant it used to defend by hand — full only when finished — is now a property of the
+    // data rather than a correction applied to the rendering: value and max are the real numbers,
+    // so a full bar exists if and only if every task is checked. What is left to decide is the
+    // tone, and that follows the same rule: success arrives on the last task, never one before.
     function progressBar(done, total) {
-      const cells = 10;
       if (!total) return "";
-      if (done >= total) return "▓".repeat(cells);
-      const filled = Math.min(cells - 1, Math.floor((done / total) * cells));
-      return "▓".repeat(filled) + "░".repeat(cells - filled);
+      const tone = done >= total ? " progress-success" : "";
+      return `<progress class="progress${tone} w-24 h-1.5 align-middle" value="${done}" max="${total}"></progress>`;
     }
 
     // One summary row per array of tasks, and the tasks themselves only on expansion.
