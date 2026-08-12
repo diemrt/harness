@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-12T10:19:49Z",
+  "last_updated": "2026-08-12T10:26:52Z",
   "rules": {
     "single_active_issue": false
   },
@@ -878,31 +878,61 @@
     {
       "id": "56f1b32c-a073-4743-b85e-6a06762a885c",
       "title": "references/issues.md: il contratto dei due array di task",
-      "description": "La reference che possiede lo schema guadagna i due array: forma, limiti, tabella dei campi accettati in input, codici di errore e il flag nuovo.\n\nPiano: docs/superpowers/plans/2026-08-12-harness-continuita-del-lavoro.md, Task 3. Spec: docs/superpowers/specs/2026-08-10-harness-continuita-del-lavoro-design.md, §2.1, §2.2, §7.\n\nIl contratto dei campi nuovi va qui e il flusso va in SKILL.md: è la lezione di P2 applicata subito, e nulla di tutto questo va dentro un comando.\n\nIl rischio vero è un numero che diverge da LIMITS: nessun test confronta la reference col codice, e chi legge crede alla reference.",
-      "status": "backlog",
+      "description": "La reference che possiede lo schema guadagna i due array: forma, limiti, tabella dei campi accettati in input, codici di errore e il flag nuovo.\n\nPiano: docs/superpowers/plans/2026-08-12-harness-continuita-del-lavoro.md, Task 3. Spec: docs/superpowers/specs/2026-08-10-harness-continuita-del-lavoro-design.md, §2.1, §2.2, §7.\n\nIl contratto dei campi nuovi va qui e il flusso va in SKILL.md: e' la lezione di P2 applicata subito, e nulla di tutto questo va dentro un comando.\n\nIl rischio vero e' un numero che diverge da LIMITS: nessun test confronta la reference col codice, e chi legge crede alla reference.\n\nPasso aggiunto dopo la verifica di cf74ee9d: va scritto cosa il guard su in_progress garantisce davvero. Nessuna issue ENTRA in in_progress senza passi dichiarati; che non possa esserne svuotata dopo, da chi passa un array vuoto esplicito piu' il flag, non e' garantito ed e' voluto.",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
         "cf74ee9d-14b4-4463-bb6d-e03df0da004b"
       ],
       "covers": [
-        "23de92d"
+        "23de92d",
+        "ca403c4"
       ],
-      "tasks": [],
+      "tasks": [
+        {
+          "id": 1,
+          "short_title": "Schema e paragrafo dei due array",
+          "full_description": "In references/issues.md: il blocco JSON dello schema con tasks e validation.tasks, e il paragrafo che spiega decomposizione, indicizzazione, perche' i task di validazione stanno dentro validation, i due momenti in cui nascono, e la conservazione in --update.",
+          "checked": true
+        },
+        {
+          "id": 2,
+          "short_title": "Limiti e tabella dei campi in input",
+          "full_description": "Due righe nella tabella dei limiti (60 e 1200) piu' la prosa su caratteri-non-parole e sul tetto generoso. Riga tasks nella tabella dei campi accettati, e riga validation aggiornata. Verificare che 60 e 1200 coincidano con LIMITS.taskTitle e LIMITS.taskDescription.",
+          "checked": true
+        },
+        {
+          "id": 3,
+          "short_title": "Aggiornamento appaiato e le sue tre esenzioni",
+          "full_description": "Il paragrafo del guard appaiato con --decomposition-unchanged, e le tre cose che non rifiuta: spunta, prima materializzazione, chiusura. Sono la definizione del guard, non eccezioni.",
+          "checked": true
+        },
+        {
+          "id": 4,
+          "short_title": "Codici di errore",
+          "full_description": "Estendere le righe INVALID_INPUT, LIMIT_EXCEEDED e FORBIDDEN_ROLE della tabella dei codici coi casi nuovi, e la frase finale su FORBIDDEN_ROLE con la spunta dei validation.tasks.",
+          "checked": true
+        },
+        {
+          "id": 5,
+          "short_title": "Cosa il guard su in_progress garantisce",
+          "full_description": "Scrivere che il tracker garantisce che nessuna issue ENTRI in in_progress senza passi dichiarati, non che non possa esserne svuotata: serve un array vuoto esplicito piu' --decomposition-unchanged, cioe' due gesti deliberati. Emerso dalla verifica di cf74ee9d.",
+          "checked": true
+        },
+        {
+          "id": 6,
+          "short_title": "Comandi, --upgrade, e rilettura del diff",
+          "full_description": "Esempio del flag nella sezione Comandi, migrazione 2 -> 3 nella sezione --upgrade. Poi npm run test verde e rilettura del diff cercando prosa rivolta a chi esegue il piano invece che al lettore.",
+          "checked": true
+        }
+      ],
       "validation": {
-        "criteria": [
-          "Lo schema in references/issues.md mostra tasks e validation.tasks nella forma { id, short_title, full_description, checked }",
-          "I limiti 60 e 1200 scritti nella tabella coincidono con LIMITS.taskTitle e LIMITS.taskDescription in scripts/issue-manager.mjs",
-          "La tabella dei campi accettati in input ha la riga tasks, e la riga validation nomina i task e la loro conservazione in update",
-          "Le righe INVALID_INPUT, LIMIT_EXCEEDED e FORBIDDEN_ROLE della tabella dei codici nominano i casi nuovi",
-          "Sono scritte le tre cose che il guard appaiato non rifiuta: la spunta, la prima materializzazione, la chiusura",
-          "--decomposition-unchanged è documentato fra i comandi, e la migrazione 2 -> 3 nella sezione --upgrade",
-          "npm run test verde, plugin-skill.test.mjs compreso"
-        ],
+        "criteria": "npm run test: 347/347 pass (incl. plugin-skill.test.mjs). Numeri: LIMITS.taskTitle=60, LIMITS.taskDescription=1200 in scripts/issue-manager.mjs righe 128,133, coincidono con la tabella Limiti (righe 465-466 di issues.md). Probe CLI su directory temporanea (--project-dir), mai su issues.json reale: (1) tick di un task senza flag e senza toccare description -> accettato (esenzione 'spunta'); (2) description sola senza flag con tasks non vuoti -> INVALID_INPUT; (3) prima materializzazione (tasks:[] -> tasks non vuoto insieme a description) senza flag -> accettata, e descrizione sola con tasks ancora vuoti -> accettata senza flag; (4) chiusura (state unknown->pass con criteria cambiati, validation.tasks invariati) senza flag -> accettata, e validation.tasks non nominato nel payload di chiusura risulta conservato nel --get successivo; (5) --update {status:in_progress} su issue con tasks:[] con --decomposition-unchanged -> rifiutato INVALID_INPUT (il flag non aggira il guard sulla transizione); (6) issue gia' in_progress con tasks non vuoti: {tasks:[]} senza flag -> INVALID_INPUT (guard appaiato), stesso payload con --decomposition-unchanged -> accettato (svuotamento post-ingresso richiede i due gesti deliberati, come dice il paragrafo del task 5). FORBIDDEN_ROLE su spunta di validation.tasks verificato per lettura del codice (issue-manager.mjs righe 755-770) e coincide con la riga aggiunta alla tabella codici e alla prosa finale. Nessun riferimento a 'Task N'/'Step N'/piano-spec specifici di questo sviluppo nel file; le due occorrenze di 'piano' (righe 399, 478) sono terminologia generica gia' usata anche in SKILL.md:190,195, non prosa rivolta al worker del piano di harness. git status --short mostra solo issues.json e skills/harness/references/issues.md modificati, nessun danno collaterale. Nessun file modificato da questo verificatore oltre alla chiusura della issue.",
         "tasks": [],
-        "state": "unknown"
+        "state": "pass"
       },
       "created_at": "2026-08-12T09:27:25Z",
-      "updated_at": "2026-08-12T09:50:43Z"
+      "updated_at": "2026-08-12T10:26:52Z"
     },
     {
       "id": "9fc8151f-450b-49f9-89a7-9552d3a97e4d",

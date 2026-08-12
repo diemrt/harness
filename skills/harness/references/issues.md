@@ -66,6 +66,9 @@ node "$SCRIPTS/issue-manager.mjs" --insert --issue-data '{"title":"...","descrip
 # aggiornare (merge: i campi omessi restano invariati)
 node "$SCRIPTS/issue-manager.mjs" --update --issue-id <id> --issue-data '{"status":"done","validation":{"criteria":"<evidenza>","state":"pass"}}'
 
+# aggiornare la prosa dichiarando che la decomposizione in task regge ancora
+node "$SCRIPTS/issue-manager.mjs" --update --issue-id <id> --issue-data-file ./change.json --decomposition-unchanged
+
 # eliminare (rifiutato finché altre issue la dichiarano in depends_on)
 node "$SCRIPTS/issue-manager.mjs" --delete --issue-id <id>
 
@@ -145,7 +148,9 @@ eseguendo solo le migrazioni comprese fra le due versioni. La logica vive in una
 ordinata** di migrazioni interna allo script, ognuna con la versione che produce (`to`); si
 applicano solo quelle con `to` maggiore della versione del file e non superiore a
 `SCHEMA_VERSION`. La migrazione `0 → 1` materializza `depends_on: []` dove la chiave manca; la
-`1 → 2` fa lo stesso con `covers: []`.
+`1 → 2` fa lo stesso con `covers: []`; la `2 → 3` con `tasks: []` e, sulle sole issue che hanno un
+oggetto `validation`, `validation.tasks: []` — una `validation` a `null` non ne guadagna uno,
+perché non ci sarebbe dove metterli.
 
 - **aggiunge soltanto:** ogni migrazione mette il default sui campi nuovi, non tocca i valori
   esistenti e non rimuove niente. Un campo deprecato lo cancella l'utente, quando decide di
@@ -321,7 +326,12 @@ eccezione: testo semplice). Su stderr non viene scritto nulla.
   "tier": "economy|standard|reasoning",
   "depends_on": ["<guid>"],
   "covers": ["<git-ref>"],
-  "validation": { "criteria": ["<string>"], "state": "unknown|pass|fail" },
+  "tasks": [{ "id": 1, "short_title": "<string>", "full_description": "<string>", "checked": false }],
+  "validation": {
+    "criteria": ["<string>"],
+    "tasks": [{ "id": 1, "short_title": "<string>", "full_description": "<string>", "checked": false }],
+    "state": "unknown|pass|fail"
+  },
   "created_at": "<datetime>",
   "updated_at": "<datetime>"
 }
@@ -379,6 +389,64 @@ altro passo dimenticabile. Una issue docs invece nasce **dopo** il commit di cod
 documentare: quello SHA esiste già nel momento in cui la issue si apre. È questo che rende il
 campo praticabile invece che teorico.
 
+**`tasks` e `validation.tasks`** sono la **decomposizione** della prosa alla grana a cui l'agente
+lavora: una voce per passo, `{ id, short_title, full_description, checked }`. `description` e
+`validation.criteria` restano invariati e restano prosa — sono il registro con cui una issue
+spiega a una persona cosa vuole e perché; i due array sono la stessa cosa all'altra grana, e
+l'aggiornamento appaiato più sotto impedisce che divergano.
+
+I task **indicizzano, non sostituiscono**: `full_description` porta quanto serve ad agire — il
+comando, l'esito atteso, il riferimento al passo di piano — non l'analisi che ci sta dietro.
+`issues.json` è committato, condiviso e riletto a ogni comando, e ogni lettura lo paga: il tracker
+guadagna l'avanzamento, non diventa il documento.
+
+I **task di validazione stanno dentro `validation`**, non accanto: è lì che vive tutto ciò che
+riguarda il giudizio, guard compreso, e tenerli fuori spargerebbe la stessa nozione in due punti
+dello schema. Se `validation` è `null` — la verifica leggera di [SKILL.md](../SKILL.md) — non ci
+sono task di validazione, e non c'è dove metterli.
+
+Entrambi sono sempre array — assente vale `[]`, `[]` esplicito ripulisce — e `null` **non** è
+ammesso, per lo stesso motivo di `depends_on` e `covers`. `id` è un intero positivo, unico dentro
+il proprio array e stabile: è locale e ordinale, e un GUID lo renderebbe illeggibile nell'unico
+contesto in cui si legge, dove il riferimento utile è «il task 4». **Nessun tetto al numero di
+task**: la grana del livello sotto varia da progetto a progetto, e un limite spingerebbe ad
+accorpare passi veri per far passare il payload.
+
+**Quando si scrivono.** `validation.tasks` nascono **con la issue**, come i criteri: chi apre sa
+cosa deve essere vero alla fine. `tasks` li materializza **chi prende la issue**, prima di
+iniziare: è chi sa *come* arrivarci. La CLI lo impone — un `in_progress` con `tasks` vuoto viene
+rifiutato con `INVALID_INPUT`, e nemmeno `--decomposition-unchanged` lo aggira.
+
+Quel rifiuto è sulla **transizione**: garantisce che nessuna issue *entri* in `in_progress` senza
+passi dichiarati. Non garantisce che non possa esserne svuotata dopo — per farlo servono un
+`"tasks": []` esplicito e il flag, cioè due gesti deliberati di chi lo sta dichiarando a voce alta.
+Un update qualunque a una issue già in volo senza task resta invece accettato: le issue scritte
+prima del campo devono restare modificabili, o il tracker conterrebbe record che nessuno può più
+toccare.
+
+**Un `--update` che non nomina `validation.tasks` li conserva.** Il payload di chiusura è
+`{criteria, state}`: senza questa regola ogni chiusura cancellerebbe la checklist che ha appena
+giudicato. Per svuotarli si passa `"tasks": []` esplicito.
+
+**Aggiornamento appaiato.** Un `--update` che modifica `description` senza toccare `tasks` — o il
+contrario — viene rifiutato con `INVALID_INPUT`, e così per `validation.criteria` e
+`validation.tasks`. Il flag `--decomposition-unchanged` dichiara che la decomposizione regge
+ancora, ed è l'unica via d'uscita. È la stessa filosofia con cui la CLI difende il DAG dai cicli:
+impossibile per costruzione, non sconsigliato a parole. Senza, la deriva sarebbe silenziosa e
+peggiore dell'assenza dei task — il verificatore misurerebbe una cosa e l'umano ne leggerebbe
+un'altra, e nulla lo direbbe.
+
+Tre cose che il guard **non** rifiuta, e non sono eccezioni ma la sua definizione:
+
+- **spuntare un task** non è una nuova decomposizione: il confronto guarda `id`, `short_title` e
+  `full_description`, mai `checked`. L'allineamento prima di ogni commit non chiede mai il flag —
+  se lo chiedesse, il flag verrebbe passato sempre e smetterebbe di significare qualcosa;
+- **la prima materializzazione** non diverge da niente: una issue senza task non ha ancora una
+  decomposizione da cui allontanarsi;
+- **alla chiusura** (`state` `pass` o `fail`) `criteria` porta l'evidenza e non più il contratto:
+  la regola vale solo finché `state` è `unknown`, altrimenti nessun verificatore potrebbe chiudere
+  una issue senza il flag.
+
 **Semantica di `validation`:** `criteria` descrive cosa rende la issue accettabile.
 - **alla creazione** — `criteria` con i criteri di accettazione, `state: "unknown"`;
 - **alla chiusura** — `criteria` con l'**evidenza** della verifica, `state: "pass"` o `"fail"`.
@@ -394,10 +462,20 @@ limiti viene rifiutato con `LIMIT_EXCEEDED`.
 | `description` | 1200 caratteri |
 | singolo criterio | 200 caratteri |
 | numero di criteri | 7 |
+| `short_title` di un task | 60 caratteri |
+| `full_description` di un task | 1200 caratteri |
 
 La lunghezza si misura sulla stringa **trimmata**: uno spazio di padding non decide l'esito. I
 limiti valgono su `--insert` e sui soli campi **presenti** in `--update` — il merge non
 rivalida i campi omessi, quindi una issue scritta prima dei limiti resta aggiornabile.
+
+I due limiti sui task valgono identici per `tasks` e per `validation.tasks`. `short_title` si
+misura in **caratteri, non in parole**: il vincolo vero è che entri in una riga del riepilogo e in
+una riga del board, ed è ciò che il rendering misura davvero — contare parole è ambiguo fra lingue,
+trattini e sigle. Il tetto di `full_description` è **generoso ma non assente**: abbastanza alto da
+non mordere mai un indice, abbastanza basso da fermare un manuale. Vale anche qui la regola del
+`LIMIT_EXCEEDED`: non dice «comprimi», dice «quel contenuto non è un task», e quasi sempre è un
+passo del piano, che sta nel piano.
 
 **Forma di `criteria`, che dipende da `state`:**
 
@@ -452,11 +530,17 @@ il verificatore indipendente porta poi la issue a `done`/`pass` oppure `blocked`
 | `tier` | string \| null | opzionale | opzionale | `economy`, `standard`, `reasoning`, oppure `null` |
 | `depends_on` | array | opzionale | opzionale | id di issue esistenti; assente vale `[]`, `[]` ripulisce; niente self-reference, niente duplicati, niente cicli; `null` non è ammesso |
 | `covers` | array | opzionale | opzionale | riferimenti git che la issue copre; assente vale `[]`, `[]` ripulisce; stringhe non vuote, niente duplicati; `null` non è ammesso |
-| `validation` | object \| null | opzionale | opzionale | `null` oppure `{ criteria, state: unknown\|pass\|fail }`; `criteria` array a `state: unknown`, stringa o array alla chiusura |
+| `tasks` | array | opzionale | opzionale | passi di esecuzione `{ id, short_title, full_description, checked }`; assente vale `[]`, `[]` ripulisce; `id` intero positivo e unico nell'array, `checked` booleano; `null` non è ammesso |
+| `validation` | object \| null | opzionale | opzionale | `null` oppure `{ criteria, tasks, state: unknown\|pass\|fail }`; `criteria` array a `state: unknown`, stringa o array alla chiusura; `tasks` come sopra, e un `--update` che non li nomina li conserva |
 
 In `--update` i campi omessi restano invariati, ma un campo **presente** deve essere valido:
 `{"title":""}` viene rifiutato, e così un payload `{}`. I campi sconosciuti sono rifiutati in
 entrambi i comandi.
+
+`--update` accetta un flag suo, `--decomposition-unchanged`: dichiara che prosa e task descrivono
+ancora gli stessi passi, e permette a uno dei due di muoversi senza l'altro. Non è una scorciatoia
+per il resto — non aggira il rifiuto di `in_progress` senza task, e non tocca nessun'altra
+validazione.
 
 ## Codici di errore
 
@@ -469,18 +553,21 @@ Il `code` è stabile: usalo per la logica, il messaggio è per gli umani.
 | `INVALID_STATE` | `validation.state` fuori da `unknown`, `pass`, `fail` |
 | `INVALID_TIER` | `tier` fuori da `economy`, `standard`, `reasoning` (un `null` esplicito è valido) |
 | `INVALID_DEPENDENCY` | `depends_on` non è un array (`null` incluso), elemento non GUID, id duplicato, self-reference, id inesistente nel tracker, ciclo diretto o indiretto; oppure `--delete` di una issue da cui altre dipendono, o `--compact` di una issue da cui dipende una issue viva |
-| `INVALID_INPUT` | campo sconosciuto, obbligatorio mancante o vuoto, payload `{}` in update, `page-size` < 1, `criteria` di forma sbagliata (stringa a `state: unknown`, array vuoto, elemento non stringa o vuoto); in `--compact` anche `blocks` assente/vuoto, blocco vuoto, stesso id in due blocchi |
-| `LIMIT_EXCEEDED` | `title`, `description` o un criterio oltre il limite di caratteri, o più di 7 criteri (vale anche per `title`/`description` di un blocco di `--compact`) |
+| `INVALID_INPUT` | campo sconosciuto, obbligatorio mancante o vuoto, payload `{}` in update, `page-size` < 1, `criteria` di forma sbagliata (stringa a `state: unknown`, array vuoto, elemento non stringa o vuoto); `tasks` o `validation.tasks` non array, voce malformata, `id` non intero positivo o duplicato, `checked` non booleano; `in_progress` con `tasks` vuoto; aggiornamento non appaiato di prosa e decomposizione; in `--compact` anche `blocks` assente/vuoto, blocco vuoto, stesso id in due blocchi |
+| `LIMIT_EXCEEDED` | `title`, `description` o un criterio oltre il limite di caratteri, più di 7 criteri, `short_title` oltre 60 o `full_description` oltre 1200 caratteri (vale anche per `title`/`description` di un blocco di `--compact`) |
 | `INVALID_JSON` | payload non JSON valido |
 | `NOT_FOUND` | nessuna issue con quell'id |
 | `FILE_NOT_FOUND` | `--issue-data-file` inesistente, o `--project-dir` che non esiste |
 | `MISSING_ARGS` | flag richiesto assente, o `--issue-data` e `--issue-data-file` insieme |
 | `UNKNOWN_COMMAND` | nessun comando riconosciuto (vedi `--help`) |
-| `FORBIDDEN_ROLE` | con `HARNESS_ROLE=worker`, tentativo di impostare `status=done` o `validation.state=pass`, oppure qualunque `--compact` |
+| `FORBIDDEN_ROLE` | con `HARNESS_ROLE=worker`, tentativo di impostare `status=done` o `validation.state=pass`, di spuntare una voce di `validation.tasks`, oppure qualunque `--compact` |
 | `ALREADY_EXISTS` | `--init` quando `issues.json` esiste già: rifiutato, niente viene scritto |
 | `SCHEMA_TOO_NEW` | `--upgrade` su un file con `schema_version` maggiore di `SCHEMA_VERSION`: rifiutato, niente viene scritto |
 
 `FORBIDDEN_ROLE` è il guard tecnico contro la self-validation: un processo lanciato con
 `HARNESS_ROLE=worker` non può chiudere la propria issue, può arrivare al massimo a
 `in_review` / `unknown`. Per lo stesso motivo un worker non può lanciare `--compact`: ogni blocco
-che quel comando scrive è un record `done` / `pass`.
+che quel comando scrive è un record `done` / `pass`, e non può spuntare una voce di
+`validation.tasks`: spuntare un criterio che misura il proprio lavoro è self-validation con
+un'altra sintassi. I propri `tasks` di esecuzione li spunta eccome — quelli dicono a che punto è,
+non se il lavoro va bene.
