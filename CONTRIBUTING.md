@@ -47,7 +47,8 @@ published from it. Consumers install from git, so the release is the tag.
 git tag v0.6.0 && git push && git push --tags
 ```
 
-**Tagging publishes nothing.** `ci.yml` is the only workflow, and it runs on pushes and pull
-requests, not on tags. The npm workflow that used to publish `@diemrt/harness` on every `v*` tag
-was removed with the rest of the pre-plugin distribution model, and `package.json` is `private`
-so `npm publish` refuses even if run by hand.
+**Tagging publishes nothing.** `ci.yml` is the only workflow, and all it does is `npm ci`,
+`npm test` and a read of the tracker. Its `on: push:` has no ref filter, so pushing a tag *does*
+run it — it just has nothing to publish with. The npm workflow that used to publish
+`@diemrt/harness` on every `v*` tag was removed with the rest of the pre-plugin distribution
+model, and `package.json` is `private` so `npm publish` refuses even if run by hand.
