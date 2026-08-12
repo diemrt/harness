@@ -1553,7 +1553,7 @@ function upgradeSeed() {
   return seed;
 }
 
-test("(a) --upgrade on a tracker without schema_version reports ok:true, from:0, to:1, and writes schema_version:1", () => {
+test("(a) --upgrade on a tracker without schema_version reports ok:true, from:0, and writes SCHEMA_VERSION", () => {
   const { dir } = setupTempProject(upgradeSeed());
   try {
     assert.ok(!("schema_version" in rootData(dir)), "the fixture must start without the key");
@@ -1562,6 +1562,25 @@ test("(a) --upgrade on a tracker without schema_version reports ok:true, from:0,
     assert.deepEqual(data, { from: 0, to: SCHEMA_VERSION, migrated: 3 });
 
     assert.equal(rootData(dir).schema_version, SCHEMA_VERSION, "the file on disk must carry the new version");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("(a2) --upgrade writes schema_version as the FIRST root key and leaves the other root keys in their original order", () => {
+  const { dir } = setupTempProject(upgradeSeed());
+  try {
+    const keysBefore = Object.keys(rootData(dir));
+    assert.ok(!keysBefore.includes("schema_version"), "the fixture must start without the key");
+
+    assertOk(run(dir, ["--upgrade"]));
+    const keysAfter = Object.keys(rootData(dir));
+
+    // Plain assignment would append the key, which is what this repository's own tracker got on its
+    // first real migration: references/issues.md promises the top of the root object, so a migrated
+    // tracker must have the same shape as one seeded by --init.
+    assert.equal(keysAfter[0], "schema_version", "schema_version must lead the root object");
+    assert.deepEqual(keysAfter.slice(1), keysBefore, "every other root key keeps its original order");
   } finally {
     cleanup(dir);
   }
@@ -1604,7 +1623,7 @@ test("(b) after --upgrade every issue has depends_on; issues that already had it
 test("(c) a second --upgrade in a row reports ok:true, migrated:0, and leaves the file byte-for-byte identical", () => {
   const { dir } = setupTempProject(upgradeSeed());
   try {
-    assertOk(run(dir, ["--upgrade"])); // first upgrade: 0 -> 1, writes the file
+    assertOk(run(dir, ["--upgrade"])); // first upgrade: 0 -> SCHEMA_VERSION, writes the file
 
     const issuesPath = path.join(dir, "issues.json");
     const beforeSecondRun = readFileSync(issuesPath); // Buffer, not string: compare raw bytes

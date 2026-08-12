@@ -18,9 +18,23 @@ creato). Il file nasce al **primo `--insert`**, oppure di proposito con `--init`
 
 ## `schema_version`
 
-`issues.json` può portare, in cima e accanto a `last_updated`, la chiave `schema_version`: la
-versione dello schema descritto in questa pagina. Lo script conosce la propria versione tramite
+`issues.json` può portare, **come prima chiave dell'oggetto radice**, la chiave `schema_version`:
+la versione dello schema descritto in questa pagina. Lo script conosce la propria versione tramite
 la costante `SCHEMA_VERSION` (oggi `2`).
+
+Ce la mettono in testa entrambi i comandi che la scrivono: `--init` la semina lì, e `--upgrade`
+ricostruisce l'oggetto radice — senza, l'assegnazione la farebbe atterrare in **coda**, dando a un
+tracker migrato una forma diversa da uno appena creato. Le altre chiavi restano nell'ordine che
+avevano.
+
+**Nessun comando legge la posizione**, quindi un tracker migrato da un plugin più vecchio di questa
+correzione ce l'ha in coda ed è legale così: `issues.json` di questo repository è esattamente quel
+caso. È l'ordine che i due comandi *scrivono*, non un invariante di ogni file esistente.
+
+La pagina **non** promette che stia accanto a `last_updated`: vale nel seed di `--init`, dove
+`last_updated` è la seconda chiave, e non vale su nessun tracker che porti un `project` o altre
+chiavi proprie. Le due cose coincidono solo in un caso, e prometterle insieme era la descrizione di
+quel caso spacciata per regola.
 
 - **chiave assente = versione 0, e il file si legge lo stesso.** Nessun comando cambia
   comportamento in base a questa chiave, nessun progetto va aggiornato per continuare a

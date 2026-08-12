@@ -112,7 +112,11 @@ const TIERS = ["economy", "standard", "reasoning"];
 
 // The schema this script currently implements, i.e. the shape documented in references/issues.md.
 // A tracker declares which version it was written against via the root-level `schema_version` key,
-// sitting next to `last_updated`. Only --init and --upgrade ever WRITE that key; every other
+// written first in the root object — by --init, which seeds it there, and by --upgrade, which
+// rebuilds the root so a migrated tracker has the same shape as a freshly created one. It is NOT
+// promised adjacent to `last_updated`: that holds only for the --init seed, where last_updated is
+// the second key, and never for a tracker carrying `project` or anything else of its own.
+// Only --init and --upgrade ever WRITE that key; every other
 // command here only reads issues.json and rewrites it unchanged on the fields it does not own —
 // see writeIssuesFile(). An absent key reads as version 0, and that is not an error: it is the
 // same choice already made for `tier` and `depends_on`, a new field never invalidates data
@@ -694,7 +698,14 @@ function upgradeTracker() {
 
   data.issues = migratedIssues;
   data.schema_version = SCHEMA_VERSION;
-  writeIssuesFile(data);
+  // Assigning the key on a file that does not have it appends it to the END of the root object,
+  // where both references/issues.md and the SCHEMA_VERSION comment above promise it sits at the
+  // top, next to last_updated. --init already seeds it first, so leaving the assignment as-is
+  // gives a migrated tracker a different shape from a freshly created one for no reason other than
+  // how it got there — and this repository's own tracker proved it, ending up with the key last.
+  // Rebuilding the root puts it first and keeps every other key in the order the file already had.
+  const { schema_version, ...rest } = data;
+  writeIssuesFile({ schema_version, ...rest });
   writeOk({ from: fromVersion, to: SCHEMA_VERSION, migrated: touched.filter(Boolean).length });
 }
 

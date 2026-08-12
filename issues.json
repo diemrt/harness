@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-12T08:02:43Z",
+  "last_updated": "2026-08-12T08:26:29Z",
   "rules": {
     "single_active_issue": false
   },
@@ -671,6 +671,33 @@
       },
       "created_at": "2026-08-11T14:53:29Z",
       "updated_at": "2026-08-11T15:59:00Z"
+    },
+    {
+      "id": "a741fbbe-9bde-4777-bebf-75f8516bac33",
+      "title": "Gate documentale dei quattro commit di codice di docs-gate, covers e board",
+      "description": "I quattro commit dichiarati in covers sono i soli scoperti su questo branch: due su scripts/docs-gate.mjs, uno su issue-manager.mjs (covers e migrazione 1 -> 2), uno su board-server.mjs (canonicalizzazione della project dir). I documenti che li descrivono esistevano gia' — references/docs-gate.md, issues.md, board.md — quindi il debito non era documentazione mancante ma documentazione mai riletta contro il codice.\n\nEsito della rilettura: docs-gate.md e board.md non avevano niente da correggere, e le affermazioni su covers in issues.md valgono tutte. La discrepanza su schema_version e' stata risolta su ENTRAMBI i lati, perche' la frase originale era insoddisfacibile: 'in cima' e 'accanto a last_updated' coincidono solo nel seed di --init, dove last_updated e' la seconda chiave, e mai su un tracker che porti un project. Quindi --upgrade ora ricostruisce l'oggetto radice e scrive la chiave in testa in modo deterministico, con un test che lo blocca; e la reference smette di promettere l'adiacenza, dichiarando che un tracker migrato prima della correzione la porta in coda ed e' legale cosi'. issues.json di questo repository e' esattamente quel caso: nessun comando legge la posizione.",
+      "status": "done",
+      "tier": "standard",
+      "depends_on": [],
+      "covers": [
+        "61837295b3c476f4fdf048f3800527dd51b8948c",
+        "8ffd0d7288479be18fb4b13a09ce1d40cd383971",
+        "43f1557c621408e7074290a93a5b0f3c3d90975f",
+        "06a2576c3da897594e6a785e308817d888eacb86"
+      ],
+      "validation": {
+        "criteria": [
+          "C1 pass: docs-gate.mjs senza argomenti esce 0, stampa 'finestra da 06a2576c . piu vecchia revisione dichiarata', 17 commit / 3 toccano codice / 0 non coperti; i 4 SHA di covers risolvono e sono nella finestra.",
+          "C2 pass: temp dir con radice {project,last_updated,rules,issues} senza schema_version; --upgrade {from:0,to:2} lascia [schema_version,project,last_updated,rules,issues], come afferma issues.md: prima chiave, resto invariato.",
+          "C3 pass: tutte e 10 le righe provate. Uscita 0: report con 50 scoperti, --help, enabled:false. Uscita 1 (una riga): covers vuoto senza --since, --since deadbeef, project-dir inesistente, config mancante, config JSON rotto.",
+          "C3 (seguito): uscita 1 anche su issues.json JSON rotto, directory non-git, git rimosso dal PATH (git non e disponibile: spawnSync git ENOENT), flag --bogus. Codice osservato = codice dichiarato, caso per caso.",
+          "C4 pass: board.md:30 e board-server.mjs:53 concordano su realpathSync.native con fallback al path dato; server avviato su un path 8.3 (DIEGO_~1) stampa projectDir lungo, resta ALIVE dopo un --insert e serve la nuova issue.",
+          "C5 pass: npm run test -> tests 323, pass 323, fail 0, exit 0. git status --short invariato (issues.json, issue-manager.mjs, references/issues.md, plugin-issue-manager.test.mjs): nessun file toccato dal verificatore."
+        ],
+        "state": "pass"
+      },
+      "created_at": "2026-08-12T08:11:30Z",
+      "updated_at": "2026-08-12T08:26:29Z"
     }
   ],
   "schema_version": 2
