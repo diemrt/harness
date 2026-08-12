@@ -774,6 +774,39 @@ test("a task block summarises in one row and keeps the tasks collapsed", async (
   }
 });
 
+test("the task row is drawn with the design system, not with characters", async () => {
+  const dir = tempProject(seed());
+  const { child, url } = await startServer(dir);
+  try {
+    const html = await (await fetch(url)).text();
+    const { renderTaskBlock } = extractFunctions(html, ["renderTaskBlock", "escapeHtml", "progressBar"]);
+
+    const rendered = renderTaskBlock([boardTask(1, { checked: true }), boardTask(2)], {
+      issueId: "abc",
+      kind: "exec",
+      label: "task",
+      expanded: new Set(),
+    });
+
+    // The summary row: a real progress element and a badge, the two containers the rest of the
+    // card already uses for a bar and for a short discreet datum.
+    assert.match(rendered, /<progress\b/);
+    assert.match(rendered, /badge badge-ghost/);
+
+    // The markers: the same icon alphabet as every other glyph on the card.
+    assert.match(rendered, /data-lucide="check-circle"/);
+    assert.match(rendered, /data-lucide="circle"/);
+
+    // And nothing of the terminal left behind.
+    assert.ok(!rendered.includes("[x]"), "no monospace checkbox survives");
+    assert.ok(!rendered.includes("[ ]"), "no monospace checkbox survives");
+    assert.ok(!/font-mono/.test(rendered), "the row carries no monospace class");
+  } finally {
+    stop(child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("an expanded block comes back expanded after a re-render", async () => {
   const dir = tempProject(seed());
   const { child, url } = await startServer(dir);
