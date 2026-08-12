@@ -977,7 +977,9 @@ test("worker MAY set validation.state up to unknown", () => {
       "worker"
     );
     const data = assertOk(result);
-    assert.deepEqual(data.validation, { criteria: ["x"], state: "unknown" });
+    // tasks materializes to [] like depends_on and covers: the stored validation always carries
+    // the key, so no reader has to tell a missing one from an empty list.
+    assert.deepEqual(data.validation, { criteria: ["x"], tasks: [], state: "unknown" });
   } finally {
     cleanup(dir);
   }
@@ -1457,7 +1459,7 @@ test("--update preserves a schema_version that differs from this script's own SC
 // --init — creates issues.json with the minimal seed, and never overwrites an existing one
 // ---------------------------------------------------------------------------
 
-const SCHEMA_VERSION = 2; // mirrors the constant in scripts/issue-manager.mjs
+const SCHEMA_VERSION = 3; // mirrors the constant in scripts/issue-manager.mjs
 
 test("--init in a directory without issues.json creates it and reports created:true", () => {
   const { dir } = setupTempProject(null);
@@ -1605,14 +1607,26 @@ test("(b) after --upgrade every issue has depends_on; issues that already had it
       // covers: materialized to [] by migration 1 -> 2, exactly as depends_on was by 0 -> 1.
       assert.deepEqual(afterIssue.covers, []);
 
+      // tasks: materialized to [] by migration 2 -> 3, exactly as covers was by 1 -> 2.
+      assert.deepEqual(afterIssue.tasks, []);
+
       // Every other field is untouched, including updated_at: adding a field is not editing the
       // issue, and the migration must not read as a second --update pass.
-      for (const field of ["title", "description", "status", "validation", "created_at", "updated_at"]) {
+      for (const field of ["title", "description", "status", "created_at", "updated_at"]) {
         assert.deepEqual(afterIssue[field], beforeIssue[field], `field '${field}' of ${beforeIssue.id} must be untouched`);
       }
+      // validation is the one exception, and only in one direction: an issue that HAS a validation
+      // object gains validation.tasks: []. Its criteria and state must come through untouched, and
+      // a null validation must not grow an object to hold tasks it does not have.
+      if (beforeIssue.validation === null) {
+        assert.equal(afterIssue.validation, null, "a null validation must stay null");
+      } else {
+        assert.deepEqual(afterIssue.validation, { ...beforeIssue.validation, tasks: [] });
+      }
+
       // No key present before is missing after, and no key absent before was invented besides
-      // the two the migrations materialize.
-      const beforeKeys = new Set([...Object.keys(beforeIssue), "depends_on", "covers"]);
+      // the three the migrations materialize.
+      const beforeKeys = new Set([...Object.keys(beforeIssue), "depends_on", "covers", "tasks"]);
       assert.deepEqual(new Set(Object.keys(afterIssue)), beforeKeys);
     }
   } finally {
@@ -2338,6 +2352,320 @@ test("--help lists covers among the accepted input fields", () => {
     const result = run(dir, ["--help"]);
     assert.equal(result.status, 0);
     assert.match(result.stdout, /covers/);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// tasks and validation.tasks — the decomposition of the prose at the grain the agent works on.
+// description and validation.criteria stay prose; these two arrays are the same thing at the
+// other grain, which is what turns freezing the work into a by-product of doing it.
+// ---------------------------------------------------------------------------
+
+function task(id, overrides = {}) {
+  return {
+    id,
+    short_title: `Task ${id}`,
+    full_description: `Run the command and check the output for task ${id}`,
+    checked: false,
+    ...overrides,
+  };
+}
+
+function insertWith(dir, payload) {
+  return run(dir, [
+    "--insert",
+    "--issue-data",
+    JSON.stringify({ title: "T", description: "D", status: "backlog", ...payload }),
+  ]);
+}
+
+test("--insert stores tasks verbatim and reads them back", () => {
+  const { dir } = setupTempProject();
+  try {
+    const data = assertOk(insertWith(dir, { tasks: [task(1), task(2, { checked: true })] }));
+    assert.equal(data.tasks.length, 2);
+    assert.deepEqual(data.tasks[0], task(1));
+    assert.equal(data.tasks[1].checked, true);
+    assert.deepEqual(assertOk(run(dir, ["--get", "--issue-id", data.id])).tasks, data.tasks);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("tasks absent at --insert is stored as [], never as a missing key", () => {
+  const { dir } = setupTempProject();
+  try {
+    const data = assertOk(insertWith(dir, {}));
+    assert.deepEqual(data.tasks, []);
+    assert.ok("tasks" in data, "an absent tasks must materialize as an empty array");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("validation.tasks lives inside validation and materializes to []", () => {
+  const { dir } = setupTempProject();
+  try {
+    const plain = assertOk(
+      insertWith(dir, { validation: { criteria: ["the command exits 0"], state: "unknown" } })
+    );
+    assert.deepEqual(plain.validation.tasks, []);
+
+    const withTasks = assertOk(
+      insertWith(dir, {
+        validation: { criteria: ["the command exits 0"], tasks: [task(1)], state: "unknown" },
+      })
+    );
+    assert.deepEqual(withTasks.validation.tasks, [task(1)]);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("a null validation stays null: no tasks are invented for it", () => {
+  const { dir } = setupTempProject();
+  try {
+    assert.equal(assertOk(insertWith(dir, { validation: null })).validation, null);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("INVALID_INPUT: a task id must be a unique positive integer", () => {
+  const { dir } = setupTempProject();
+  try {
+    assertFail(insertWith(dir, { tasks: [task("1")] }), "INVALID_INPUT");
+    assertFail(insertWith(dir, { tasks: [task(1.5)] }), "INVALID_INPUT");
+    assertFail(insertWith(dir, { tasks: [task(0)] }), "INVALID_INPUT");
+    assertFail(insertWith(dir, { tasks: [task(1), task(1)] }), "INVALID_INPUT");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("INVALID_INPUT: every task field is required, checked is a boolean, no extra fields", () => {
+  const { dir } = setupTempProject();
+  try {
+    const { checked, ...noChecked } = task(1);
+    assertFail(insertWith(dir, { tasks: [noChecked] }), "INVALID_INPUT");
+    assertFail(insertWith(dir, { tasks: [task(1, { checked: "yes" })] }), "INVALID_INPUT");
+    assertFail(insertWith(dir, { tasks: [task(1, { short_title: "  " })] }), "INVALID_INPUT");
+    assertFail(insertWith(dir, { tasks: [task(1, { full_description: "" })] }), "INVALID_INPUT");
+    assertFail(insertWith(dir, { tasks: [{ ...task(1), owner: "me" }] }), "INVALID_INPUT");
+    assertFail(insertWith(dir, { tasks: "one, two" }), "INVALID_INPUT");
+    assertFail(insertWith(dir, { tasks: null }), "INVALID_INPUT");
+    assertFail(
+      insertWith(dir, {
+        validation: { criteria: ["c"], tasks: [task(1, { checked: 1 })], state: "unknown" },
+      }),
+      "INVALID_INPUT"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("the message for an unknown validation field names every field that is allowed", () => {
+  const { dir } = setupTempProject();
+  try {
+    const parsed = assertFail(
+      insertWith(dir, { validation: { criteria: ["c"], state: "unknown", owner: "me" } }),
+      "INVALID_INPUT"
+    );
+    // A hardcoded list goes stale the moment a field is added, and an error message that lies
+    // about what is accepted costs the caller the one thing the message exists to give.
+    assert.match(parsed.error, /Allowed fields: criteria, state, tasks/);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("LIMIT_EXCEEDED: short_title over 60 characters, full_description over 1200", () => {
+  const { dir } = setupTempProject();
+  try {
+    assertFail(insertWith(dir, { tasks: [task(1, { short_title: "x".repeat(61) })] }), "LIMIT_EXCEEDED");
+    assertFail(
+      insertWith(dir, { tasks: [task(1, { full_description: "x".repeat(1201) })] }),
+      "LIMIT_EXCEEDED"
+    );
+    // The number of tasks is deliberately uncapped: a limit would push a caller to merge real
+    // steps to make the payload fit, exactly as it would with depends_on.
+    const many = Array.from({ length: 40 }, (_, i) => task(i + 1));
+    assert.equal(assertOk(insertWith(dir, { tasks: many })).tasks.length, 40);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--update carries validation.tasks over when the payload does not name them", () => {
+  const { dir } = setupTempProject();
+  try {
+    const created = assertOk(
+      insertWith(dir, {
+        status: "in_review",
+        tasks: [task(1, { checked: true })],
+        validation: { criteria: ["the command exits 0"], tasks: [task(1)], state: "unknown" },
+      })
+    );
+    const closed = assertOk(
+      run(dir, [
+        "--update",
+        "--issue-id",
+        created.id,
+        "--issue-data",
+        JSON.stringify({
+          status: "done",
+          validation: { criteria: "npm test: 88 passing", state: "pass" },
+        }),
+      ])
+    );
+    assert.deepEqual(
+      closed.validation.tasks,
+      [task(1)],
+      "closing an issue must not delete the checklist it was judged against"
+    );
+    assert.equal(closed.validation.state, "pass");
+    assert.deepEqual(closed.tasks, [task(1, { checked: true })]);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("an explicit empty array clears the validation tasks", () => {
+  const { dir } = setupTempProject();
+  try {
+    const created = assertOk(
+      insertWith(dir, {
+        validation: { criteria: ["the command exits 0"], tasks: [task(1)], state: "unknown" },
+      })
+    );
+    const updated = assertOk(
+      run(dir, [
+        "--update",
+        "--issue-id",
+        created.id,
+        "--issue-data",
+        JSON.stringify({
+          validation: { criteria: ["the command exits 0"], tasks: [], state: "unknown" },
+        }),
+      ])
+    );
+    assert.deepEqual(updated.validation.tasks, []);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("an issue stored before the fields gets them on the first --update, not a missing key", () => {
+  const { dir } = setupTempProject();
+  try {
+    // ID_TWO in the base seed predates both arrays and carries a string criteria.
+    const updated = assertOk(
+      run(dir, ["--update", "--issue-id", ID_TWO, "--issue-data", JSON.stringify({ status: "blocked" })])
+    );
+    assert.deepEqual(updated.tasks, []);
+    assert.deepEqual(updated.validation.tasks, []);
+    assert.equal(updated.validation.criteria, "criteria two", "the prose must survive untouched");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("(d) 2 -> 3 materializes tasks and validation.tasks, and creates no validation where there was none", () => {
+  const seed = {
+    schema_version: 2,
+    last_updated: "1970-01-01T00:00:00Z",
+    issues: [
+      {
+        id: ID_ONE,
+        title: "No validation",
+        description: "D",
+        status: "backlog",
+        tier: null,
+        depends_on: [],
+        covers: [],
+        validation: null,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+      {
+        id: ID_TWO,
+        title: "With validation",
+        description: "D",
+        status: "in_review",
+        tier: null,
+        depends_on: [],
+        covers: [],
+        validation: { criteria: ["the command exits 0"], state: "unknown" },
+        created_at: "2026-01-02T00:00:00Z",
+        updated_at: "2026-01-02T00:00:00Z",
+      },
+    ],
+  };
+  const { dir } = setupTempProject(seed);
+  try {
+    const data = assertOk(run(dir, ["--upgrade"]));
+    assert.deepEqual(data, { from: 2, to: 3, migrated: 2 });
+
+    const [first, second] = storedIssues(dir);
+    assert.deepEqual(first.tasks, []);
+    assert.equal(first.validation, null, "a null validation must not grow a tasks array");
+    assert.deepEqual(second.tasks, []);
+    assert.deepEqual(second.validation.tasks, []);
+    assert.deepEqual(second.validation.criteria, ["the command exits 0"]);
+    assert.equal(second.validation.state, "unknown");
+
+    // Idempotent down to the bytes, like every migration before it.
+    const bytes = readFileSync(path.join(dir, "issues.json"), "utf8");
+    assert.equal(assertOk(run(dir, ["--upgrade"])).migrated, 0);
+    assert.equal(readFileSync(path.join(dir, "issues.json"), "utf8"), bytes);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--compact archives the originals with their tasks and writes empty ones on the block", () => {
+  const { dir } = setupTempProject();
+  try {
+    const created = assertOk(
+      insertWith(dir, {
+        status: "done",
+        tasks: [task(1, { checked: true })],
+        validation: { criteria: ["the command exits 0"], tasks: [task(1, { checked: true })], state: "pass" },
+      })
+    );
+
+    const data = assertOk(
+      run(dir, [
+        "--compact",
+        "--issue-data",
+        JSON.stringify({
+          blocks: [{ title: "Block", description: "One closed issue", issue_ids: [created.id] }],
+        }),
+      ])
+    );
+
+    const archived = JSON.parse(readFileSync(data.archivePath, "utf8")).issues[0];
+    assert.deepEqual(archived.tasks, [task(1, { checked: true })]);
+    assert.deepEqual(archived.validation.tasks, [task(1, { checked: true })]);
+
+    const block = storedIssues(dir).find((i) => i.id === data.blocks[0].id);
+    assert.deepEqual(block.tasks, [], "a block has nothing left to execute");
+    assert.deepEqual(block.validation.tasks, [], "and nothing left to judge");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--help documents tasks and the 2 -> 3 migration", () => {
+  const { dir } = setupTempProject();
+  try {
+    const result = run(dir, ["--help"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /tasks/);
+    assert.match(result.stdout, /2->3/);
   } finally {
     cleanup(dir);
   }

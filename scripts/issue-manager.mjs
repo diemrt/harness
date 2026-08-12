@@ -50,7 +50,8 @@
 //     "tier": "<economy|standard|reasoning>"|null,
 //     "depends_on": ["<guid>"],
 //     "covers": ["<git-ref>"],
-//     "validation": { "criteria": ["<string>"], "state": "<unknown|pass|fail>" }|null,
+//     "tasks": [ { "id": 1, "short_title": "<string>", "full_description": "<string>", "checked": false } ],
+//     "validation": { "criteria": ["<string>"], "tasks": [ ... ], "state": "<unknown|pass|fail>" }|null,
 //     "created_at": "<datetime>",
 //     "updated_at": "<datetime>"
 // }
@@ -76,8 +77,20 @@
 // duplicates — because a reference that means nothing fails to resolve and is reported as such by
 // scripts/docs-gate.mjs, which is a mistake you can see rather than one that passes.
 //
+// tasks / validation.tasks: the decomposition of the prose at the grain the agent works on — one
+// entry per step, { id, short_title, full_description, checked }. `tasks` are the execution steps,
+// materialized by whoever takes the issue; `validation.tasks` are the judgement steps, born with
+// the issue. Both are always stored as an array ([] when absent), for the reason depends_on and
+// covers are: a reader must never have to tell a missing key from an empty list. They INDEX, they
+// do not replace — full_description carries what it takes to act, not the analysis behind it. The
+// ids are integers, unique inside their own array, local and ordinal: the useful reference is
+// "task 4", and a GUID would make it unreadable in the one place it is read.
+//
 // --insert requires the full payload. --update merges: omitted fields keep their current value,
-// while an explicit "validation": null clears the validation object.
+// while an explicit "validation": null clears the validation object. Inside a validation object
+// that IS provided, an absent "tasks" inherits the stored ones rather than clearing them: the
+// closing payload is {criteria, state}, and without that rule every closure would delete the very
+// checklist it just judged.
 
 import { parseArgs } from "node:util";
 import { randomUUID } from "node:crypto";
@@ -102,6 +115,15 @@ const LIMITS = {
   description: 1200,
   criterion: 200,
   criteriaCount: 7,
+  // Measured in characters and not in words: the real constraint is fitting one row of the summary
+  // and one row of the board, which is what the rendering measures. Counting words is ambiguous
+  // across languages, hyphens and acronyms; counting characters is not.
+  taskTitle: 60,
+  // Generous, not absent. High enough never to bite an index entry — a command, its expected
+  // outcome, the pointer to the plan step — low enough to stop a manual. Without any ceiling the
+  // "tasks index, they do not replace" rule would be the only defence, and a rule without a check
+  // is the rule that gets skipped.
+  taskDescription: 1200,
 };
 
 // What the work of an issue is expected to cost, so whoever dispatches it does not have to work it
@@ -121,7 +143,7 @@ const TIERS = ["economy", "standard", "reasoning"];
 // see writeIssuesFile(). An absent key reads as version 0, and that is not an error: it is the
 // same choice already made for `tier` and `depends_on`, a new field never invalidates data
 // written before it existed.
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 // Ordered migrations for --upgrade. Each entry names the schema version it PRODUCES (`to`) and a
 // function that migrates one issue object, returning either the same reference (untouched) or a
@@ -168,6 +190,37 @@ const MIGRATIONS = [
         return issue;
       }
       return { ...issue, covers: [] };
+    },
+  },
+  {
+    to: 3,
+    // 2 -> 3: materialize tasks: [] on the issue, and validation.tasks: [] on the issues that
+    // carry a validation object. Same shape as the two migrations before it: an issue written
+    // before the fields already READS as "no tasks" everywhere else, and this only writes that
+    // reading down on disk. Nothing acquires a task, and an issue whose validation is null does
+    // not grow one to hold them: there would be nowhere to put them, and inventing a validation
+    // object would turn a lightweight-verification issue into one with an empty contract.
+    migrateIssue(issue) {
+      const needsTasks = !hasProp(issue, "tasks");
+      const validation = issue.validation;
+      const hasValidationObject =
+        validation !== null &&
+        validation !== undefined &&
+        typeof validation === "object" &&
+        !Array.isArray(validation);
+      const needsValidationTasks = hasValidationObject && !hasProp(validation, "tasks");
+
+      if (!needsTasks && !needsValidationTasks) {
+        return issue;
+      }
+      const next = { ...issue };
+      if (needsTasks) {
+        next.tasks = [];
+      }
+      if (needsValidationTasks) {
+        next.validation = { ...validation, tasks: [] };
+      }
+      return next;
     },
   },
 ];
@@ -353,6 +406,107 @@ function validateCoversShape(covers) {
   });
 }
 
+// Helper: validate an array of tasks — the decomposition of the prose, one entry per step.
+//
+// One validator for both arrays, because they have the same shape and differ only in who may write
+// them: `tasks` is the execution checklist, materialized by whoever takes the issue, and
+// `validation.tasks` is the judgement checklist, born with it. What tells them apart is the role
+// guard, and that lives in enforceRolePolicy, not here.
+//
+// `id` is a positive integer, unique inside its own array and stable: it is local and ordinal — the
+// useful reference is "task 4" — and a GUID would make it unreadable in the one context where it is
+// read. No cap on the number of entries, for the reason depends_on has none: a cap pushes a caller
+// to merge real steps to make the payload fit.
+function validateTasks(tasks, fieldName) {
+  const allowed = ["id", "short_title", "full_description", "checked"];
+
+  if (!Array.isArray(tasks)) {
+    fail(
+      `'${fieldName}' must be an array of { ${allowed.join(", ")} }. Pass [] to clear it.`,
+      "INVALID_INPUT"
+    );
+  }
+
+  const seen = new Set();
+
+  tasks.forEach((entry, index) => {
+    const where = `${fieldName}[${index}]`;
+
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+      fail(`'${where}' must be an object with ${allowed.join(", ")}.`, "INVALID_INPUT");
+    }
+
+    const unknown = Object.keys(entry).filter((f) => !allowed.includes(f));
+    if (unknown.length > 0) {
+      fail(
+        `Unknown field(s) in '${where}': ${unknown.join(", ")}. Allowed fields: ${allowed.join(", ")}.`,
+        "INVALID_INPUT"
+      );
+    }
+    for (const field of allowed) {
+      if (!hasProp(entry, field)) {
+        fail(`'${where}.${field}' is required.`, "INVALID_INPUT");
+      }
+    }
+
+    if (typeof entry.id !== "number" || !Number.isInteger(entry.id) || entry.id < 1) {
+      fail(
+        `'${where}.id' must be a positive integer: it is a local, ordinal reference, not a GUID.`,
+        "INVALID_INPUT"
+      );
+    }
+    if (seen.has(entry.id)) {
+      fail(`'${fieldName}' lists id ${entry.id} more than once: an id must name one task.`, "INVALID_INPUT");
+    }
+    seen.add(entry.id);
+
+    if (isNullOrWhitespace(entry.short_title)) {
+      fail(`'${where}.short_title' must be a non-empty string.`, "INVALID_INPUT");
+    }
+    validateLength(`${where}.short_title`, entry.short_title, LIMITS.taskTitle);
+
+    if (isNullOrWhitespace(entry.full_description)) {
+      fail(`'${where}.full_description' must be a non-empty string.`, "INVALID_INPUT");
+    }
+    validateLength(`${where}.full_description`, entry.full_description, LIMITS.taskDescription);
+
+    if (typeof entry.checked !== "boolean") {
+      fail(`'${where}.checked' must be a boolean.`, "INVALID_INPUT");
+    }
+  });
+}
+
+// Helper: build the validation object as it gets STORED.
+//
+// Two jobs, and both exist so that a reader never has to tell a missing key from an empty list —
+// the same reason depends_on and covers are materialized on insert:
+//   1. an absent `tasks` becomes [];
+//   2. on --update, a payload that does not name `tasks` inherits the ones already stored.
+// (2) is not a nicety: the closing payload is {criteria, state}, and without it every closure would
+// delete the checklist it has just judged. Clearing them stays possible with an explicit [].
+// A null validation stays null: an issue with no criteria has no object to put tasks in.
+function normalizeValidation(validation, existingValidation) {
+  if (validation === null || validation === undefined) {
+    return validation ?? null;
+  }
+  if (typeof validation !== "object" || Array.isArray(validation)) {
+    return validation;
+  }
+  const inherited =
+    existingValidation !== null &&
+    existingValidation !== undefined &&
+    typeof existingValidation === "object" &&
+    !Array.isArray(existingValidation) &&
+    Array.isArray(existingValidation.tasks)
+      ? existingValidation.tasks
+      : [];
+  return {
+    criteria: validation.criteria,
+    tasks: hasProp(validation, "tasks") ? validation.tasks : inherited,
+    state: validation.state,
+  };
+}
+
 // Helper: the part of depends_on that the payload cannot answer for — every id must exist, an issue
 // cannot depend on itself, and the tracker must stay a DAG.
 //
@@ -445,7 +599,16 @@ function validateIssueInput(issue, partial = false) {
     fail("Issue data must be a JSON object.", "INVALID_INPUT");
   }
 
-  const allowedFields = ["title", "description", "status", "validation", "tier", "depends_on", "covers"];
+  const allowedFields = [
+    "title",
+    "description",
+    "status",
+    "validation",
+    "tier",
+    "depends_on",
+    "covers",
+    "tasks",
+  ];
   const providedFields = Object.keys(issue);
   const unknownFields = providedFields.filter((f) => !allowedFields.includes(f));
   if (unknownFields.length > 0) {
@@ -509,20 +672,27 @@ function validateIssueInput(issue, partial = false) {
     validateCoversShape(issue.covers);
   }
 
-  // validation: must be null or a well-formed object { criteria, state (valid) }
+  // tasks: optional everywhere, absent reads as []. The decomposition of `description` at the grain
+  // the agent works on; the prose stays where it is, untouched, next to it.
+  if (hasProp(issue, "tasks")) {
+    validateTasks(issue.tasks, "tasks");
+  }
+
+  // validation: must be null or a well-formed object { criteria, tasks, state (valid) }
   if (hasProp(issue, "validation") && issue.validation !== null) {
     const v = issue.validation;
     if (v === null || typeof v !== "object" || Array.isArray(v)) {
       fail("'validation' must be null or an object with 'criteria' and 'state'.", "INVALID_INPUT");
     }
-    const allowedValidationFields = ["criteria", "state"];
+    const allowedValidationFields = ["criteria", "state", "tasks"];
     const providedValidationFields = Object.keys(v);
     const unknownValidationFields = providedValidationFields.filter(
       (f) => !allowedValidationFields.includes(f)
     );
     if (unknownValidationFields.length > 0) {
       fail(
-        `Unknown field(s) in 'validation' object: ${unknownValidationFields.join(", ")}. Allowed fields: criteria, state.`,
+        `Unknown field(s) in 'validation' object: ${unknownValidationFields.join(", ")}. ` +
+          `Allowed fields: ${allowedValidationFields.join(", ")}.`,
         "INVALID_INPUT"
       );
     }
@@ -538,6 +708,13 @@ function validateIssueInput(issue, partial = false) {
     // The state decides which rules apply to criteria, so it is validated first.
     validateState(v.state);
     validateCriteria(v.criteria, v.state);
+
+    // The validation tasks live INSIDE validation and not beside it: everything that concerns the
+    // judgement of an issue lives here, guard included, and splitting the same notion across two
+    // places in the schema would only make it easier to update one and forget the other.
+    if (hasProp(v, "tasks")) {
+      validateTasks(v.tasks, "validation.tasks");
+    }
   }
 }
 
@@ -917,7 +1094,11 @@ function compactTracker(compactData) {
     // A block summarises closed issues; it covers no revision of its own. The revisions the
     // originals declared leave with them, whole, into the archive.
     covers: [],
+    // A block summarises closed work: there is nothing left to execute and nothing left to judge.
+    // The originals keep their own tasks, whole, inside the archive.
+    tasks: [],
     validation: {
+      tasks: [],
       // The evidence of a compaction is where the originals went and what they were, so the block
       // stays traceable back to the issues it replaced without reopening the archive to find out.
       criteria: [
@@ -1000,7 +1181,9 @@ function showHelp() {
     "  --upgrade   : { from, to, migrated } — brings issues.json's schema_version (absent reads as",
     "                0) up to SCHEMA_VERSION, running only the migrations in between. Adds new",
     "                fields with their default (0->1 materializes depends_on: [] where missing,",
-    "                1->2 does the same with covers: []); never touches or removes an existing",
+    "                1->2 does the same with covers: [], 2->3 with tasks: [] and, on the issues",
+    "                that carry a validation object, validation.tasks: []); never touches or",
+    "                removes an existing",
     "                value. Idempotent: a file already at SCHEMA_VERSION returns migrated: 0 and",
     "                is NOT rewritten. A file declaring a schema_version ABOVE SCHEMA_VERSION fails",
     "                with SCHEMA_TOO_NEW and writes",
@@ -1037,9 +1220,14 @@ function showHelp() {
     "  covers       : array of git references this issue covers; absent reads as [], [] clears it",
     "                 non-empty strings, no duplicates — no further check: harness is not a git",
     "                 library, and a reference that does not resolve is reported by docs-gate.mjs",
-    "  validation   : null OR { criteria, state: unknown|pass|fail }",
+    `  tasks        : array of { id, short_title (max ${LIMITS.taskTitle} chars), full_description (max ${LIMITS.taskDescription}), checked }`,
+    "                 the execution steps; absent reads as [], [] clears it; ids are unique positive",
+    "                 integers, and the number of tasks is not capped",
+    "  validation   : null OR { criteria, tasks, state: unknown|pass|fail }",
     `                 state=unknown : criteria is an array of at most ${LIMITS.criteriaCount} strings of ${LIMITS.criterion} characters`,
     "                 state=pass|fail : criteria carries the verification evidence — string or array, uncapped",
+    "                 tasks : the judgement steps, same shape as the ones above; an --update that",
+    "                         does not name them keeps the stored ones instead of clearing them",
     "--insert requires title, description and status.",
     '--update merges: omitted fields keep their current value; an explicit "validation": null clears it.',
     "Length limits are checked on --insert and on the fields actually present in --update, and are",
@@ -1131,7 +1319,10 @@ function insertIssue(issueData) {
     // tracker, and a missing key would push that check onto every reader instead of settling it
     // here — the same reason depends_on is materialized above.
     covers: hasProp(newIssue, "covers") ? newIssue.covers : [],
-    validation: hasProp(newIssue, "validation") ? newIssue.validation : null,
+    // Always an array, never absent: status-cli and the board read this on every issue they render,
+    // and a missing key would push that check onto every reader instead of settling it here.
+    tasks: hasProp(newIssue, "tasks") ? newIssue.tasks : [],
+    validation: normalizeValidation(hasProp(newIssue, "validation") ? newIssue.validation : null, null),
     created_at: now,
     updated_at: now,
   };
@@ -1188,7 +1379,19 @@ function updateIssue(issueId, issueData) {
       : Array.isArray(existing.covers)
         ? existing.covers
         : [],
-    validation: hasProp(updatedIssue, "validation") ? updatedIssue.validation : existing.validation,
+    // Same merge as covers: an issue written before this field has no key at all, so the merge
+    // materialises the empty array rather than carrying an undefined into the stored object.
+    tasks: hasProp(updatedIssue, "tasks")
+      ? updatedIssue.tasks
+      : Array.isArray(existing.tasks)
+        ? existing.tasks
+        : [],
+    // The existing validation is passed along even when the payload replaces it: that is what lets
+    // a closing {criteria, state} keep the tasks it was judged against instead of dropping them.
+    validation: normalizeValidation(
+      hasProp(updatedIssue, "validation") ? updatedIssue.validation : existing.validation,
+      existing.validation ?? null
+    ),
     created_at: existing.created_at,
     updated_at: nowTimestamp(),
   };

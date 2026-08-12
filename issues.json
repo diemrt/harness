@@ -1,6 +1,6 @@
 {
   "project": "MyProject",
-  "last_updated": "2026-08-12T09:28:56Z",
+  "last_updated": "2026-08-12T09:49:47Z",
   "rules": {
     "single_active_issue": false
   },
@@ -718,24 +718,18 @@
       "id": "d56925cd-2096-463c-bc92-8c75c6612954",
       "title": "I due array di task nello schema, e la migrazione 2 -> 3",
       "description": "Lo schema della issue guadagna due array: `tasks` per l'esecuzione e `validation.tasks` dentro `validation` per il giudizio. Sono la decomposizione della prosa alla grana a cui l'agente lavora davvero; `description` e `validation.criteria` restano invariati e restano prosa.\n\nPiano: docs/superpowers/plans/2026-08-12-harness-continuita-del-lavoro.md, Task 1. Spec: docs/superpowers/specs/2026-08-10-harness-continuita-del-lavoro-design.md, §2 e §7.\n\nSCHEMA_VERSION va a 3 e la migrazione si accoda a MIGRATIONS senza rinumerare le voci esistenti. Entrambi gli array si materializzano a [] come depends_on e covers; una validation a null non ne guadagna uno, perché non c'è dove metterli.\n\nUn --update che non nomina validation.tasks li conserva: il payload di chiusura è {criteria, state}, e senza questa regola ogni chiusura cancellerebbe la checklist che ha appena giudicato. Per svuotarli si passa \"tasks\": [] esplicito.",
-      "status": "in_progress",
+      "status": "done",
       "tier": "standard",
       "depends_on": [],
       "covers": [],
+      "tasks": [],
       "validation": {
-        "criteria": [
-          "--insert con tasks e validation.tasks memorizza i due array verbatim, e --get li rilegge identici",
-          "tasks assente all'insert vale [] e non una chiave mancante; una validation a null resta null e non guadagna un array",
-          "id non intero, id duplicato, checked non booleano, campo extra o array mancante sono rifiutati con INVALID_INPUT",
-          "short_title oltre 60 caratteri e full_description oltre 1200 sono rifiutati con LIMIT_EXCEEDED; il numero di task non ha tetto",
-          "--upgrade da schema_version 2 a 3 materializza i due array, riporta migrated pari alle issue toccate, e un secondo giro lascia il file identico ai byte",
-          "--compact archivia gli originali coi loro task e scrive tasks vuoti sul blocco",
-          "npm run test verde, con i test nuovi in test/plugin-issue-manager.test.mjs"
-        ],
-        "state": "unknown"
+        "criteria": "RI-VERIFICA DOPO IL DELTA (messaggio del campo ignoto dentro validation).\nGATE: npm run test -> EXIT=0, tests 337 / pass 337 / fail 0 / skipped 0. Il test nuovo \"the message for an unknown validation field names every field that is allowed\" e eseguito e verde (gate log riga 238).\nDELTA CONTENUTO: git diff -U0 mostra un solo hunk in piu rispetto alla verifica precedente in scripts/issue-manager.mjs (@@ -525 +694,2 @@), e nel test file la coda passa da +2356,302 a +2359,314 (un test nuovo, 12 righe). Nessun altro hunk cambiato, nessun file nuovo: git status --short resta issues.json, scripts/issue-manager.mjs, test/plugin-issue-manager.test.mjs.\nMESSAGGIO: scripts/issue-manager.mjs:694-695 deriva ora la lista da allowedValidationFields.join(\", \"). Probe su tracker temp (--project-dir, --init): validation con campo owner -> {ok:false, code INVALID_INPUT, \"Unknown field(s) in validation object: owner. Allowed fields: criteria, state, tasks.\"}. Il messaggio top-level e invariato e gia elencava tasks.\nCRITERI RICONTROLLATI DOPO IL DELTA: (2) --insert con validation:null -> validation null, tasks []; nessun oggetto inventato. (5) tracker temp v2 -> --upgrade {from:2,to:3,migrated:2}, validation null resta null, l altra guadagna validation.tasks:[]; secondo giro {from:3,to:3,migrated:0} e cmp: BYTE-IDENTICI. Regola di merge: --update {status:done, validation:{criteria,state}} conserva tasks [id1] e validation.tasks [id2] e porta state a pass.\nVERIFICA PRECEDENTE (invariata, codice non toccato in quei punti): (1) insert verbatim + get identico; (3) id non intero/stringa/0, id duplicato, checked non booleano, campo extra, campo mancante, tasks non-array -> tutti INVALID_INPUT, su tasks e su validation.tasks; (4) short_title 61 e full_description 1201 -> LIMIT_EXCEEDED (60 e 1200 accettati), 200 task per array accettati; (6) --compact archivia l originale con tasks e validation.tasks interi e scrive [] su entrambi nel blocco; (7) 14 test nuovi in test/plugin-issue-manager.test.mjs piu i due preesistenti aggiornati senza indebolirli.\nDanni collaterali: nessuno. Tutti i probe su copie in scratchpad con --project-dir esplicito, mai sul tracker reale; il verificatore non ha modificato alcun file oltre a questa chiusura, e non ha fatto commit.\nFuori scope (non blocca): il tracker di questo repo resta a schema_version 2 con 42 issue senza tasks (--upgrade su se stesso e un atto separato, come il commit 59885c1 per la v2); skills/harness/references/issues.md documentera i campi nuovi in Task 3 del piano. Nota di stato: alla riconsegna la issue risultava status in_review ma validation.state ancora \"pass\" (la lista originale dei criteri era gia stata sostituita dall evidenza della prima chiusura, come vuole il campo).",
+        "tasks": [],
+        "state": "pass"
       },
       "created_at": "2026-08-12T09:27:25Z",
-      "updated_at": "2026-08-12T09:28:56Z"
+      "updated_at": "2026-08-12T09:49:47Z"
     },
     {
       "id": "cf74ee9d-14b4-4463-bb6d-e03df0da004b",
