@@ -38,7 +38,8 @@ Nel resto del documento `$SCRIPTS` sta per `${CLAUDE_PLUGIN_ROOT}/scripts`.
    È l'unico passo di visibilità del clock-in: è testo, sta nella sessione, e non dipende da un
    processo che deve sopravvivere fra un turno e l'altro.
 5. **Scelta del lavoro** — identifica le issue su cui lavorare rispettando la regola 1-WIP
-   qui sotto.
+   qui sotto. Prima di portarne una a `in_progress`, materializza i suoi `tasks`: la CLI rifiuta
+   quel passaggio senza almeno un task, ed è lì che i passi smettono di vivere solo nella sessione.
 
 Leggi solo la documentazione necessaria alla richiesta: contesto in più costa token e non
 migliora la risposta.
@@ -247,6 +248,75 @@ controllo del diff contro la classe dichiarata, e la chiusura scrive comunque `v
 oggetto, con `state` e l'evidenza: vedi
 [references/verification.md](references/verification.md).
 
+## I task: la issue dice anche a che punto è
+
+`description` e `validation.criteria` sono prosa, e restano tali. Accanto a loro la issue porta
+due array di task — `tasks` per l'esecuzione, `validation.tasks` per il giudizio — che sono la
+stessa cosa alla grana a cui un agente lavora davvero. Forma e limiti stanno in
+[references/issues.md](references/issues.md); qui sta il flusso.
+
+Quell'albero di attività esisteva già, ma solo nella testa della sessione: ogni agente rileggeva
+la prosa e se lo ricavava da capo, a runtime, leggermente diverso da quello dell'agente prima. Era
+la cosa su cui il lavoro procedeva davvero, e moriva con la sessione che la conteneva.
+
+**Non contraddicono la bussola.** La bussola governa dove scatta la **verifica indipendente**,
+cioè dove si spende un agente intero; una checklist dentro la issue non crea nessun giro di
+verificatore in più. E i task **indicizzano** il livello a grana fine, non lo sostituiscono:
+`full_description` porta quanto serve ad agire, non l'analisi che ci sta dietro. Il tracker
+guadagna l'avanzamento, non diventa il documento.
+
+### I due momenti
+
+**`validation.tasks` nascono con la issue**, come i criteri: chi apre sa cosa deve essere vero
+alla fine. Se `validation` è `null` — la verifica leggera qui sopra — non ce ne sono.
+
+**`tasks` li materializza chi prende la issue**, al clock-in, prima di iniziare: è chi sa *come*
+arrivarci. La CLI lo impone: un `in_progress` con `tasks` vuoto viene rifiutato. È il punto in cui
+«predefinito a monte» smette di essere un'intenzione e diventa un dato.
+
+L'asimmetria non è un compromesso: è la stessa che la bussola descrive al punto 3. Chiedere a chi
+apre di indovinare anche i passi produrrebbe passi inventati, che il worker riscriverebbe comunque.
+
+### Chi può spuntare cosa
+
+Il worker spunta i propri task di **esecuzione**, mai quelli di **giudizio**: spuntare un criterio
+che misura il proprio lavoro è self-validation con un'altra sintassi, e con `HARNESS_ROLE=worker`
+la CLI lo rifiuta con `FORBIDDEN_ROLE` come rifiuta `status=done` e `validation.state=pass`.
+
+Per lo stesso motivo **il worker non cancella né riscrive i propri task di validazione**, come già
+non può declassare i criteri: cancellare ciò che ti giudica e dichiararlo soddisfatto sono la
+stessa mossa. Questo la CLI non lo impedisce — lo impedisci tu.
+
+**Prosa e task si toccano insieme.** Un `--update` che riscrive la `description` senza rivedere i
+`tasks` viene rifiutato — e lo stesso vale per `validation.criteria` e `validation.tasks` finché
+lo `state` è `unknown`. Se la decomposizione regge davvero, lo si dichiara con
+`--decomposition-unchanged`.
+
+Tre casi non chiedono mai il flag, e sono la definizione del guard più che sue eccezioni: spuntare
+un task (è avanzamento, non una nuova decomposizione), materializzare i task la prima volta (non
+c'è ancora niente da cui divergere) e chiudere la issue (lì `criteria` porta l'evidenza, non più il
+contratto). Le condizioni esatte stanno in [references/issues.md](references/issues.md), che
+possiede il contratto.
+
+### L'ancoraggio al commit
+
+**Prima di ogni commit, i task si allineano.** Il punto è scelto sui numeri, non per eleganza: il
+commit è l'azione più frequente del workflow — il doppio delle invocazioni del riepilogo — ed è già
+un momento presidiato da harness.
+
+È una **prescrizione, non una garanzia**, e la differenza col gate documentale è la forma del
+danno quando salta: un gate saltato *perde* un promemoria, un allineamento saltato lascia il
+tracker **indietro di un commit, non sbagliato**.
+
+Ai due momenti che sono atti dichiarati — il **clock-out**, e l'istante in cui un umano dice
+«congela» — l'allineamento è completo ed esplicito. Non sono riti impliciti: sono richieste.
+
+**Il congelamento non ha bisogno di altro.** La decisione lasciata in sospeso — quella che alla
+ripresa vale più di tutto il resto — è un task non spuntato il cui `short_title` è la decisione da
+prendere. E lo stato di git non entra nel tracker: ramo, commit avanti, commit non spinti sono a un
+comando di distanza e cambiano di continuo; duplicarli in `issues.json` produrrebbe un dato stantio
+con l'aria di essere fresco. Il tracker dice cosa è fatto e cosa è aperto, git dice dov'è.
+
 ## Verifica indipendente
 
 A fine lavoro il worker porta la issue a `status = in_review` con
@@ -327,8 +397,9 @@ e propone solo ciò che passa la bussola qui sopra.
 ## Clock out (fine sessione)
 
 Per ogni issue lavorata: lavoro concluso → `in_review` → verifica indipendente → `pass` →
-pubblicazione. Se durante la sessione hai avviato il board, fermalo adesso col `pid` della
-riga di avvio.
+pubblicazione. Allinea i `tasks` di ogni issue toccata prima di chiudere: è uno dei due momenti
+in cui l'allineamento è un atto dichiarato, non un rito implicito. Se durante la sessione hai
+avviato il board, fermalo adesso col `pid` della riga di avvio.
 
 Chiudi ristampando il riepilogo (`node "$SCRIPTS/status-cli.mjs"`, verbatim in un blocco di
 codice): è il confronto con quello del clock-in, e dice in una schermata cosa si è mosso.

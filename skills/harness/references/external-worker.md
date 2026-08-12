@@ -104,6 +104,13 @@ non solo vietata a parole.
 Nel modello plugin **non** esiste più l'hook `pre-commit` che bloccava i commit del worker:
 il divieto di committare resta scritto nel prompt e nelle regole della skill.
 
+**È un divieto più stretto dell'invariante generale, di proposito.** L'invariante dice che niente
+raggiunge il ramo condiviso prima del `pass`, e lascia liberi i commit locali sul ramo di lavoro
+([git.md](git.md)); al worker esterno si chiede di non committare **affatto**. La ragione è la
+distanza: gira in un processo che l'orchestratore non vede mentre lavora, e i commit sono la
+traccia che gli resterebbe addosso senza che nessuno li abbia guardati. Chi committa è chi ha in
+mano il quadro, cioè l'orchestratore, dopo il `pass`.
+
 Perché il runner sia lanciabile senza approvazione a ogni issue serve una allow rule nelle
 settings di Claude Code. Attenzione: quella regola autorizza **l'intera catena**, comprese le
 eventuali flag di bypass dentro `command` — il classifier vede la stringa del runner, non

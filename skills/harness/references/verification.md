@@ -8,8 +8,8 @@ buono.** Un agente che verifica sé stesso trova quello che si aspetta di trovar
 | Ruolo | Può | Non può |
 |---|---|---|
 | **Orchestratore** | assegnare il lavoro, pubblicare dopo il `pass` | dichiarare `pass` su lavoro proprio |
-| **Worker** | implementare, portare la issue a `in_review` | chiudere la issue, pubblicare |
-| **Verificatore** | eseguire il gate, chiudere la issue `done`/`blocked` | correggere il lavoro |
+| **Worker** | implementare, spuntare i propri `tasks`, portare la issue a `in_review` | chiudere la issue, spuntare i `validation.tasks`, pubblicare |
+| **Verificatore** | eseguire il gate, spuntare i `validation.tasks`, chiudere la issue `done`/`blocked` | correggere il lavoro |
 
 Tre ruoli, tre agenti distinti. Se il worker è un worker esterno
 ([external-worker.md](external-worker.md)), l'invariante non cambia.
@@ -26,11 +26,15 @@ Tier del verificatore **>=** tier del worker, mai inferiore.
 
 1. **Leggere i criteri** della issue (`validation.criteria`) e confrontarli con gli
    **artefatti reali**: i file, non il racconto di chi li ha scritti.
-2. **Eseguire il comando di verifica** dichiarato in `.harness/config.json`
+2. **Spuntare i `validation.tasks`** man mano che li verifica, e lasciare non spuntati quelli che
+   non ha verificato. Sono i suoi: la CLI rifiuta a un processo `HARNESS_ROLE=worker` di
+   spuntarne uno, come rifiuta `validation.state = pass`. Un task di validazione non spuntato su
+   una issue chiusa `pass` è una contraddizione, e si risolve **prima** di chiudere, non dopo.
+3. **Eseguire il comando di verifica** dichiarato in `.harness/config.json`
    ([config.md](config.md)). Il suo esito *è* il gate: se fallisce, la issue fallisce.
-3. **Non correggere niente.** Se trova un problema lo riporta; non lo aggiusta. Un
+4. **Non correggere niente.** Se trova un problema lo riporta; non lo aggiusta. Un
    verificatore che ripara è tornato a essere il worker, e la verifica è persa.
-4. **Chiudere la issue:**
+5. **Chiudere la issue:**
 
 ```bash
 # superata
@@ -44,6 +48,9 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id> 
 
 Il campo `criteria` alla chiusura va riscritto con l'**evidenza**: quali comandi sono stati
 eseguiti e con quale esito. "Verificato, tutto ok" non è evidenza; l'output di un comando lo è.
+
+Il payload di chiusura può **omettere** `validation.tasks`: la CLI conserva quelli memorizzati
+invece di cancellarli. Per spuntarli vanno rispediti per intero, con `checked` aggiornato.
 
 ## Issue senza criteri: verifica leggera
 
@@ -126,8 +133,9 @@ hook git sono stati eliminati perché imponevano `core.hooksPath` a tutto il clo
 husky/lefthook e la configurazione di colleghi che harness non lo usano nemmeno.
 
 Resta un guard tecnico, quello che conta di più: `issue-manager.mjs` rifiuta con
-`FORBIDDEN_ROLE` qualunque tentativo di impostare `status=done` o `validation.state=pass` da
-un processo con `HARNESS_ROLE=worker`. Il resto è disciplina applicata dall'orchestratore.
+`FORBIDDEN_ROLE` qualunque tentativo di impostare `status=done`, `validation.state=pass` o di
+spuntare una voce di `validation.tasks` da un processo con `HARNESS_ROLE=worker`. Il resto è
+disciplina applicata dall'orchestratore.
 
 Quel guard vive nell'**environment del processo**, quindi lo si ha solo se qualcuno lo mette:
 un subagent sì, l'orchestratore che lavora inline no. Lavorando inline (`execution.mode`, vedi

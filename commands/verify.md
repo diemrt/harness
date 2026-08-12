@@ -35,9 +35,10 @@ Avvia l'agent `harness-verifier` (subagent dedicato, mai in linea) passandogli:
   `git diff --stat` come punto di partenza, non il racconto di chi ha lavorato;
 - il fatto che il gate è il comando `verify` di `.harness/config.json`.
 
-Il verificatore legge i `validation.criteria`, li confronta con gli artefatti reali, esegue
-il gate e **chiude lui la issue**: `done`/`pass` con l'evidenza, oppure `blocked`/`fail` con
-il motivo. Non chiuderla tu, né prima né dopo di lui.
+Il verificatore legge i `validation.criteria`, li confronta con gli artefatti reali, spunta i
+`validation.tasks` che ha verificato davvero, esegue il gate e **chiude lui la issue**:
+`done`/`pass` con l'evidenza, oppure `blocked`/`fail` con il motivo. Non chiuderla tu, né prima
+né dopo di lui.
 
 ## 3. Riporta l'esito
 

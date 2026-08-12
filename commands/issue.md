@@ -52,18 +52,25 @@ gestire nella shell), con `"status":"backlog"` e
 `"validation":{"criteria":["...","..."],"state":"unknown"}`. L'id della issue creata si legge da
 `.data.id` della risposta, non dal testo del messaggio.
 
-Una issue docs che documenta un commit già fatto dichiara quel commit in `"covers":["<sha>"]`: è
-ciò che la rende visibile al gate (`/harness:docs-gate`).
+Insieme ai criteri scrivi i `validation.tasks`. I `tasks` di esecuzione no: li materializza chi
+prende la issue, e la CLI li esige al passaggio a `in_progress`.
+
+Una issue docs che documenta commit già fatti li dichiara in `"covers":["<sha>"]`: è ciò che la
+rende visibile al gate (`/harness:docs-gate`).
 
 ## `update <id> <modifica>` → aggiornare
 
 `--update --issue-id <id> --issue-data-file <path>`: merge, campi omessi invariati, un campo
 presente dev'essere valido.
 
+**Prosa e decomposizione si toccano insieme:** cambiare la `description` senza rivedere i `tasks`
+viene rifiutato; se i passi reggono, dichiaralo con `--decomposition-unchanged`. Spuntare un task
+non chiede mai il flag.
+
 **Da qui non si chiude una issue.** Non portare mai lo stato a `done` né `validation.state` a
 `pass`: la chiusura spetta a un agente diverso da chi ha svolto il lavoro, con
 `/harness:verify`. Il worker arriva al massimo a `in_review` / `unknown`; oltre, con
-`HARNESS_ROLE=worker`, la CLI rifiuta `FORBIDDEN_ROLE`.
+`HARNESS_ROLE=worker`, la CLI rifiuta `FORBIDDEN_ROLE` — spunta dei `validation.tasks` compresa.
 
 ## `init` → crea il tracker
 
