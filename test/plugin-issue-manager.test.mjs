@@ -487,7 +487,7 @@ test("an issue stored before the field gets an explicit null, not a missing key"
   const { dir } = setupTempProject();
   try {
     const data = assertOk(
-      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", '{"status":"in_progress"}'])
+      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", '{"status":"blocked"}'])
     );
     assert.equal(data.tier, null);
     assert.ok("tier" in data, "the stored issue must carry the key");
@@ -617,9 +617,9 @@ test("an --update that omits an over-limit field still succeeds: the merge does 
   const { dir } = setupTempProject(seed);
   try {
     const data = assertOk(
-      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", '{"status":"in_progress"}'])
+      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", '{"status":"blocked"}'])
     );
-    assert.equal(data.status, "in_progress");
+    assert.equal(data.status, "blocked");
     assert.equal(data.description.length, 4150);
   } finally {
     cleanup(dir);
@@ -752,7 +752,7 @@ test("an issue stored with string criteria stays readable and updatable", () => 
     assert.equal(read.validation.criteria, "criteria two");
 
     const updated = assertOk(
-      run(dir, ["--update", "--issue-id", ID_TWO, "--issue-data", '{"status":"in_progress"}'])
+      run(dir, ["--update", "--issue-id", ID_TWO, "--issue-data", '{"status":"blocked"}'])
     );
     assert.equal(updated.validation.criteria, "criteria two", "the legacy shape must survive");
   } finally {
@@ -1329,7 +1329,15 @@ test("depends_on does not gate the work: an issue with open dependencies can go 
   const { dir } = setupTempProject(seedWithEdges({ [ID_TWO]: [ID_ONE] }));
   try {
     const updated = assertOk(
-      run(dir, ["--update", "--issue-id", ID_TWO, "--issue-data", JSON.stringify({ status: "in_progress" })])
+      // The tasks ride along because in_progress now requires them; the point of the test is the
+      // other rule, that an OPEN dependency does not stop the transition.
+      run(dir, [
+        "--update",
+        "--issue-id",
+        ID_TWO,
+        "--issue-data",
+        JSON.stringify({ status: "in_progress", tasks: [task(1)] }),
+      ])
     );
     assert.equal(updated.status, "in_progress");
   } finally {
@@ -1404,7 +1412,7 @@ test("--update on a file without schema_version leaves it without the key", () =
   try {
     assert.ok(!("schema_version" in rootData(dir)));
     assertOk(
-      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "in_progress" })])
+      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "blocked" })])
     );
     assert.ok(
       !("schema_version" in rootData(dir)),
@@ -1432,7 +1440,7 @@ test("--update on a file that has schema_version rewrites it with the same value
   try {
     assert.equal(rootData(dir).schema_version, 1);
     assertOk(
-      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "in_progress" })])
+      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "blocked" })])
     );
     assert.equal(rootData(dir).schema_version, 1, "the existing value must survive untouched");
   } finally {
@@ -1447,7 +1455,7 @@ test("--update preserves a schema_version that differs from this script's own SC
   const { dir } = setupTempProject(seedWithSchemaVersion(0));
   try {
     assertOk(
-      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "in_progress" })])
+      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "blocked" })])
     );
     assert.equal(rootData(dir).schema_version, 0, "an unrelated value must not be coerced to 1");
   } finally {
@@ -1710,7 +1718,7 @@ test("neither --insert nor --update runs a migration: a file without schema_vers
   const { dir } = setupTempProject(upgradeSeed());
   try {
     assertOk(run(dir, ["--insert", "--issue-data", JSON.stringify({ title: "T", description: "D", status: "backlog" })]));
-    assertOk(run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "in_progress" })]));
+    assertOk(run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "blocked" })]));
     assert.ok(
       !("schema_version" in rootData(dir)),
       "--insert/--update must never stamp schema_version onto a file that never had it"
@@ -2273,7 +2281,7 @@ test("--update merges covers: omitted keeps it, [] clears it, a new array replac
     );
 
     const untouched = assertOk(
-      run(dir, ["--update", "--issue-id", created.id, "--issue-data", JSON.stringify({ status: "in_progress" })])
+      run(dir, ["--update", "--issue-id", created.id, "--issue-data", JSON.stringify({ status: "blocked" })])
     );
     assert.deepEqual(untouched.covers, ["a1b2c3d"], "an update that omits covers must keep it");
 
@@ -2298,7 +2306,7 @@ test("an issue written before covers existed stays readable, and the first --upd
   try {
     assert.ok(!("covers" in storedIssues(dir).find((i) => i.id === ID_ONE)));
     const updated = assertOk(
-      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "in_progress" })])
+      run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "blocked" })])
     );
     assert.deepEqual(updated.covers, []);
   } finally {
@@ -2541,6 +2549,9 @@ test("an explicit empty array clears the validation tasks", () => {
         validation: { criteria: ["the command exits 0"], tasks: [task(1)], state: "unknown" },
       })
     );
+    // Emptying the tasks while the criteria stay put IS a change of decomposition, so the paired
+    // rule asks for the flag: the caller has to say out loud that the prose still holds. That is
+    // the escape hatch working, not a hole in it.
     const updated = assertOk(
       run(dir, [
         "--update",
@@ -2550,6 +2561,7 @@ test("an explicit empty array clears the validation tasks", () => {
         JSON.stringify({
           validation: { criteria: ["the command exits 0"], tasks: [], state: "unknown" },
         }),
+        "--decomposition-unchanged",
       ])
     );
     assert.deepEqual(updated.validation.tasks, []);
@@ -2654,6 +2666,267 @@ test("--compact archives the originals with their tasks and writes empty ones on
     const block = storedIssues(dir).find((i) => i.id === data.blocks[0].id);
     assert.deepEqual(block.tasks, [], "a block has nothing left to execute");
     assert.deepEqual(block.validation.tasks, [], "and nothing left to judge");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// The guards on the tasks: the part of the design that stops advising and starts refusing. A
+// worker does not check what judges it, an issue in flight declares how it gets there, and the
+// prose never drifts away from its own decomposition.
+// ---------------------------------------------------------------------------
+
+test("FORBIDDEN_ROLE: a worker cannot check a validation task", () => {
+  const { dir } = setupTempProject();
+  try {
+    const created = assertOk(
+      insertWith(dir, {
+        validation: { criteria: ["the command exits 0"], tasks: [task(1)], state: "unknown" },
+      })
+    );
+    const payload = JSON.stringify({
+      validation: {
+        criteria: ["the command exits 0"],
+        tasks: [task(1, { checked: true })],
+        state: "unknown",
+      },
+    });
+
+    assertFail(
+      runWithRole(dir, ["--update", "--issue-id", created.id, "--issue-data", payload], "worker"),
+      "FORBIDDEN_ROLE"
+    );
+
+    // The same payload from a non-worker goes through: the guard is about the role, not the shape.
+    const data = assertOk(
+      runWithRole(dir, ["--update", "--issue-id", created.id, "--issue-data", payload], undefined)
+    );
+    assert.equal(data.validation.tasks[0].checked, true);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("a worker may still check its own execution tasks", () => {
+  const { dir } = setupTempProject();
+  try {
+    const created = assertOk(insertWith(dir, { status: "in_progress", tasks: [task(1), task(2)] }));
+    const data = assertOk(
+      runWithRole(
+        dir,
+        [
+          "--update",
+          "--issue-id",
+          created.id,
+          "--issue-data",
+          JSON.stringify({ tasks: [task(1, { checked: true }), task(2)] }),
+        ],
+        "worker"
+      )
+    );
+    assert.equal(data.tasks[0].checked, true);
+    assert.equal(data.tasks[1].checked, false);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("INVALID_INPUT: in_progress is refused with an empty tasks, on insert and on update", () => {
+  const { dir } = setupTempProject();
+  try {
+    assertFail(insertWith(dir, { status: "in_progress" }), "INVALID_INPUT");
+    assertFail(insertWith(dir, { status: "in_progress", tasks: [] }), "INVALID_INPUT");
+    assert.equal(
+      assertOk(insertWith(dir, { status: "in_progress", tasks: [task(1)] })).status,
+      "in_progress"
+    );
+
+    const backlog = assertOk(insertWith(dir, {}));
+    assertFail(
+      run(dir, ["--update", "--issue-id", backlog.id, "--issue-data", JSON.stringify({ status: "in_progress" })]),
+      "INVALID_INPUT"
+    );
+    assert.equal(
+      assertOk(
+        run(dir, [
+          "--update",
+          "--issue-id",
+          backlog.id,
+          "--issue-data",
+          JSON.stringify({ status: "in_progress", tasks: [task(1)] }),
+        ])
+      ).status,
+      "in_progress"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("an issue that already has tasks goes in_progress without resending them", () => {
+  const { dir } = setupTempProject();
+  try {
+    const created = assertOk(insertWith(dir, { tasks: [task(1)] }));
+    const data = assertOk(
+      run(dir, ["--update", "--issue-id", created.id, "--issue-data", JSON.stringify({ status: "in_progress" })])
+    );
+    assert.equal(data.status, "in_progress");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("INVALID_INPUT: description and its decomposition must move together", () => {
+  const { dir } = setupTempProject();
+  try {
+    const created = assertOk(insertWith(dir, { tasks: [task(1), task(2)] }));
+
+    assertFail(
+      run(dir, [
+        "--update",
+        "--issue-id",
+        created.id,
+        "--issue-data",
+        JSON.stringify({ description: "A different plan entirely" }),
+      ]),
+      "INVALID_INPUT"
+    );
+    assertFail(
+      run(dir, [
+        "--update",
+        "--issue-id",
+        created.id,
+        "--issue-data",
+        JSON.stringify({ tasks: [task(1), task(2), task(3)] }),
+      ]),
+      "INVALID_INPUT"
+    );
+
+    // Together: accepted.
+    assertOk(
+      run(dir, [
+        "--update",
+        "--issue-id",
+        created.id,
+        "--issue-data",
+        JSON.stringify({ description: "A different plan entirely", tasks: [task(1), task(2), task(3)] }),
+      ])
+    );
+
+    // Declared unchanged: accepted, and it is the caller who takes responsibility for saying so.
+    assertOk(
+      run(dir, [
+        "--update",
+        "--issue-id",
+        created.id,
+        "--issue-data",
+        JSON.stringify({ description: "Reworded, same steps" }),
+        "--decomposition-unchanged",
+      ])
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("ticking a task is progress, not a new decomposition: no flag needed", () => {
+  const { dir } = setupTempProject();
+  try {
+    const created = assertOk(insertWith(dir, { status: "in_progress", tasks: [task(1), task(2)] }));
+    assertOk(
+      run(dir, [
+        "--update",
+        "--issue-id",
+        created.id,
+        "--issue-data",
+        JSON.stringify({ tasks: [task(1, { checked: true }), task(2)] }),
+      ])
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("the first materialization of tasks needs no flag: there is nothing to diverge from", () => {
+  const { dir } = setupTempProject();
+  try {
+    const created = assertOk(insertWith(dir, {}));
+    assertOk(
+      run(dir, [
+        "--update",
+        "--issue-id",
+        created.id,
+        "--issue-data",
+        JSON.stringify({ status: "in_progress", tasks: [task(1), task(2)] }),
+      ])
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("the paired rule applies to validation only while the criteria are the contract", () => {
+  const { dir } = setupTempProject();
+  try {
+    const created = assertOk(
+      insertWith(dir, {
+        status: "in_review",
+        validation: { criteria: ["the command exits 0"], tasks: [task(1)], state: "unknown" },
+      })
+    );
+
+    assertFail(
+      run(dir, [
+        "--update",
+        "--issue-id",
+        created.id,
+        "--issue-data",
+        JSON.stringify({ validation: { criteria: ["something else entirely"], state: "unknown" } }),
+      ]),
+      "INVALID_INPUT"
+    );
+
+    // At closure criteria carries the EVIDENCE, not the contract: the pairing does not apply, and
+    // a verifier never has to pass a flag to close an issue.
+    assertOk(
+      run(dir, [
+        "--update",
+        "--issue-id",
+        created.id,
+        "--issue-data",
+        JSON.stringify({ status: "done", validation: { criteria: "npm test: 88 passing", state: "pass" } }),
+      ])
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("clearing validation altogether is paired by construction", () => {
+  const { dir } = setupTempProject();
+  try {
+    const created = assertOk(
+      insertWith(dir, {
+        validation: { criteria: ["the command exits 0"], tasks: [task(1)], state: "unknown" },
+      })
+    );
+    const data = assertOk(
+      run(dir, ["--update", "--issue-id", created.id, "--issue-data", JSON.stringify({ validation: null })])
+    );
+    assert.equal(data.validation, null);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--help documents the guards and the flag", () => {
+  const { dir } = setupTempProject();
+  try {
+    const result = run(dir, ["--help"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /--decomposition-unchanged/);
+    assert.match(result.stdout, /validation\.tasks/);
   } finally {
     cleanup(dir);
   }

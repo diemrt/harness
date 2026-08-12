@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-12T09:51:42Z",
+  "last_updated": "2026-08-12T10:19:49Z",
   "rules": {
     "single_active_issue": false
   },
@@ -808,28 +808,72 @@
       "id": "cf74ee9d-14b4-4463-bb6d-e03df0da004b",
       "title": "I tre guard sui task, e il flag --decomposition-unchanged",
       "description": "I tre punti in cui questa spec smette di consigliare e rende impossibile: un worker non spunta ciò che lo giudica, una issue in volo dichiara come ci arriva, e la prosa non si allontana dalla propria decomposizione.\n\nPiano: docs/superpowers/plans/2026-08-12-harness-continuita-del-lavoro.md, Task 2. Spec: docs/superpowers/specs/2026-08-10-harness-continuita-del-lavoro-design.md, §3.1, §3.2, §3.3.\n\nIl confronto dell'aggiornamento appaiato guarda id, short_title e full_description, mai checked: spuntare un task è avanzamento, non una nuova decomposizione, e una regola che chiedesse il flag a ogni spunta verrebbe risposta col flag a ogni chiamata. Per lo stesso motivo la prima materializzazione è esente (non c'è ancora una decomposizione da cui divergere) e sul lato validazione il guard vale solo finché state è unknown, perché alla chiusura criteria porta l'evidenza e non più il contratto.",
-      "status": "backlog",
+      "status": "done",
       "tier": "reasoning",
       "depends_on": [
         "d56925cd-2096-463c-bc92-8c75c6612954"
       ],
       "covers": [],
+      "tasks": [
+        {
+          "id": 1,
+          "short_title": "I test rossi dei tre guard",
+          "full_description": "In test/plugin-issue-manager.test.mjs: FORBIDDEN_ROLE sulla spunta di validation.tasks da worker, spunta dei propri tasks permessa, in_progress senza task su insert e update, aggiornamento non appaiato, le tre esenzioni. node --test test/plugin-issue-manager.test.mjs: rossi.",
+          "checked": true
+        },
+        {
+          "id": 2,
+          "short_title": "Il guard di ruolo si estende a validation.tasks",
+          "full_description": "In enforceRolePolicy, dopo il blocco su state pass: rifiuta FORBIDDEN_ROLE se il payload porta una voce di validation.tasks con checked true. Aggiornare il paragrafo Role guard nell'intestazione e in showHelp.",
+          "checked": true
+        },
+        {
+          "id": 3,
+          "short_title": "enforceTasksForProgress sulla transizione",
+          "full_description": "Nuovo helper: in_progress con tasks vuoto fallisce INVALID_INPUT. Su insert sempre; su update SOLO quando il payload porta status, non sullo stato risultante. Leggere lo stato risultante rifiuterebbe ogni update a una issue gia' in volo senza task, comprese quelle scritte prima del campo: record non piu' modificabili, che non e' cio' che significa dichiarare i passi prima di partire. I task invece si leggono dal merge, cosi' chi li ha gia' parte senza rispedirli.",
+          "checked": true
+        },
+        {
+          "id": 4,
+          "short_title": "decompositionOf e enforcePairedUpdate",
+          "full_description": "Il fingerprint ignora checked (id, short_title, full_description). Il guard salta se la decomposizione corrente e' vuota, e sul lato validazione vale solo a state unknown e non su validation null. Rifiuto INVALID_INPUT che nomina quale lato si e' mosso da solo.",
+          "checked": true
+        },
+        {
+          "id": 5,
+          "short_title": "Il flag --decomposition-unchanged",
+          "full_description": "Booleano in parseArgs, passato a updateIssue come terzo argomento, chiamato dopo aver trovato existing. Documentarlo in showHelp: riga d'uso di --update e blocco dei payload.",
+          "checked": true
+        },
+        {
+          "id": 6,
+          "short_title": "Suite verde e passaggio a in_review",
+          "full_description": "npm run test verde. Dodici test esistenti hanno dovuto adattarsi: nove usavano in_progress di passaggio e ora usano blocked, uno lo usa davvero e porta i task, uno svuota validation.tasks e passa il flag, e il fixture del worker esterno nasce con un task.",
+          "checked": true
+        }
+      ],
       "validation": {
         "criteria": [
-          "Con HARNESS_ROLE=worker un update che porta a true un validation.tasks[].checked è rifiutato con FORBIDDEN_ROLE; lo stesso payload da un non-worker passa",
-          "Con HARNESS_ROLE=worker spuntare una voce dei propri tasks resta permesso",
-          "status in_progress con tasks vuoto è rifiutato con INVALID_INPUT su --insert e su --update",
-          "Una issue che ha già i task passa a in_progress senza rispedirli",
-          "Un --update che cambia description senza toccare la decomposizione dei tasks, o il contrario, è rifiutato con INVALID_INPUT; idem per validation.criteria e validation.tasks a state unknown",
-          "--decomposition-unchanged accetta lo stesso payload; spunta, prima materializzazione e chiusura pass o fail non chiedono mai il flag",
-          "npm run test verde"
+          "VERDETTO pass (seconda verifica, dopo il fail su intestazione stale). Gate: npm run test -> tests 347, pass 347, fail 0, cancelled 0, skipped 0, todo 0, duration_ms 48985.",
+          "DELTA RI-VERIFICATO: solo commenti in scripts/issue-manager.mjs. git diff -U0 aggiunge due soli hunk rispetto alla verifica precedente, @@ -39,2 +39,4 @@ e @@ -42,0 +45,5 @@, entrambi di sole righe //. L elenco delle righe aggiunte non-commento e non-vuote (120) e delle righe rimosse non-commento e IDENTICO riga per riga a quello gia verificato: enforceRolePolicy, enforceTasksForProgress, decompositionOf, enforcePairedUpdate, le stringhe di showHelp, decomposition-unchanged in parseArgs, updateIssue(issueId, issueData, declaredUnchanged), tasks: mergedTasks. Zero righe eseguibili cambiate. test/plugin-issue-manager.test.mjs e test/plugin-worker.test.mjs invariati (295 e 9 righe nel diffstat, come prima).",
+          "INTESTAZIONE ORA CORRETTA (era il motivo del fail): righe 37-44 nominano il terzo rifiuto — validation.state === pass, status === done, o checked === true su una voce di validation.tasks -> FORBIDDEN_ROLE, con la ragione (checking a criterion that measures your own work is self-validation with a different syntax) e cosa il worker puo ancora fare (in_review, unknown, e spuntare i propri tasks). Righe 46-49: capoverso separato per il rifiuto non di ruolo, in_progress con tasks vuoto, con la precisazione che il controllo e sulla transizione e mai su un update non correlato a una issue gia in volo. Ogni affermazione dell intestazione corrisponde al comportamento provato sotto.",
+          "C1 ok: HARNESS_ROLE=worker + update con validation.tasks[0].checked=true -> ok:false FORBIDDEN_ROLE; stesso payload senza ruolo -> ok:true, checked=true.",
+          "C2 ok: HARNESS_ROLE=worker + update dei propri tasks con checked=true -> ok:true.",
+          "C3 ok: insert {status:in_progress} -> INVALID_INPUT; insert {status:in_progress,tasks:[]} -> INVALID_INPUT; update {status:in_progress} su issue senza task -> INVALID_INPUT; update {status:in_progress,tasks:[]} --decomposition-unchanged -> INVALID_INPUT (il flag non aggira il guard).",
+          "C4 ok: issue con tasks gia presenti, update {status:in_progress} -> ok:true, status=in_progress, tasks=[1] conservati.",
+          "C5 ok: description da sola -> INVALID_INPUT; tasks da soli -> INVALID_INPUT; validation.criteria da soli a state unknown -> INVALID_INPUT; validation.tasks da soli a state unknown -> INVALID_INPUT; description+tasks insieme senza flag -> ok:true.",
+          "C6 ok: gli stessi payload con --decomposition-unchanged -> ok:true. Tre esenzioni senza flag: spunta di validation.tasks a criteria invariati -> ok:true e spunta di tasks a description invariata -> ok:true; prima materializzazione di tasks e di validation -> ok:true; chiusura {status:done, state:pass} -> ok:true e {status:blocked, state:fail} -> ok:true.",
+          "C7 ok: npm run test verde, 347/347.",
+          "DEVIAZIONE DAL PIANO (guard sulla transizione invece che sullo stato risultante): confermata giustificata, e ora anche dichiarata nell intestazione. Nessuna via porta una issue A in_progress senza task.",
+          "OSSERVAZIONE FUORI SCOPE, non blocca e confermata tale: resta possibile svuotare i tasks di una issue gia in_progress con --update {tasks:[]} --decomposition-unchanged (provato: ok:true, status=in_progress, tasks=[]). Il coordinatore la porta come passo di documentazione nella issue 56f1b32c (contratto in references/issues.md); concordo, il flag e un gesto deliberato e non serve un guard in piu.",
+          "LINE ENDING e LARGHEZZA: file interamente LF prima e dopo (CRLF count 0 su HEAD e sul working tree); righe dell intestazione al massimo 99 colonne, dentro la convenzione del file.",
+          "COLLATERALI: git status --short -> solo issues.json, scripts/issue-manager.mjs, test/plugin-issue-manager.test.mjs, test/plugin-worker.test.mjs. Tutte le prove CLI su tracker temporaneo con --project-dir esplicito; nessun record di prova in issues.json del progetto; nessun commit."
         ],
-        "state": "unknown",
-        "tasks": []
+        "tasks": [],
+        "state": "pass"
       },
       "created_at": "2026-08-12T09:27:25Z",
-      "updated_at": "2026-08-12T09:27:25Z",
-      "tasks": []
+      "updated_at": "2026-08-12T10:19:49Z"
     },
     {
       "id": "56f1b32c-a073-4743-b85e-6a06762a885c",

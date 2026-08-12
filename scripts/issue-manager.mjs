@@ -36,10 +36,17 @@
 //
 // Role guard: when the HARNESS_ROLE environment variable is set to "worker", a worker process
 // cannot self-validate its own work. Any --insert/--update payload that sets
-// validation.state === "pass" or status === "done" is rejected with FORBIDDEN_ROLE. A worker may
-// still move status up to "in_review" and validation.state up to "unknown". --compact is refused
+// validation.state === "pass", status === "done", or checked === true on an entry of
+// validation.tasks is rejected with FORBIDDEN_ROLE — checking a criterion that measures your own
+// work is self-validation with a different syntax. A worker may still move status up to
+// "in_review", validation.state up to "unknown", and check its own "tasks". --compact is refused
 // outright under that role, because every block it writes is a done/pass record. Any other/unset
 // HARNESS_ROLE leaves behavior unchanged.
+//
+// A separate refusal, not about roles: an issue cannot move to status "in_progress" while its
+// "tasks" are empty. Whoever takes it materializes the steps first, so the tracker keeps them when
+// the session that held them ends. The check is on the transition — a payload asking for
+// in_progress — and never on an unrelated update to an issue already in flight.
 
 // Every issue in the issues.json file should have the following structure:
 // {
@@ -744,6 +751,131 @@ function enforceRolePolicy(payload) {
       "FORBIDDEN_ROLE"
     );
   }
+  // Checking a criterion that measures your own work is self-validation with a different syntax,
+  // so it is refused for the same reason validation.state === "pass" is. A worker checks its own
+  // execution tasks; the judgement ones belong to whoever judges.
+  if (
+    hasProp(payload, "validation") &&
+    payload.validation !== null &&
+    typeof payload.validation === "object" &&
+    Array.isArray(payload.validation.tasks) &&
+    payload.validation.tasks.some(
+      (entry) => entry !== null && typeof entry === "object" && entry.checked === true
+    )
+  ) {
+    fail(
+      "Role 'worker' cannot check an entry of 'validation.tasks' (self-validation is forbidden). A " +
+        "worker checks its own 'tasks'; the judgement ones belong to the verifier, exactly as " +
+        "validation.state does.",
+      "FORBIDDEN_ROLE"
+    );
+  }
+}
+
+// Helper: an issue in flight declares HOW it will be done, or it is not in flight.
+//
+// This is where "decided upstream" stops being an intention and becomes data. The agent that takes
+// the issue is the one who knows the steps, and while they lived only in its session they died
+// with it — which is the cost the two arrays exist to remove. A rule nobody enforces is the rule
+// that was already being skipped.
+function enforceTasksForProgress(status, tasks) {
+  if (status !== "in_progress") {
+    return;
+  }
+  if (Array.isArray(tasks) && tasks.length > 0) {
+    return;
+  }
+  fail(
+    "An issue cannot go to 'in_progress' with an empty 'tasks': whoever takes it materializes the " +
+      "steps first, so the tracker keeps them when the session that held them ends.",
+    "INVALID_INPUT"
+  );
+}
+
+// Helper: the fingerprint of a decomposition — what the tasks SAY, not how far along they are.
+//
+// `checked` is deliberately out. Ticking a task off is progress, and since the tasks are aligned
+// before every commit — the most frequent action of the workflow — a rule that asked for the flag
+// on every tick would be answered with the flag on every call, which is how a guard stops meaning
+// anything.
+function decompositionOf(tasks) {
+  return JSON.stringify(
+    (Array.isArray(tasks) ? tasks : []).map((entry) => [
+      entry?.id ?? null,
+      entry?.short_title ?? null,
+      entry?.full_description ?? null,
+    ])
+  );
+}
+
+// Helper: prose and its decomposition move together, or neither moves.
+//
+// They describe the same work at two grains, and letting one drift from the other would be worse
+// than having no tasks at all: the verifier would measure one thing and the human would read
+// another, and nothing would say so. Same philosophy with which the CLI already defends the DAG
+// from cycles — impossible by construction, not discouraged in words.
+//
+// Two exemptions, and both exist so the flag does not become a reflex:
+//   - a decomposition that does not exist yet cannot diverge, so the first materialization is free;
+//   - on the validation side the rule holds only while state is "unknown", because at closure
+//     `criteria` carries the evidence and not the contract, and a verifier writing evidence would
+//     otherwise have to pass the flag every single time.
+function enforcePairedUpdate(payload, existing, declaredUnchanged) {
+  if (declaredUnchanged) {
+    return;
+  }
+
+  const currentTasks = Array.isArray(existing.tasks) ? existing.tasks : [];
+  if (currentTasks.length > 0) {
+    const nextTasks = hasProp(payload, "tasks") ? payload.tasks : currentTasks;
+    const proseMoved = hasProp(payload, "description") && payload.description !== existing.description;
+    const tasksMoved = decompositionOf(nextTasks) !== decompositionOf(currentTasks);
+    if (proseMoved !== tasksMoved) {
+      fail(
+        (proseMoved
+          ? "'description' changed while 'tasks' stayed as they were."
+          : "'tasks' changed while 'description' stayed as it was.") +
+          " The prose and its decomposition describe the same work at two grains: update both, or " +
+          "pass --decomposition-unchanged to declare that the other one still holds.",
+        "INVALID_INPUT"
+      );
+    }
+  }
+
+  // Clearing validation takes criteria and tasks away together: paired by construction.
+  if (!hasProp(payload, "validation") || payload.validation === null) {
+    return;
+  }
+  const currentValidation =
+    existing.validation !== null &&
+    existing.validation !== undefined &&
+    typeof existing.validation === "object" &&
+    !Array.isArray(existing.validation)
+      ? existing.validation
+      : null;
+  if (currentValidation === null || payload.validation.state !== "unknown") {
+    return;
+  }
+  const currentValidationTasks = Array.isArray(currentValidation.tasks) ? currentValidation.tasks : [];
+  if (currentValidationTasks.length === 0) {
+    return;
+  }
+  const nextValidationTasks = hasProp(payload.validation, "tasks")
+    ? payload.validation.tasks
+    : currentValidationTasks;
+  const criteriaMoved =
+    JSON.stringify(payload.validation.criteria) !== JSON.stringify(currentValidation.criteria);
+  const validationTasksMoved =
+    decompositionOf(nextValidationTasks) !== decompositionOf(currentValidationTasks);
+  if (criteriaMoved !== validationTasksMoved) {
+    fail(
+      (criteriaMoved
+        ? "'validation.criteria' changed while 'validation.tasks' stayed as they were."
+        : "'validation.tasks' changed while 'validation.criteria' stayed as they were.") +
+        " Update both, or pass --decomposition-unchanged.",
+      "INVALID_INPUT"
+    );
+  }
 }
 
 // Helper: validate that issue id is a valid GUID (accepts the same shapes .NET's [guid]::TryParse
@@ -1142,6 +1274,7 @@ function showHelp() {
     "                        [--status backlog|in_progress|in_review|blocked|done, default: backlog]",
     "node issue-manager.mjs --insert (--issue-data '<json>' | --issue-data-file <path>)",
     "node issue-manager.mjs --update --issue-id <id> (--issue-data '<json>' | --issue-data-file <path>)",
+    "                        [--decomposition-unchanged]",
     "node issue-manager.mjs --delete --issue-id <id>",
     "node issue-manager.mjs --init",
     "node issue-manager.mjs --upgrade",
@@ -1162,9 +1295,13 @@ function showHelp() {
     "             MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE, ALREADY_EXISTS, SCHEMA_TOO_NEW",
     "",
     "Role guard: when env var HARNESS_ROLE=worker, --insert/--update requests that set",
-    "status=done or validation.state=pass are rejected with FORBIDDEN_ROLE (no self-validation).",
-    "A worker may still set status up to in_review and validation.state up to unknown.",
+    "status=done, validation.state=pass, or check an entry of validation.tasks are rejected with",
+    "FORBIDDEN_ROLE (no self-validation). A worker may still set status up to in_review,",
+    "validation.state up to unknown, and check its own 'tasks'.",
     "--compact is refused outright under that role: every block it writes is a done/pass record.",
+    "",
+    "An issue cannot go to status=in_progress with an empty 'tasks': whoever takes it materializes",
+    "the steps first, so the tracker keeps them when the session that held them ends.",
     "",
     "data payload per command:",
     "  --get       : the issue object",
@@ -1207,6 +1344,13 @@ function showHelp() {
     "Passing the payload:",
     "  --issue-data-file <path>  reads the JSON from a file — no shell quoting/escaping",
     "  --issue-data '<json>'     inline JSON; mutually exclusive with --issue-data-file",
+    "",
+    "--decomposition-unchanged (on --update only): declares that the prose and its tasks still",
+    "  describe the same steps, so one may move without the other. Without it, changing",
+    "  'description' without 'tasks' — or 'validation.criteria' without 'validation.tasks' while",
+    "  state is 'unknown' — is rejected with INVALID_INPUT. Three cases never need the flag:",
+    "  ticking a task off (progress is not a new decomposition), materializing tasks for the first",
+    "  time, and closing an issue, where criteria carries the evidence instead of the contract.",
     "",
     "Allowed input fields for --insert/--update: title, description, status, tier, depends_on, covers, validation",
     `  title        : non-empty string, at most ${LIMITS.title} characters`,
@@ -1302,6 +1446,7 @@ function insertIssue(issueData) {
   const existingIssues = Array.isArray(data.issues) ? data.issues : [];
   const dependsOn = hasProp(newIssue, "depends_on") ? newIssue.depends_on : [];
   validateDependencyGraph(dependsOn, existingIssues, null);
+  enforceTasksForProgress(newIssue.status, hasProp(newIssue, "tasks") ? newIssue.tasks : []);
 
   const now = nowTimestamp();
 
@@ -1334,7 +1479,7 @@ function insertIssue(issueData) {
 
 // 5. Function to update an existing issue by ID
 // Merge semantics: a field absent from the payload keeps its current value.
-function updateIssue(issueId, issueData) {
+function updateIssue(issueId, issueData, declaredUnchanged = false) {
   validateIssueId(issueId);
   const updatedIssue = parseIssueData(issueData);
 
@@ -1350,6 +1495,24 @@ function updateIssue(issueId, issueData) {
   }
 
   const existing = issues[issueIndex];
+
+  enforcePairedUpdate(updatedIssue, existing, declaredUnchanged);
+
+  const mergedTasks = hasProp(updatedIssue, "tasks")
+    ? updatedIssue.tasks
+    : Array.isArray(existing.tasks)
+      ? existing.tasks
+      : [];
+
+  // The guard is on the TRANSITION — a payload that asks for in_progress — not on the resulting
+  // state. Reading the merged status instead would refuse every unrelated update to an issue
+  // already in flight without tasks, including the ones written before the field existed: the
+  // tracker would hold records that can no longer be edited at all, which is not what "declare the
+  // steps before you start" means. The tasks are read from the merge, though, so an issue that
+  // already carries them starts without resending them.
+  if (hasProp(updatedIssue, "status")) {
+    enforceTasksForProgress(updatedIssue.status, mergedTasks);
+  }
 
   // The graph checks need the tracker as stored, and only the edges of THIS issue are being
   // replaced — an update that omits depends_on cannot introduce a cycle, so it is not re-validated.
@@ -1381,11 +1544,7 @@ function updateIssue(issueId, issueData) {
         : [],
     // Same merge as covers: an issue written before this field has no key at all, so the merge
     // materialises the empty array rather than carrying an undefined into the stored object.
-    tasks: hasProp(updatedIssue, "tasks")
-      ? updatedIssue.tasks
-      : Array.isArray(existing.tasks)
-        ? existing.tasks
-        : [],
+    tasks: mergedTasks,
     // The existing validation is passed along even when the payload replaces it: that is what lets
     // a closing {criteria, state} keep the tasks it was judged against instead of dropping them.
     validation: normalizeValidation(
@@ -1449,6 +1608,7 @@ function main() {
       init: { type: "boolean" },
       upgrade: { type: "boolean" },
       compact: { type: "boolean" },
+      "decomposition-unchanged": { type: "boolean" },
       "issue-id": { type: "string" },
       "issue-data": { type: "string" },
       "issue-data-file": { type: "string" },
@@ -1512,7 +1672,7 @@ function main() {
         "MISSING_ARGS"
       );
     }
-    updateIssue(issueId, issueData);
+    updateIssue(issueId, issueData, values["decomposition-unchanged"] === true);
   } else if (values.delete) {
     if (!issueId) {
       fail("Please provide an issue ID to delete.", "MISSING_ARGS");

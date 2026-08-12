@@ -429,7 +429,14 @@ test("a worker launched by --run cannot close its own issue: issue-manager rejec
         "--project-dir",
         dir,
         "--issue-data",
-        JSON.stringify({ title: "Worker task", description: "d", status: "in_progress" }),
+        // An issue in flight declares its steps, so the seed carries one: the tracker refuses
+        // in_progress with an empty tasks, and this fixture is a real issue taken by a real worker.
+        JSON.stringify({
+          title: "Worker task",
+          description: "d",
+          status: "in_progress",
+          tasks: [{ id: 1, short_title: "close it", full_description: "try to close the issue", checked: false }],
+        }),
       ],
       { encoding: "utf8" }
     );
