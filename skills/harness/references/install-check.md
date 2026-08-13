@@ -53,6 +53,12 @@ Il controllo si ferma alla **prima** risposta utile: con una sorgente `directory
 niente, perché il difetto è la sorgente e il diff direbbe «tutto a posto» proprio mentre il
 problema è che non esiste nessuna pubblicazione.
 
+**Su un ramo di lavoro fallisce, ed è corretto.** Un file di componente aggiunto e non ancora
+pubblicato è, per la copia installata, un file mancante: `DIVERGENT_INSTALL` con l'elenco di ciò
+che il rilascio non ha ancora portato. Non è un falso allarme, è la stessa domanda posta prima
+del momento giusto — il controllo si esegue **dopo** che il rilascio è atterrato, non a metà di
+un ramo. Se lo lanci mentre lavori, leggi `missing` come «ecco cosa non è ancora uscito».
+
 ## Perché esiste
 
 Fra il 2026-07-29 e il 2026-08-13 il marketplace `diemrt` è stato registrato come `directory`
