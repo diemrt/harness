@@ -115,13 +115,25 @@ I test pesano 1,6 volte il codice.
 | `issue-manager.mjs` | 1.707 | 2.945 | 4.652 | 41,4% | misto |
 | **board** (`board.html` + server) | 891 | 982 | **1.873** | **16,6%** | ergonomia |
 | `harness-config.mjs` | 462 | 642 | 1.104 | 9,8% | infrastruttura |
-| `status-cli.mjs` | 378 | 706 | 1.084 | 9,6% | ergonomia |
+| `status-cli.mjs` | 378 | 706 | 1.084 | 9,6% | **misto** (vedi sotto) |
 | `docs-gate.mjs` | 496 | 497 | 993 | 8,8% | tesi (`covers`) |
 | `harness-worker.mjs` | 355 | 484 | 839 | 7,5% | infrastruttura |
 | test su skill / comandi / agent | — | 704 | 704 | 6,3% | meta |
 
-Per secchio, sul solo script: **tesi ~868** (il blocco in `issue-manager` più `docs-gate`),
-**substrato ~637**, **ergonomia ~1.848**, infrastruttura ~817.
+**Correzione al primo conteggio: `status-cli.mjs` non è tutto ergonomia.**
+
+| `status-cli.mjs` (378 righe) | Righe | Codice | Cos'è |
+|---|---:|---:|---|
+| Calcolo — `isWorkable`, `findCycle`, `danglingDeps`, `buildAlerts`, `dependsOn` | 111 | 83 | **tesi** |
+| Presentazione — barre, icone tier, troncamenti, righe, legenda | 148 | 121 | ergonomia |
+| Impalcatura + header | 119 | 78 | — |
+
+Quelle 111 righe sono **la regola 1-WIP resa calcolabile**, e lo dice `SKILL.md`: «Prima la
+ricostruiva l'orchestratore a giudizio e nessuno poteva controllarla; ora si calcola dal tracker,
+e il board la disegna».
+
+Per secchio, sul solo script, corretto: **tesi ~979** (il blocco in `issue-manager`, `docs-gate`,
+il calcolo di `status-cli`), **substrato ~637**, **ergonomia ~1.737**, infrastruttura ~817.
 
 **Classificazioni confermate dal committente**, non ovvie e quindi da non rimettere in
 discussione: `tasks` di esecuzione stanno nella **tesi** (nessun tracker esaminato li ha come dato
@@ -152,6 +164,47 @@ componente che la spec del 2026-08-10 dice di **non avviare di propria iniziativ
 morto tre volte in una sessione (≈50, 25 e 16 minuti, quindi nemmeno un timeout configurabile),
 «l'instabilità non è sistematica, il che è la cosa peggiore», e la fonte affidabile è diventata il
 riepilogo testuale. `status-cli.mjs` è portante; il board no, e costa il doppio.
+
+### Ergonomia: emettere invece di servire
+
+**L'ergonomia sono due strati con destini opposti.** Il **calcolo** — prontezza, cicli, catene,
+allerte — non si sposta per definizione: nessuno strumento esterno conosce la regola «una issue in
+corso per catena di dipendenza». È tesi travestita da riepilogo. La **presentazione** — barre,
+colori, icone, HTML — si sposta.
+
+**Il limite duro:** non si eredita il board di qualcun altro senza adottarne lo storage. Un
+visualizzatore deve leggere il dato — la web UI di Backlog.md legge il markdown di Backlog.md,
+quella di beads legge il suo Dolt. «Ergonomia esterna» più `issues.json` ha quindi **una sola
+forma**: non adottare uno *strumento*, adottare un **formato che ha già i renderer**.
+
+È la simmetria con §5 che rende la cosa praticabile: **non esiste uno standard per il grafo dei
+work item, ma esiste ed è ubiquo uno standard per disegnare un grafo.** Mermaid renderizza gratis
+su GitHub, GitLab, Obsidian, negli artifact di Claude, in VS Code con estensione — zero righe
+mantenute per il rendering.
+
+**Il confine, detto in una riga:** *l'ergonomia esce di casa solo se smetti di servirla e cominci
+a emetterla.* Servire richiede un processo, e un processo muore — è il difetto che il board ha già
+documentato. Emettere richiede un formatter, che non ha stato e non può morire.
+
+### Come viene usato il board, dal committente (2026-08-13)
+
+Dato di requisito, non congettura. Il bisogno è **uno e venti**, non uno:
+
+- **~80% — dettaglio, su richiesta, senza bisogno di live.** Leggere descrizioni, validazioni,
+  stati e completamento dei task: ai checkpoint, davanti a una issue `blocked`, prima di far
+  partire uno sviluppo, quando si ferma tutto per capire cosa era stato fatto, e alla fine per la
+  pulizia con `--compact`. Il committente osserva che per questo uso **il dato fuori dalla CLI va
+  bene, e forse meglio** — anche accanto a una CLI diversa da Claude Code.
+- **~20% — avanzamento live, e di una cosa sola: i conteggi per stato.** La barra in alto che dice
+  quante issue sono `in_progress`, quante `in_review`. Il motivo dichiarato non è che serva il
+  board: è che **la CLI non offre un punto fisso da guardare** per sapere a colpo d'occhio dove si
+  è arrivati mentre il lavoro procede.
+
+**La conseguenza progettuale.** Il 20% non è un requisito di board: è un requisito di *statusline*
+— una riga sempre visibile, senza processo da tenere vivo, senza scheda del browser, alimentata da
+un `status-cli` con output compatto. E l'80% che non ha bisogno del live è esattamente ciò che un
+export statico serve **meglio** di un server. **Il board come servizio resta senza nessuno dei due
+usi da coprire.**
 
 ## 3. La rubrica
 
@@ -200,6 +253,9 @@ Da non rimettere in discussione a ogni giro, salvo motivo nuovo.
 - **Il board è il candidato numero uno alla cancellazione** (§2, misurato): 1.873 righe, 16,6%
   della superficie, per un componente che il progetto stesso ha già declassato per iscritto. È
   indipendente da qualunque decisione sullo store.
+- **Il board serve due bisogni distinti, e nessuno dei due chiede un server** (§2, dichiarato dal
+  committente): dettaglio su richiesta → export statico; conteggi live → statusline. Il calcolo
+  che li alimenta resta di harness perché è tesi.
 
 ## 5. Standard: non ce n'è uno
 
@@ -384,8 +440,14 @@ constatazione che il campo dei sostituti è più stretto di quanto sembrasse.
 - Il board resta di harness o si eredita quello del substrato?
 - **Esporre harness come server MCP**: quanto costa, e cosa espone — solo lettura, o anche le
   mutazioni con i guard dentro?
-- Cancellare il board è deciso o solo misurato? E se cancellato, cosa lo sostituisce — niente, o
-  un export statico che non ha un processo da tenere vivo?
+- La statusline: che cosa ci sta davvero in una riga, e `status-cli` cresce di un flag o di un
+  comando? Il refresh avviene al confine di turno, non in continuo — coincide con l'unico momento
+  in cui i conteggi cambiano davvero (una mutazione del tracker), ma va confermato sull'uso reale.
+- L'export statico: un HTML autocontenuto (conserva `board.html`, che è lavoro appena fatto) o
+  markdown + Mermaid (renderizzato da altri, ma perde il layout)? I due non si escludono.
+- Cosa si perde cancellando il servizio: aggiornamento live del *dettaglio*, filtri, ricerca,
+  espansione dei task. Il committente ha dichiarato che il dettaglio non gli serve live — resta da
+  verificare se filtri e ricerca pesino.
 - `--compact` (237 righe) e `--upgrade` (159) sono ergonomia: servono ancora, o sono stati scritti
   per un tracker più grande di quello che c'è?
 
