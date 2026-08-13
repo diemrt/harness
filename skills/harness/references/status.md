@@ -59,17 +59,43 @@ entrambi i casi la riga è la stessa e non si stampa né barra né sezioni.
 ## `--oneline`: il contratto qui si inverte
 
 ```bash
-node "$SCRIPTS/status-cli.mjs" --oneline
+node "$SCRIPTS/status-cli.mjs" --oneline [--color]
 ```
 
 ```
-1 in corso | 2 in verifica | 4 backlog | 12 chiuse
-1 in corso | 3 backlog | 9 chiuse !
+1 in corso [2/9] | 4 backlog | 12 chiuse
+1 in corso | 1 in verifica | 3 backlog | 9 chiuse !
 ```
 
 Una riga sola: i conteggi per stato, gli stati a zero omessi, e `!` quando c'è un'allerta — un
 ciclo o una dipendenza che non risolve. Su un tracker vuoto la riga è **vuota**: una barra di stato
 che dice «zero» spende per l'assenza di notizie la riga che le era stata data.
+
+### Il conteggio dei task, e quando sparisce
+
+`[2/9]` sono i task di esecuzione spuntati sul totale, e compaiono **solo quando c'è esattamente
+una issue in volo** fra `in_progress` e `in_review`. Con due, quel numero sarebbe il progresso di
+quale? Un numero che ha bisogno di una domanda per essere letto è peggio di nessun numero, e nella
+seconda riga dell'esempio infatti non c'è.
+
+Le parentesi quadre fanno da icona al posto di un glifo: in questo repository significano già
+checklist — `- [x]` nell'export, `[x]` negli elenchi di task — quindi il numero si legge come task
+senza bisogno di una legenda, e restano ASCII.
+
+Una issue in volo **senza task** non stampa parentesi: `[-]` occuperebbe spazio per dire che non
+c'è niente da dire. E una issue `blocked` da sola non porta il conteggio, perché non è ciò su cui
+si sta lavorando.
+
+### `--color`
+
+Aggiunge ANSI: ciano su ciò che si muove, giallo su ciò che aspetta il giudizio di qualcun altro,
+rosso su ciò che è fermo e sul marcatore `!`, grigio sul backlog che nessuno ha ancora toccato,
+verde sulle chiuse.
+
+**È opt-in, e resta tale.** Il default non emette un solo byte di escape, perché l'ospite può
+essere un prompt che li rende alla lettera invece di interpretarli — e una riga di stato piena di
+`\x1b[36m` è peggio di una riga senza colore. Il colore aggiunge **vernice, non contenuto**:
+togliendo gli escape si riottiene esattamente la riga in chiaro.
 
 L'ordine non è quello della barra. La barra risponde a «quanto è arrivato avanti il progetto» e
 apre col lavoro chiuso; questa riga risponde a «dove siamo adesso», e il lavoro chiuso è la cosa
@@ -89,9 +115,10 @@ occupa la riga che esisteva per mostrare il lavoro, non si può chiudere, e non 
 informazione che chi guarda non possa ottenere lanciando il riepilogo intero. Quindi non fallisce
 mai, non scrive mai su stderr, e degrada a riga vuota.
 
-Il separatore è `|` e non `·`: il riepilogo a schermo intero può permettersi caratteri non ASCII
-perché finisce in un blocco di codice markdown, questa riga finisce in una barra di tmux o in un
-prompt PowerShell, dove la codifica non è garantita.
+Il separatore è `|` e non `·`, e vale la stessa ragione per cui `--color` non è il default: il
+riepilogo a schermo intero può permettersi caratteri non ASCII perché finisce in un blocco di
+codice markdown, questa riga finisce in una barra di tmux o in un prompt PowerShell, dove né la
+codifica né il supporto agli escape sono garantiti.
 
 **È un'eccezione deliberata, non una svista da correggere.** Chi la trova e la "sistema"
 riportandola al contratto generale rompe l'unica cosa per cui il flag esiste.

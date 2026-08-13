@@ -61,6 +61,17 @@ export const ONELINE_LABEL = {
   done: "chiuse",
 };
 
+// SGR codes, applied only under --color. Cyan for what is moving, yellow for what waits on someone
+// else's judgement, red for what is stuck, grey for what nothing has touched yet, green for closed.
+export const ONELINE_COLOR = {
+  in_progress: "36",
+  in_review: "33",
+  blocked: "31",
+  backlog: "90",
+  done: "32",
+  alert: "31",
+};
+
 export const WIDTH = 80;
 export const BAR_INNER = 77; // WIDTH minus the leading space and the two brackets
 // Narrower than it was: the count column took seven columns, and a title that runs past the edge
@@ -232,23 +243,53 @@ export function renderSnapshot(snapshot, { project, lastUpdated }) {
   ].join("\n");
 }
 
+function paint(text, code, color) {
+  return color ? `\x1b[${code}m${text}\x1b[0m` : text;
+}
+
+// The task count appears only when EXACTLY ONE issue is in flight across in_progress and in_review.
+// With two, "[2/9]" would be the progress of which one? A number that needs a question before it
+// can be read is worse than no number at all.
+function soleInFlight(snapshot) {
+  if (snapshot.counts.in_progress + snapshot.counts.in_review !== 1) return null;
+  if (!Array.isArray(snapshot.inFlight)) return null;
+  return (
+    snapshot.inFlight.find(
+      (issue) => issue.status === "in_progress" || issue.status === "in_review"
+    ) ?? null
+  );
+}
+
 // One line for a host status bar: tmux, starship, a shell prompt, the Claude Code statusLine.
-// ASCII only and no ANSI — the full-screen summary can afford box drawing because it lands in a
-// markdown code block, this lands in a prompt where the encoding is not guaranteed.
+// ASCII by default and no ANSI — the full-screen summary can afford box drawing because it lands in
+// a markdown code block, this lands in a prompt where the encoding is not guaranteed. Colour is
+// opt-in through `color`, never assumed.
 //
 // An empty tracker prints nothing at all: a status bar saying "zero" spends the row it was given
 // on the absence of news.
-export function renderOneline(snapshot) {
-  const parts = ONELINE_ORDER.filter((status) => snapshot.counts[status] > 0).map(
-    (status) => `${snapshot.counts[status]} ${ONELINE_LABEL[status]}`
-  );
+export function renderOneline(snapshot, { color = false } = {}) {
+  const sole = soleInFlight(snapshot);
+  const soleProgress = sole ? taskProgress(sole) : "-";
+
+  const parts = ONELINE_ORDER.filter((status) => snapshot.counts[status] > 0).map((status) => {
+    let label = `${snapshot.counts[status]} ${ONELINE_LABEL[status]}`;
+    // Square brackets, not a glyph: in this repository they already mean checklist — `- [x]` in the
+    // export, `[x]` in the task lists — so the number reads as tasks without a legend. An issue
+    // with no tasks yet shows nothing rather than "[-]": a dash here is noise, not information.
+    if (sole && sole.status === status && soleProgress !== "-") {
+      label += ` [${soleProgress}]`;
+    }
+    return paint(label, ONELINE_COLOR[status], color);
+  });
+
   if (parts.length === 0) return "";
-  return `${parts.join(" | ")}${snapshot.alerts.length > 0 ? " !" : ""}`;
+  const alert = snapshot.alerts.length > 0 ? ` ${paint("!", ONELINE_COLOR.alert, color)}` : "";
+  return `${parts.join(" | ")}${alert}`;
 }
 
 const USAGE = [
   "Usage:",
-  "  node status-cli.mjs [--project-dir <path>] [--oneline] [--help]",
+  "  node status-cli.mjs [--project-dir <path>] [--oneline [--color]] [--help]",
   "",
   "Prints one screen of tracker status: counts, what is in flight, what can be taken now.",
   "Output is text, not JSON, and nothing is ever written to stderr.",
@@ -258,6 +299,9 @@ const USAGE = [
   "--oneline      one ASCII line of counts for a host status bar (tmux, starship, a shell",
   "               prompt, the Claude Code statusLine). Always exits 0 and stays silent on",
   "               any problem: an error repeated on every refresh is worse than no line.",
+  "               Shows [done/total] tasks only when exactly one issue is in flight.",
+  "--color        add ANSI colour to --oneline. Off by default: the host may be a prompt",
+  "               that renders the escape codes literally. No effect without --oneline.",
   "",
   "Exit codes: 0 on success and on an empty tracker; 1 on a missing project directory, an",
   "unreadable issues.json, or an unknown flag. --oneline always exits 0.",
@@ -280,7 +324,7 @@ function resolveProjectDir(projectDir) {
 // Every way this can go wrong, collected in one place and turned into an empty line. It does not
 // share resolveProjectDir() on purpose: that one calls fail(), which exits 1, and this command must
 // not — see the branch in main() for why.
-function onelineFor(projectDirArg) {
+function onelineFor(projectDirArg, color) {
   try {
     const dir = path.resolve(projectDirArg ?? process.cwd());
     if (!existsSync(dir) || !statSync(dir).isDirectory()) return "";
@@ -290,7 +334,7 @@ function onelineFor(projectDirArg) {
     if (!existsSync(trackerPath)) return "";
     const data = JSON.parse(readFileSync(trackerPath, "utf8"));
     const issues = Array.isArray(data.issues) ? data.issues : [];
-    return renderOneline(buildSnapshot(issues));
+    return renderOneline(buildSnapshot(issues), { color });
   } catch {
     return "";
   }
@@ -305,6 +349,7 @@ function main() {
       options: {
         "project-dir": { type: "string" },
         oneline: { type: "boolean", default: false },
+        color: { type: "boolean", default: false },
         help: { type: "boolean", default: false },
       },
     }));
@@ -328,7 +373,7 @@ function main() {
   // an empty line. Do not "fix" this back to the contract of the rest of the CLI: the reason is
   // written in references/status.md, not only here.
   if (values.oneline) {
-    process.stdout.write(`${onelineFor(values["project-dir"])}\n`);
+    process.stdout.write(`${onelineFor(values["project-dir"], values.color)}\n`);
     return;
   }
 

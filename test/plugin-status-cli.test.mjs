@@ -754,6 +754,100 @@ test("renderOneline stays inside ASCII: it lands in tmux, not in a code block", 
   assert.match(line, /^[\x20-\x7e]*$/, `non-ASCII in the status line: ${JSON.stringify(line)}`);
 });
 
+// The task count is the answer to "how far is the thing being worked on", and that question only
+// has one answer when only one thing is being worked on.
+
+const inFlightSnapshot = (issues, over = {}) => ({
+  counts: counts(over),
+  alerts: [],
+  inFlight: issues,
+});
+
+test("the task count shows when exactly one issue is in flight", () => {
+  const line = renderOneline(
+    inFlightSnapshot(
+      [issue("aaaaaaaa-0000-0000-0000-000000000000", { status: "in_progress", tasks: withTasks(9, 2) })],
+      { in_progress: 1, backlog: 3, done: 9 }
+    )
+  );
+  assert.equal(line, "1 in corso [2/9] | 3 backlog | 9 chiuse");
+});
+
+test("the task count shows for an issue waiting on the verifier too", () => {
+  const line = renderOneline(
+    inFlightSnapshot(
+      [issue("bbbbbbbb-0000-0000-0000-000000000000", { status: "in_review", tasks: withTasks(4, 4) })],
+      { in_review: 1, done: 9 }
+    )
+  );
+  assert.equal(line, "1 in verifica [4/4] | 9 chiuse");
+});
+
+test("with two issues in flight the count disappears: it would answer for which one?", () => {
+  const line = renderOneline(
+    inFlightSnapshot(
+      [
+        issue("aaaaaaaa-0000-0000-0000-000000000000", { status: "in_progress", tasks: withTasks(9, 2) }),
+        issue("bbbbbbbb-0000-0000-0000-000000000000", { status: "in_review", tasks: withTasks(4, 4) }),
+      ],
+      { in_progress: 1, in_review: 1, done: 9 }
+    )
+  );
+  assert.equal(line, "1 in corso | 1 in verifica | 9 chiuse");
+});
+
+test("an issue with no tasks yet shows no brackets, not an empty pair", () => {
+  const line = renderOneline(
+    inFlightSnapshot(
+      [issue("aaaaaaaa-0000-0000-0000-000000000000", { status: "in_progress", tasks: [] })],
+      { in_progress: 1, done: 9 }
+    )
+  );
+  assert.equal(line, "1 in corso | 9 chiuse");
+});
+
+test("a blocked issue alone does not carry the count: it is not what is being worked on", () => {
+  const line = renderOneline(
+    inFlightSnapshot(
+      [issue("cccccccc-0000-0000-0000-000000000000", { status: "blocked", tasks: withTasks(5, 1) })],
+      { blocked: 1, done: 9 }
+    )
+  );
+  assert.equal(line, "1 bloccate | 9 chiuse");
+});
+
+test("--color wraps every part, and without it there is not one escape byte", () => {
+  const snapshot = inFlightSnapshot([], { in_progress: 1, done: 2 });
+  snapshot.alerts = ["ciclo"];
+
+  const plain = renderOneline(snapshot);
+  assert.equal(plain.includes("\x1b"), false, "the default must never emit ANSI");
+
+  const painted = renderOneline(snapshot, { color: true });
+  assert.match(painted, /\x1b\[36m1 in corso\x1b\[0m/);
+  assert.match(painted, /\x1b\[32m2 chiuse\x1b\[0m/);
+  assert.match(painted, /\x1b\[31m!\x1b\[0m/);
+  // Stripping the escapes must give back exactly the plain line: colour adds paint, not content.
+  assert.equal(painted.replace(/\x1b\[[0-9;]*m/g, ""), plain);
+});
+
+test("--color on the process emits ANSI, and its absence does not", () => {
+  const tracker = JSON.stringify({
+    schema_version: 3,
+    issues: [issue("aaaaaaaa-0000-0000-0000-000000000000", { status: "in_progress", tasks: withTasks(3, 1) })],
+  });
+
+  const plain = runIn(tempProject(tracker), ["--oneline"]);
+  assert.equal(plain.status, 0);
+  assert.equal(plain.stdout.includes("\x1b"), false);
+  assert.equal(plain.stdout.trim(), "1 in corso [1/3]");
+
+  const painted = runIn(tempProject(tracker), ["--oneline", "--color"]);
+  assert.equal(painted.status, 0);
+  assert.equal(painted.stderr, "");
+  assert.equal(painted.stdout.includes("\x1b"), true);
+});
+
 test("--oneline exits 0 and stays silent when there is no tracker", () => {
   const run = runIn(tempProject(), ["--oneline"]);
   assert.equal(run.status, 0, "a status bar command must never fail");
