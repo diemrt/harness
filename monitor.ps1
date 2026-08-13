@@ -23,7 +23,7 @@ Add-Type -AssemblyName System.Drawing
 
 # --- CONFIGURAZIONE ---
 $StatusCli    = Join-Path $PluginDir "scripts\status-cli.mjs"
-$IntervalMs   = 5000
+$IntervalMs   = 1000
 $CornerRadius = 14      # raggio dei due angoli inferiori
 $PadX         = 18
 $PadY         = 8
