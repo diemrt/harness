@@ -63,13 +63,14 @@ node "$SCRIPTS/status-cli.mjs" --oneline [--color]
 ```
 
 ```
-1 in corso [2/9] | 4 backlog | 12 chiuse
-1 in corso | 1 in verifica | 3 backlog | 9 chiuse !
+1 in corso [2/9] | 4 backlog | 12 chiuse | 12s
+1 in corso | 1 in verifica | 3 backlog | 9 chiuse ! | 1h 2m 12s
 ```
 
-Una riga sola: i conteggi per stato, gli stati a zero omessi, e `!` quando c'è un'allerta — un
-ciclo o una dipendenza che non risolve. Su un tracker vuoto la riga è **vuota**: una barra di stato
-che dice «zero» spende per l'assenza di notizie la riga che le era stata data.
+Una riga sola: i conteggi per stato, gli stati a zero omessi, `!` quando c'è un'allerta — un ciclo
+o una dipendenza che non risolve — e in coda l'**età del tracker**. Su un tracker vuoto la riga è
+**vuota**: una barra di stato che dice «zero» spende per l'assenza di notizie la riga che le era
+stata data, e l'età da sola sarebbe il battito di conteggi che nessuno sta mostrando.
 
 ### Il conteggio dei task, e quando sparisce
 
@@ -86,11 +87,51 @@ Una issue in volo **senza task** non stampa parentesi: `[-]` occuperebbe spazio 
 c'è niente da dire. E una issue `blocked` da sola non porta il conteggio, perché non è ciò su cui
 si sta lavorando.
 
+### L'età del tracker: il battito, e cosa dice
+
+In coda alla riga sta da quanto tempo `issues.json` è stato scritto l'ultima volta — il campo
+`last_updated`, reso in tre scaglioni:
+
+| età | forma |
+|---|---|
+| sotto il minuto | `12s` |
+| sotto l'ora | `3m 12s` |
+| oltre | `1h 2m 12s` |
+
+**I secondi non spariscono mai**, in nessuno dei tre. Non è simmetria: è l'unico modo perché il
+numero cambi a ogni refresh. Togliendoli sopra il minuto il battito si fermerebbe per sessanta
+secondi alla volta, e in quei sessanta secondi una riga viva tornerebbe indistinguibile da una
+morta — cioè esattamente il problema per cui l'età esiste.
+
+**Perché serve un battito, se la riga non ha cache.** Il comando rilegge `issues.json` a ogni
+esecuzione e non tiene stato: se gira, è allineato per costruzione, e l'unico disallineamento
+possibile è **non girare**. Ma una riga ferma e una riga aggiornata che mostrano gli stessi
+conteggi sono lo stesso identico testo, e si può guardare per minuti una riga morta credendola
+fresca. L'età è l'unica cosa sulla riga che cambia da sola, quindi è l'unica che risponde a
+«questo l'ho appena letto o è lì da stamattina?».
+
+**Quando sospetti una riga morta**, guardala per qualche secondo: se il numero non sale, non è il
+tracker a essere fermo — è l'ospite che non sta più lanciando il comando. Quanto fine sia il
+battito lo decide il refresh dell'ospite, non harness: con `status-interval 15` di tmux l'età sale
+a scatti di quindici secondi, e va bene così, perché quello che si sta verificando è che salga.
+
+**Il ritorno a `0s` è la conferma che una modifica è atterrata.** Ogni scrittura del tracker
+riporta `last_updated` ad adesso — `issue-manager.mjs` lo aggiorna a ogni `--insert`, `--update`,
+`--delete` — quindi dopo un comando che ha toccato le issue l'età riparte da zero. È una ricevuta
+che non serve chiedere: se il numero non è ripartito, la scrittura non c'è stata.
+
+Se `last_updated` manca o non è una data interpretabile, **l'età non compare affatto**: niente
+punto interrogativo, niente segnaposto. È la stessa regola delle parentesi dei task — quando non
+c'è niente da dire non si occupa spazio per dirlo. Un tracker scritto nel futuro (orologi
+disallineati fra chi scrive e chi legge) si legge `0s` invece che con un'età negativa: non è una
+notizia che meriti la riga.
+
 ### `--color`
 
 Aggiunge ANSI: ciano su ciò che si muove, giallo su ciò che aspetta il giudizio di qualcun altro,
 rosso su ciò che è fermo e sul marcatore `!`, grigio sul backlog che nessuno ha ancora toccato,
-verde sulle chiuse.
+verde sulle chiuse. Grigia anche l'età, ma per un'altra ragione: non è una delle cose contate, è
+metadato della riga, e non deve competere per l'attenzione con il lavoro.
 
 **È opt-in, e resta tale.** Il default non emette un solo byte di escape, perché l'ospite può
 essere un prompt che li rende alla lettera invece di interpretarli — e una riga di stato piena di
@@ -129,24 +170,54 @@ Harness non implementa una statusline: implementa un comando che stampa una riga
 configurazione dell'ospite, e non è codice di harness — è anche il motivo per cui staccarsi da
 Claude Code non costa niente.
 
+Le ricette qui sotto sono complete: **si copiano e si sostituiscono solo i due path**.
+
+- `<plugin>` — la radice del plugin harness, cioè la directory che contiene `scripts/`. È quella
+  che la skill chiama `$SCRIPTS` una volta aggiunto `/scripts`.
+- `<progetto>` — la radice del progetto, cioè la directory che contiene `issues.json`.
+
+`--project-dir` c'è in tutte e tre **apposta**: la cwd con cui l'ospite lancia il comando non è
+garantita, e senza il flag una barra configurata una volta stampa la riga vuota appena la si guarda
+da un'altra directory. Su un tracker che non c'è la riga esce vuota e basta, quindi un path
+sbagliato non urla: si riconosce dal fatto che la barra tace.
+
+**Claude Code** — `.claude/settings.json` del progetto, oppure `~/.claude/settings.json` per averla
+ovunque:
+
 ```jsonc
-// .claude/settings.json
-{ "statusLine": { "type": "command", "command": "node \"$SCRIPTS/status-cli.mjs\" --oneline" } }
+{
+  "statusLine": {
+    "type": "command",
+    "command": "node \"<plugin>/scripts/status-cli.mjs\" --oneline --project-dir \"<progetto>\""
+  }
+}
 ```
 
-```bash
-# tmux
-set -g status-right '#(node "$SCRIPTS/status-cli.mjs" --oneline)'
-```
+**tmux** — in `~/.tmux.conf`. La seconda riga non è decorativa: il default di `status-interval` è
+15 secondi, ed è quello, non harness, a decidere quanto fine sia il battito.
 
 ```bash
-# ovunque, senza integrazione: un pannello a fianco
-watch -n 5 node "$SCRIPTS/status-cli.mjs" --oneline
+set -g status-right '#(node "<plugin>/scripts/status-cli.mjs" --oneline --project-dir "<progetto>")'
+set -g status-interval 5
+```
+
+**Ovunque, senza integrazione** — un pannello a fianco. `--color` qui ha senso: un terminale gli
+escape li rende.
+
+```bash
+watch -n 5 node "<plugin>/scripts/status-cli.mjs" --oneline --color --project-dir "<progetto>"
+```
+
+Su Windows `watch` non esiste, e il ciclo equivalente in PowerShell è una riga:
+
+```powershell
+while ($true) { Clear-Host; node "<plugin>\scripts\status-cli.mjs" --oneline --project-dir "<progetto>"; Start-Sleep 5 }
 ```
 
 Il refresh avviene quando l'ospite lo chiede — al confine di turno, per la statusline di Claude
 Code. Coincide con l'unico momento in cui i conteggi possono essere cambiati davvero, perché
-cambiano solo quando qualcuno scrive sul tracker.
+cambiano solo quando qualcuno scrive sul tracker. L'età invece sale a ogni refresh, ed è per questo
+che distingue una barra che gira da una che si è fermata.
 
 ## Come si legge l'output
 

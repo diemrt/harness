@@ -70,6 +70,9 @@ export const ONELINE_COLOR = {
   backlog: "90",
   done: "32",
   alert: "31",
+  // The age is metadata about the line, not one of the things being counted: grey keeps it from
+  // competing for attention with the work.
+  age: "90",
 };
 
 export const WIDTH = 80;
@@ -119,6 +122,31 @@ function formatWhen(lastUpdated) {
     `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())} ` +
     `${pad(when.getHours())}:${pad(when.getMinutes())}`
   );
+}
+
+// How long ago the tracker was last written, for the status line. This is the line's heartbeat:
+// the command has no cache and rereads issues.json every run, so a line that RUNS is aligned by
+// construction and the only possible mismatch is not running at all — which a frozen line and a
+// fresh one showing the same counts cannot be told apart by.
+//
+// The seconds are in all three brackets on purpose. Drop them above the minute and the heartbeat
+// stops for sixty seconds at a time, which is exactly the dead line this exists to rule out.
+//
+// A timestamp in the future is clock skew between whoever wrote and whoever reads, not news: it
+// flattens to 0s rather than spending the row on a negative number.
+export function formatAge(lastUpdated, now = Date.now()) {
+  if (!lastUpdated) return null;
+  const when = new Date(lastUpdated);
+  if (Number.isNaN(when.getTime())) return null;
+
+  const total = Math.max(0, Math.floor((now - when.getTime()) / 1000));
+  const seconds = total % 60;
+  const minutes = Math.floor(total / 60) % 60;
+  const hours = Math.floor(total / 3600);
+
+  if (total < 60) return `${seconds}s`;
+  if (total < 3600) return `${minutes}m ${seconds}s`;
+  return `${hours}h ${minutes}m ${seconds}s`;
 }
 
 // Segments are proportional, but a status holding at least one issue always gets a column: a
@@ -267,7 +295,11 @@ function soleInFlight(snapshot) {
 //
 // An empty tracker prints nothing at all: a status bar saying "zero" spends the row it was given
 // on the absence of news.
-export function renderOneline(snapshot, { color = false } = {}) {
+//
+// The age of the tracker closes the line, and is the one field here that changes on its own: see
+// formatAge() for why it is a heartbeat and not decoration. Absent or unparseable last_updated
+// prints nothing rather than a placeholder — the same rule the task brackets follow.
+export function renderOneline(snapshot, { color = false, lastUpdated = null, now = Date.now() } = {}) {
   const sole = soleInFlight(snapshot);
   const soleProgress = sole ? taskProgress(sole) : "-";
 
@@ -282,9 +314,13 @@ export function renderOneline(snapshot, { color = false } = {}) {
     return paint(label, ONELINE_COLOR[status], color);
   });
 
+  // Before the age, and deliberately: an empty tracker has no news, and an age alone would be a
+  // heartbeat for counts nobody is showing.
   if (parts.length === 0) return "";
   const alert = snapshot.alerts.length > 0 ? ` ${paint("!", ONELINE_COLOR.alert, color)}` : "";
-  return `${parts.join(" | ")}${alert}`;
+  const age = formatAge(lastUpdated, now);
+  const heartbeat = age ? ` | ${paint(age, ONELINE_COLOR.age, color)}` : "";
+  return `${parts.join(" | ")}${alert}${heartbeat}`;
 }
 
 const USAGE = [
@@ -299,7 +335,9 @@ const USAGE = [
   "--oneline      one ASCII line of counts for a host status bar (tmux, starship, a shell",
   "               prompt, the Claude Code statusLine). Always exits 0 and stays silent on",
   "               any problem: an error repeated on every refresh is worse than no line.",
-  "               Shows [done/total] tasks only when exactly one issue is in flight.",
+  "               Shows [done/total] tasks only when exactly one issue is in flight, and",
+  "               closes with how long ago the tracker was written (12s, 3m 12s, 1h 2m 12s):",
+  "               that age is the heartbeat that tells a live line from a frozen one.",
   "--color        add ANSI colour to --oneline. Off by default: the host may be a prompt",
   "               that renders the escape codes literally. No effect without --oneline.",
   "",
@@ -334,7 +372,7 @@ function onelineFor(projectDirArg, color) {
     if (!existsSync(trackerPath)) return "";
     const data = JSON.parse(readFileSync(trackerPath, "utf8"));
     const issues = Array.isArray(data.issues) ? data.issues : [];
-    return renderOneline(buildSnapshot(issues), { color });
+    return renderOneline(buildSnapshot(issues), { color, lastUpdated: data.last_updated ?? null });
   } catch {
     return "";
   }

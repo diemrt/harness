@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-13T13:39:00Z",
+  "last_updated": "2026-08-13T14:06:04Z",
   "rules": {
     "single_active_issue": false
   },
@@ -941,11 +941,54 @@
       "id": "6a0ee313-df2e-4899-bdc3-3dcc1132836e",
       "title": "L'eta' del tracker nella riga di stato, e come agganciarla",
       "description": "La riga di stato non dice se e' viva. Il comando rilegge issues.json a ogni esecuzione e non ha cache, quindi se gira e' allineato per costruzione: l'unico disallineamento possibile e' non girare. Ma una riga ferma e una riga aggiornata che mostra lo stesso valore sono indistinguibili, e il 2026-08-13 il committente ha guardato per minuti una riga morta credendola aggiornata.\n\nServe un battito che sia anche informazione: l'eta' di last_updated in coda alla riga. Formato 12s, poi 3m 12s, poi 1h 2m 12s - i secondi restano sempre, altrimenti sopra il minuto il battito si ferma per sessanta secondi e non si distingue piu' da una riga morta. Appena il tracker viene scritto torna a 0s, ed e' la conferma che la modifica e' atterrata.\n\nNello stesso giro la sezione sugli ospiti di references/status.md diventa un vero 'come lo agganci al tuo progetto': oggi le ricette ci sono ma abbozzate, e chi installa harness deve ricordarsele.",
-      "status": "backlog",
+      "status": "in_progress",
       "tier": "standard",
       "depends_on": [],
       "covers": [],
-      "tasks": [],
+      "tasks": [
+        {
+          "id": 1,
+          "short_title": "I test dell'eta' prima del codice",
+          "full_description": "In test/plugin-status-cli.test.mjs: formatAge nei tre scaglioni (12s, 3m 12s, 1h 2m 12s), last_updated assente o non interpretabile che non produce nulla, riga ancora dentro [\\x20-\\x7e], nessun ANSI senza --color. Rossi prima di toccare lo script.",
+          "checked": true
+        },
+        {
+          "id": 2,
+          "short_title": "formatAge: tre scaglioni, secondi sempre",
+          "full_description": "In scripts/status-cli.mjs accanto a formatWhen: da last_updated e now a '12s' / '3m 12s' / '1h 2m 12s'. null se il campo manca o non e' una data. Futuro (skew d'orologio) si appiattisce a 0s invece di un'eta' negativa. Esportata, cosi' i tre scaglioni si provano senza passare dalla riga.",
+          "checked": true
+        },
+        {
+          "id": 3,
+          "short_title": "L'eta' chiude la riga, e onelineFor la passa",
+          "full_description": "renderOneline prende lastUpdated e now fra le opzioni e chiude la riga con l'eta' dopo il marcatore '!'. onelineFor legge data.last_updated. Tracker vuoto: riga vuota, nessuna eta'. Sotto --color l'eta' e' grigia, e togliendo gli escape si riottiene la riga in chiaro. USAGE aggiornata.",
+          "checked": true
+        },
+        {
+          "id": 4,
+          "short_title": "Il test di processo che vede il battito",
+          "full_description": "Due esecuzioni di --oneline sullo stesso tracker separate da un'attesa: la seconda eta' e' maggiore della prima. E' il test che dimostra il battito, non solo il formato.",
+          "checked": true
+        },
+        {
+          "id": 5,
+          "short_title": "references/status.md: l'eta' come battito",
+          "full_description": "Sotto '--oneline': cosa significa l'eta', perche' i secondi non spariscono mai, come si legge quando si sospetta una riga morta, e che il ritorno a 0s e' la conferma che la modifica e' atterrata.",
+          "checked": true
+        },
+        {
+          "id": 6,
+          "short_title": "references/status.md: le ricette d'aggancio",
+          "full_description": "statusLine di Claude Code, tmux status-right, watch in un pannello: ognuna copiabile senza modifiche oltre ai path, con --project-dir dove la cwd dell'ospite non e' garantita e la nota su Windows dove watch non c'e'.",
+          "checked": true
+        },
+        {
+          "id": 7,
+          "short_title": "Suite verde e allineamento al commit",
+          "full_description": "npm test verde, che e' il gate di .harness/config.json. Task allineati prima del commit, poi la issue va in in_review per la verifica indipendente.",
+          "checked": false
+        }
+      ],
       "validation": {
         "criteria": [
           "renderOneline chiude la riga con l'eta' di last_updated nei tre scaglioni: 12s, 3m 12s, 1h 2m 12s - i secondi non spariscono mai",
@@ -1003,7 +1046,7 @@
         "state": "unknown"
       },
       "created_at": "2026-08-13T13:39:00Z",
-      "updated_at": "2026-08-13T13:39:00Z"
+      "updated_at": "2026-08-13T14:06:04Z"
     },
     {
       "id": "f57521cb-3a57-4c45-a029-4fa608c23d98",

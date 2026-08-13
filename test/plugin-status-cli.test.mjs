@@ -8,6 +8,7 @@ import {
   buildSnapshot,
   renderSnapshot,
   renderOneline,
+  formatAge,
   STATUS_ICON,
   TIER_ICON,
   WIDTH,
@@ -886,4 +887,151 @@ test("--oneline exits 0 even when the project directory does not exist", () => {
   assert.equal(run.status, 0);
   assert.equal(run.stderr, "");
   assert.equal(run.stdout.trim(), "");
+});
+
+// ---------------------------------------------------------------------------
+// The age of the tracker: the line's heartbeat. This command has no cache and rereads issues.json
+// on every run, so a line that RUNS is aligned by construction — the only possible mismatch is not
+// running at all. A frozen line and a fresh one showing the same counts are indistinguishable
+// without this, which is how someone watches a dead line for minutes believing it live.
+// ---------------------------------------------------------------------------
+
+const AT = Date.parse("2026-08-13T12:00:00.000Z");
+const ago = (seconds) => new Date(AT - seconds * 1000).toISOString();
+
+test("formatAge is seconds under the minute", () => {
+  assert.equal(formatAge(ago(0), AT), "0s");
+  assert.equal(formatAge(ago(12), AT), "12s");
+  assert.equal(formatAge(ago(59), AT), "59s");
+});
+
+test("formatAge is minutes and seconds under the hour", () => {
+  assert.equal(formatAge(ago(60), AT), "1m 0s");
+  assert.equal(formatAge(ago(192), AT), "3m 12s");
+  assert.equal(formatAge(ago(3599), AT), "59m 59s");
+});
+
+test("formatAge is hours, minutes and seconds beyond that", () => {
+  assert.equal(formatAge(ago(3600), AT), "1h 0m 0s");
+  assert.equal(formatAge(ago(3732), AT), "1h 2m 12s");
+  assert.equal(formatAge(ago(90000), AT), "25h 0m 0s");
+});
+
+test("the seconds never disappear, in any of the three brackets", () => {
+  // Without them the heartbeat stops for a whole minute above the minute mark, and a live line
+  // becomes indistinguishable from a dead one exactly when it matters.
+  for (const seconds of [5, 192, 3732, 90000]) {
+    assert.match(formatAge(ago(seconds), AT), /\d+s$/);
+  }
+});
+
+test("formatAge says nothing at all when there is nothing to say", () => {
+  // No placeholder, no question mark: the same rule as the task brackets.
+  assert.equal(formatAge(null, AT), null);
+  assert.equal(formatAge(undefined, AT), null);
+  assert.equal(formatAge("", AT), null);
+  assert.equal(formatAge("not a date", AT), null);
+});
+
+test("a tracker written in the future reads as fresh, never as a negative age", () => {
+  // Clock skew between the writer and the reader is not an error worth a row in a status bar.
+  assert.equal(formatAge(ago(-30), AT), "0s");
+});
+
+test("renderOneline closes the line with the age of last_updated", () => {
+  const line = renderOneline(
+    { counts: counts({ in_progress: 1, done: 9 }), alerts: [] },
+    { lastUpdated: ago(192), now: AT }
+  );
+  assert.equal(line, "1 in corso | 9 chiuse | 3m 12s");
+});
+
+test("the age sits after the alert marker: it closes the line, and the marker is a count's", () => {
+  const line = renderOneline(
+    { counts: counts({ backlog: 1 }), alerts: ["ciclo nei depends_on: a b"] },
+    { lastUpdated: ago(12), now: AT }
+  );
+  assert.equal(line, "1 backlog ! | 12s");
+});
+
+test("no last_updated means no age, and no space spent saying so", () => {
+  const snapshot = { counts: counts({ in_progress: 1, done: 9 }), alerts: [] };
+  assert.equal(renderOneline(snapshot), "1 in corso | 9 chiuse");
+  assert.equal(renderOneline(snapshot, { lastUpdated: null, now: AT }), "1 in corso | 9 chiuse");
+  assert.equal(
+    renderOneline(snapshot, { lastUpdated: "not a date", now: AT }),
+    "1 in corso | 9 chiuse"
+  );
+});
+
+test("an empty tracker stays the empty line, age or no age", () => {
+  assert.equal(renderOneline({ counts: counts(), alerts: [] }, { lastUpdated: ago(12), now: AT }), "");
+});
+
+test("the line stays inside ASCII with the age on it", () => {
+  const line = renderOneline(
+    {
+      counts: counts({ backlog: 1, in_progress: 1, in_review: 1, blocked: 1, done: 1 }),
+      alerts: ["x"],
+    },
+    { lastUpdated: ago(3732), now: AT }
+  );
+  assert.match(line, /^[\x20-\x7e]*$/, `non-ASCII in the status line: ${JSON.stringify(line)}`);
+});
+
+test("the age is paint under --color and content without it", () => {
+  const snapshot = { counts: counts({ in_progress: 1, done: 2 }), alerts: [] };
+  const opts = { lastUpdated: ago(12), now: AT };
+
+  const plain = renderOneline(snapshot, opts);
+  assert.equal(plain.includes("\x1b"), false, "the default must never emit ANSI");
+  assert.ok(plain.endsWith(" | 12s"));
+
+  const painted = renderOneline(snapshot, { ...opts, color: true });
+  assert.match(painted, /\x1b\[90m12s\x1b\[0m$/);
+  assert.equal(painted.replace(/\x1b\[[0-9;]*m/g, ""), plain);
+});
+
+test("--oneline on the process carries the age of the tracker it just read", () => {
+  const run = runIn(
+    tempProject(
+      JSON.stringify({
+        schema_version: 3,
+        last_updated: new Date().toISOString(),
+        issues: [issue("aaaaaaaa-0000-0000-0000-000000000000", { status: "in_progress" })],
+      })
+    ),
+    ["--oneline"]
+  );
+  assert.equal(run.status, 0);
+  assert.equal(run.stderr, "");
+  assert.match(run.stdout.trim(), /^1 in corso \| \d+s$/);
+});
+
+// Read as seconds, so the three brackets compare as one number.
+function ageSeconds(line) {
+  const match = line.trim().match(/(?:(\d+)h )?(?:(\d+)m )?(\d+)s$/);
+  assert.ok(match, `no age at the end of ${JSON.stringify(line)}`);
+  const [, h = 0, m = 0, s] = match;
+  return Number(h) * 3600 + Number(m) * 60 + Number(s);
+}
+
+test("the age grows between two readings: this is the heartbeat, not just the format", async () => {
+  // The whole point of the field. A format test would pass on a line that never moves, and a line
+  // that never moves is exactly the failure this issue exists for.
+  const dir = tempProject(
+    JSON.stringify({
+      schema_version: 3,
+      last_updated: new Date().toISOString(),
+      issues: [issue("aaaaaaaa-0000-0000-0000-000000000000", { status: "in_progress" })],
+    })
+  );
+  try {
+    const first = ageSeconds(runIn(dir, ["--oneline"]).stdout);
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    const second = ageSeconds(runIn(dir, ["--oneline"]).stdout);
+    assert.ok(second > first, `the line did not move: ${first}s then ${second}s`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
