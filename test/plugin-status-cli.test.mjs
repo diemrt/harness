@@ -9,6 +9,7 @@ import {
   renderSnapshot,
   renderOneline,
   formatAge,
+  formatClock,
   STATUS_ICON,
   TIER_ICON,
   WIDTH,
@@ -720,26 +721,37 @@ const counts = (over = {}) => ({
   ...over,
 });
 
+// A fixed instant to render against, so nothing here depends on the wall clock. CLOCK is derived
+// rather than written out: the rendered hour depends on the machine's timezone, and a literal
+// would pin these tests to whoever wrote them. The FORMAT is pinned separately, by the
+// formatClock tests, which build a date from local components.
+const AT = Date.parse("2026-08-13T12:00:00.000Z");
+const ago = (seconds) => new Date(AT - seconds * 1000).toISOString();
+const CLOCK = formatClock(AT);
+
 test("renderOneline lists the non-empty statuses in reading order", () => {
-  const line = renderOneline({
-    counts: counts({ backlog: 4, in_progress: 1, in_review: 2, done: 12 }),
-    alerts: [],
-  });
-  assert.equal(line, "1 in corso | 2 in verifica | 4 backlog | 12 chiuse");
+  const line = renderOneline(
+    { counts: counts({ backlog: 4, in_progress: 1, in_review: 2, done: 12 }), alerts: [] },
+    { now: AT }
+  );
+  assert.equal(line, `1 in corso | 2 in verifica | 4 backlog | 12 chiuse | ${CLOCK}`);
 });
 
 test("renderOneline drops the statuses nothing is in", () => {
-  const line = renderOneline({
-    counts: counts({ backlog: 3, in_progress: 1, done: 9 }),
-    alerts: [],
-  });
-  assert.equal(line, "1 in corso | 3 backlog | 9 chiuse");
+  const line = renderOneline(
+    { counts: counts({ backlog: 3, in_progress: 1, done: 9 }), alerts: [] },
+    { now: AT }
+  );
+  assert.equal(line, `1 in corso | 3 backlog | 9 chiuse | ${CLOCK}`);
 });
 
 test("renderOneline marks alerts and only alerts", () => {
   const only = counts({ backlog: 1 });
-  assert.equal(renderOneline({ counts: only, alerts: [] }), "1 backlog");
-  assert.equal(renderOneline({ counts: only, alerts: ["ciclo nei depends_on: a b"] }), "1 backlog !");
+  assert.equal(renderOneline({ counts: only, alerts: [] }, { now: AT }), `1 backlog | ${CLOCK}`);
+  assert.equal(
+    renderOneline({ counts: only, alerts: ["ciclo nei depends_on: a b"] }, { now: AT }),
+    `1 backlog ! | ${CLOCK}`
+  );
 });
 
 test("renderOneline on an empty tracker is the empty line", () => {
@@ -769,9 +781,10 @@ test("the task count shows when exactly one issue is in flight", () => {
     inFlightSnapshot(
       [issue("aaaaaaaa-0000-0000-0000-000000000000", { status: "in_progress", tasks: withTasks(9, 2) })],
       { in_progress: 1, backlog: 3, done: 9 }
-    )
+    ),
+    { now: AT }
   );
-  assert.equal(line, "1 in corso [2/9] | 3 backlog | 9 chiuse");
+  assert.equal(line, `1 in corso [2/9] | 3 backlog | 9 chiuse | ${CLOCK}`);
 });
 
 test("the task count shows for an issue waiting on the verifier too", () => {
@@ -779,9 +792,10 @@ test("the task count shows for an issue waiting on the verifier too", () => {
     inFlightSnapshot(
       [issue("bbbbbbbb-0000-0000-0000-000000000000", { status: "in_review", tasks: withTasks(4, 4) })],
       { in_review: 1, done: 9 }
-    )
+    ),
+    { now: AT }
   );
-  assert.equal(line, "1 in verifica [4/4] | 9 chiuse");
+  assert.equal(line, `1 in verifica [4/4] | 9 chiuse | ${CLOCK}`);
 });
 
 test("with two issues in flight the count disappears: it would answer for which one?", () => {
@@ -792,9 +806,10 @@ test("with two issues in flight the count disappears: it would answer for which 
         issue("bbbbbbbb-0000-0000-0000-000000000000", { status: "in_review", tasks: withTasks(4, 4) }),
       ],
       { in_progress: 1, in_review: 1, done: 9 }
-    )
+    ),
+    { now: AT }
   );
-  assert.equal(line, "1 in corso | 1 in verifica | 9 chiuse");
+  assert.equal(line, `1 in corso | 1 in verifica | 9 chiuse | ${CLOCK}`);
 });
 
 test("an issue with no tasks yet shows no brackets, not an empty pair", () => {
@@ -802,9 +817,10 @@ test("an issue with no tasks yet shows no brackets, not an empty pair", () => {
     inFlightSnapshot(
       [issue("aaaaaaaa-0000-0000-0000-000000000000", { status: "in_progress", tasks: [] })],
       { in_progress: 1, done: 9 }
-    )
+    ),
+    { now: AT }
   );
-  assert.equal(line, "1 in corso | 9 chiuse");
+  assert.equal(line, `1 in corso | 9 chiuse | ${CLOCK}`);
 });
 
 test("a blocked issue alone does not carry the count: it is not what is being worked on", () => {
@@ -812,19 +828,20 @@ test("a blocked issue alone does not carry the count: it is not what is being wo
     inFlightSnapshot(
       [issue("cccccccc-0000-0000-0000-000000000000", { status: "blocked", tasks: withTasks(5, 1) })],
       { blocked: 1, done: 9 }
-    )
+    ),
+    { now: AT }
   );
-  assert.equal(line, "1 bloccate | 9 chiuse");
+  assert.equal(line, `1 bloccate | 9 chiuse | ${CLOCK}`);
 });
 
 test("--color wraps every part, and without it there is not one escape byte", () => {
   const snapshot = inFlightSnapshot([], { in_progress: 1, done: 2 });
   snapshot.alerts = ["ciclo"];
 
-  const plain = renderOneline(snapshot);
+  const plain = renderOneline(snapshot, { now: AT });
   assert.equal(plain.includes("\x1b"), false, "the default must never emit ANSI");
 
-  const painted = renderOneline(snapshot, { color: true });
+  const painted = renderOneline(snapshot, { color: true, now: AT });
   assert.match(painted, /\x1b\[36m1 in corso\x1b\[0m/);
   assert.match(painted, /\x1b\[32m2 chiuse\x1b\[0m/);
   assert.match(painted, /\x1b\[31m!\x1b\[0m/);
@@ -841,7 +858,7 @@ test("--color on the process emits ANSI, and its absence does not", () => {
   const plain = runIn(tempProject(tracker), ["--oneline"]);
   assert.equal(plain.status, 0);
   assert.equal(plain.stdout.includes("\x1b"), false);
-  assert.equal(plain.stdout.trim(), "1 in corso [1/3]");
+  assert.match(plain.stdout.trim(), /^1 in corso \[1\/3\] \| \d{2}:\d{2}:\d{2}$/);
 
   const painted = runIn(tempProject(tracker), ["--oneline", "--color"]);
   assert.equal(painted.status, 0);
@@ -878,7 +895,7 @@ test("--oneline prints the counts of a real tracker", () => {
   );
   assert.equal(run.status, 0);
   assert.equal(run.stderr, "");
-  assert.equal(run.stdout.trim(), "1 in corso | 1 chiuse");
+  assert.match(run.stdout.trim(), /^1 in corso \| 1 chiuse \| \d{2}:\d{2}:\d{2}$/);
 });
 
 test("--oneline exits 0 even when the project directory does not exist", () => {
@@ -895,9 +912,6 @@ test("--oneline exits 0 even when the project directory does not exist", () => {
 // running at all. A frozen line and a fresh one showing the same counts are indistinguishable
 // without this, which is how someone watches a dead line for minutes believing it live.
 // ---------------------------------------------------------------------------
-
-const AT = Date.parse("2026-08-13T12:00:00.000Z");
-const ago = (seconds) => new Date(AT - seconds * 1000).toISOString();
 
 test("formatAge is seconds under the minute", () => {
   assert.equal(formatAge(ago(0), AT), "0s");
@@ -938,37 +952,63 @@ test("a tracker written in the future reads as fresh, never as a negative age", 
   assert.equal(formatAge(ago(-30), AT), "0s");
 });
 
-test("renderOneline closes the line with the age of last_updated", () => {
+// ---------------------------------------------------------------------------
+// The clock of the render. The age tells a dead line from a live one only across two glances —
+// you have to watch it move. The clock needs no waiting: it is checked against a clock the reader
+// already has. And because this command has no cache, the instant of the render IS the freshness
+// of the counts, so one reading answers both questions.
+//
+// Measured on 2026-08-13: the host stopped invoking the command for 8m02s while the tracker moved
+// three times, and the frozen line happened to show counts that were, by coincidence, correct.
+// ---------------------------------------------------------------------------
+
+test("formatClock is the local time of the render, to the second", () => {
+  // Built from LOCAL components on purpose: an instant plus a literal would pin this test to the
+  // timezone of whoever wrote it.
+  assert.equal(formatClock(new Date(2026, 7, 13, 16, 34, 50).getTime()), "16:34:50");
+  assert.equal(formatClock(new Date(2026, 7, 13, 0, 0, 0).getTime()), "00:00:00");
+  assert.equal(formatClock(new Date(2026, 7, 13, 9, 5, 3).getTime()), "09:05:03");
+  assert.equal(formatClock(new Date(2026, 7, 13, 23, 59, 59).getTime()), "23:59:59");
+});
+
+test("formatClock always has something to say: now is always knowable", () => {
+  // Unlike the age, which depends on a field that may be missing, the render instant always
+  // exists. There is no branch where this returns null.
+  assert.match(formatClock(AT), /^\d{2}:\d{2}:\d{2}$/);
+  assert.match(formatClock(), /^\d{2}:\d{2}:\d{2}$/);
+});
+
+test("renderOneline closes the line with the age and the instant it was taken", () => {
   const line = renderOneline(
     { counts: counts({ in_progress: 1, done: 9 }), alerts: [] },
     { lastUpdated: ago(192), now: AT }
   );
-  assert.equal(line, "1 in corso | 9 chiuse | 3m 12s");
+  assert.equal(line, `1 in corso | 9 chiuse | 3m 12s @ ${CLOCK}`);
 });
 
-test("the age sits after the alert marker: it closes the line, and the marker is a count's", () => {
+test("the tail sits after the alert marker: the marker belongs to the counts", () => {
   const line = renderOneline(
     { counts: counts({ backlog: 1 }), alerts: ["ciclo nei depends_on: a b"] },
     { lastUpdated: ago(12), now: AT }
   );
-  assert.equal(line, "1 backlog ! | 12s");
+  assert.equal(line, `1 backlog ! | 12s @ ${CLOCK}`);
 });
 
-test("no last_updated means no age, and no space spent saying so", () => {
+test("no last_updated leaves the clock alone: no age, no placeholder", () => {
   const snapshot = { counts: counts({ in_progress: 1, done: 9 }), alerts: [] };
-  assert.equal(renderOneline(snapshot), "1 in corso | 9 chiuse");
-  assert.equal(renderOneline(snapshot, { lastUpdated: null, now: AT }), "1 in corso | 9 chiuse");
-  assert.equal(
-    renderOneline(snapshot, { lastUpdated: "not a date", now: AT }),
-    "1 in corso | 9 chiuse"
-  );
+  const expected = `1 in corso | 9 chiuse | ${CLOCK}`;
+  assert.equal(renderOneline(snapshot, { now: AT }), expected);
+  assert.equal(renderOneline(snapshot, { lastUpdated: null, now: AT }), expected);
+  assert.equal(renderOneline(snapshot, { lastUpdated: "not a date", now: AT }), expected);
 });
 
-test("an empty tracker stays the empty line, age or no age", () => {
+test("an empty tracker stays the empty line, clock and age included", () => {
+  // A status bar saying "nothing, as of 16:34:50" still spends the row on the absence of news.
   assert.equal(renderOneline({ counts: counts(), alerts: [] }, { lastUpdated: ago(12), now: AT }), "");
+  assert.equal(renderOneline({ counts: counts(), alerts: [] }, { now: AT }), "");
 });
 
-test("the line stays inside ASCII with the age on it", () => {
+test("the line stays inside ASCII with age and clock on it", () => {
   const line = renderOneline(
     {
       counts: counts({ backlog: 1, in_progress: 1, in_review: 1, blocked: 1, done: 1 }),
@@ -979,20 +1019,20 @@ test("the line stays inside ASCII with the age on it", () => {
   assert.match(line, /^[\x20-\x7e]*$/, `non-ASCII in the status line: ${JSON.stringify(line)}`);
 });
 
-test("the age is paint under --color and content without it", () => {
+test("the tail is paint under --color and content without it", () => {
   const snapshot = { counts: counts({ in_progress: 1, done: 2 }), alerts: [] };
   const opts = { lastUpdated: ago(12), now: AT };
 
   const plain = renderOneline(snapshot, opts);
   assert.equal(plain.includes("\x1b"), false, "the default must never emit ANSI");
-  assert.ok(plain.endsWith(" | 12s"));
+  assert.ok(plain.endsWith(` | 12s @ ${CLOCK}`));
 
   const painted = renderOneline(snapshot, { ...opts, color: true });
-  assert.match(painted, /\x1b\[90m12s\x1b\[0m$/);
+  assert.match(painted, /\x1b\[90m12s @ \d{2}:\d{2}:\d{2}\x1b\[0m$/);
   assert.equal(painted.replace(/\x1b\[[0-9;]*m/g, ""), plain);
 });
 
-test("--oneline on the process carries the age of the tracker it just read", () => {
+test("--oneline on the process carries the age and the clock", () => {
   const run = runIn(
     tempProject(
       JSON.stringify({
@@ -1005,12 +1045,34 @@ test("--oneline on the process carries the age of the tracker it just read", () 
   );
   assert.equal(run.status, 0);
   assert.equal(run.stderr, "");
-  assert.match(run.stdout.trim(), /^1 in corso \| \d+s$/);
+  assert.match(run.stdout.trim(), /^1 in corso \| \d+s @ \d{2}:\d{2}:\d{2}$/);
 });
 
-// Read as seconds, so the three brackets compare as one number.
+test("the clock on the process is the instant of the render, not of the tracker", () => {
+  // The tracker here was written long ago; the clock must still be now. It is the one field that
+  // does not come from issues.json at all.
+  const run = runIn(
+    tempProject(
+      JSON.stringify({
+        schema_version: 3,
+        last_updated: "2020-01-01T00:00:00.000Z",
+        issues: [issue("aaaaaaaa-0000-0000-0000-000000000000", { status: "in_progress" })],
+      })
+    ),
+    ["--oneline"]
+  );
+  const secondsOfDay = (hhmmss) =>
+    Number(hhmmss.slice(0, 2)) * 3600 + Number(hhmmss.slice(3, 5)) * 60 + Number(hhmmss.slice(6));
+  const clock = run.stdout.trim().slice(-8);
+  const raw = Math.abs(secondsOfDay(formatClock()) - secondsOfDay(clock));
+  const drift = Math.min(raw, 86400 - raw); // a run straddling midnight is not a failure
+  assert.ok(drift < 120, `the clock read ${clock}, which is not the instant of the render`);
+});
+
+// Read as seconds, so the three brackets compare as one number. The age now sits before the
+// clock, so the anchor is " @ ", not the end of the line.
 function ageSeconds(line) {
-  const match = line.trim().match(/(?:(\d+)h )?(?:(\d+)m )?(\d+)s$/);
+  const match = line.trim().match(/(?:(\d+)h )?(?:(\d+)m )?(\d+)s @ \d{2}:\d{2}:\d{2}$/);
   assert.ok(match, `no age at the end of ${JSON.stringify(line)}`);
   const [, h = 0, m = 0, s] = match;
   return Number(h) * 3600 + Number(m) * 60 + Number(s);

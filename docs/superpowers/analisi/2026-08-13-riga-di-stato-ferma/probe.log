@@ -1,0 +1,46 @@
+2026-08-13T14:31:47.331Z pid=23828 START
+2026-08-13T14:31:47.402Z pid=23828 END   71ms  line="\u001b[90m6 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m19m 24s\u001b[0m"
+2026-08-13T14:33:24.016Z pid=37628 START
+2026-08-13T14:33:24.110Z pid=37628 END   94ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m1m 17s\u001b[0m"
+2026-08-13T14:33:24.544Z pid=8024 START
+2026-08-13T14:33:24.638Z pid=8024 END   94ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m1m 17s\u001b[0m"
+2026-08-13T14:33:25.204Z pid=20612 START
+2026-08-13T14:33:25.299Z pid=20612 END   95ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m1m 18s\u001b[0m"
+2026-08-13T14:33:27.730Z pid=26204 START
+2026-08-13T14:33:27.819Z pid=26204 END   89ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m1m 20s\u001b[0m"
+2026-08-13T14:33:30.033Z pid=19000 START
+2026-08-13T14:33:30.114Z pid=19000 END   81ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m1m 23s\u001b[0m"
+2026-08-13T14:33:40.038Z pid=37448 START
+2026-08-13T14:33:40.120Z pid=37448 END   82ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m1m 33s\u001b[0m"
+2026-08-13T14:33:44.178Z pid=26264 START
+2026-08-13T14:33:44.257Z pid=26264 END   79ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m1m 37s\u001b[0m"
+2026-08-13T14:33:44.742Z pid=6376 START
+2026-08-13T14:33:44.827Z pid=6376 END   85ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m1m 37s\u001b[0m"
+2026-08-13T14:33:45.533Z pid=34932 START
+2026-08-13T14:33:45.617Z pid=34932 END   84ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m1m 38s\u001b[0m"
+2026-08-13T14:33:50.042Z pid=28940 START
+2026-08-13T14:33:50.131Z pid=28940 END   89ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m1m 43s\u001b[0m"
+2026-08-13T14:33:52.627Z pid=33940 START
+2026-08-13T14:33:52.720Z pid=33940 END   93ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m1m 45s\u001b[0m"
+2026-08-13T14:33:53.712Z pid=19588 START
+2026-08-13T14:33:53.799Z pid=19588 END   87ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m1m 46s\u001b[0m"
+2026-08-13T14:34:00.040Z pid=21360 START
+2026-08-13T14:34:00.131Z pid=21360 END   91ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m1m 53s\u001b[0m"
+2026-08-13T14:34:14.876Z pid=36736 START
+2026-08-13T14:34:14.997Z pid=36736 END   121ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m2m 7s\u001b[0m"
+2026-08-13T14:34:17.632Z pid=36420 START
+2026-08-13T14:34:17.737Z pid=36420 END   105ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m2m 10s\u001b[0m"
+2026-08-13T14:34:20.821Z pid=27904 START
+2026-08-13T14:34:20.918Z pid=27904 END   97ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m2m 13s\u001b[0m"
+2026-08-13T14:34:27.837Z pid=4172 START
+2026-08-13T14:34:27.919Z pid=4172 END   82ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m2m 20s\u001b[0m"
+2026-08-13T14:34:29.969Z pid=35408 START
+2026-08-13T14:34:30.054Z pid=35408 END   85ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m2m 23s\u001b[0m"
+2026-08-13T14:34:30.886Z pid=21460 START
+2026-08-13T14:34:30.973Z pid=21460 END   87ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m2m 23s\u001b[0m"
+2026-08-13T14:34:37.871Z pid=23648 START
+2026-08-13T14:34:37.988Z pid=23648 END   117ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m2m 30s\u001b[0m"
+2026-08-13T14:34:40.979Z pid=32356 START
+2026-08-13T14:34:41.059Z pid=32356 END   80ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m2m 34s\u001b[0m"
+2026-08-13T14:34:50.806Z pid=17188 START
+2026-08-13T14:34:50.881Z pid=17188 END   75ms  line="\u001b[90m7 backlog\u001b[0m | \u001b[32m12 chiuse\u001b[0m | \u001b[90m2m 43s\u001b[0m"

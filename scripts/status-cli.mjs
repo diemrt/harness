@@ -70,9 +70,9 @@ export const ONELINE_COLOR = {
   backlog: "90",
   done: "32",
   alert: "31",
-  // The age is metadata about the line, not one of the things being counted: grey keeps it from
+  // Age and clock are metadata about the reading, not things being counted: grey keeps them from
   // competing for attention with the work.
-  age: "90",
+  tail: "90",
 };
 
 export const WIDTH = 80;
@@ -147,6 +147,21 @@ export function formatAge(lastUpdated, now = Date.now()) {
   if (total < 60) return `${seconds}s`;
   if (total < 3600) return `${minutes}m ${seconds}s`;
   return `${hours}h ${minutes}m ${seconds}s`;
+}
+
+// The instant of the render, in local time. It answers the question the age can only answer
+// across two glances: the age has to be watched moving, this is checked against a clock the
+// reader already has, in one reading and with no waiting.
+//
+// And because this command has no cache — every run rereads issues.json and exits — the instant
+// of the render IS the freshness of the counts. One field, both questions.
+//
+// It never returns null: unlike the age, which depends on a field that may be missing from the
+// tracker, "now" is always knowable.
+export function formatClock(now = Date.now()) {
+  const when = new Date(now);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(when.getHours())}:${pad(when.getMinutes())}:${pad(when.getSeconds())}`;
 }
 
 // Segments are proportional, but a status holding at least one issue always gets a column: a
@@ -314,13 +329,17 @@ export function renderOneline(snapshot, { color = false, lastUpdated = null, now
     return paint(label, ONELINE_COLOR[status], color);
   });
 
-  // Before the age, and deliberately: an empty tracker has no news, and an age alone would be a
-  // heartbeat for counts nobody is showing.
+  // Before the tail, and deliberately: an empty tracker has no news, and "nothing, as of 16:34:50"
+  // still spends on the absence of news the row it was given.
   if (parts.length === 0) return "";
   const alert = snapshot.alerts.length > 0 ? ` ${paint("!", ONELINE_COLOR.alert, color)}` : "";
+
+  // `3m 12s @ 16:34:50` — the age is the datum, the clock says when it was taken. With no
+  // last_updated the clock stands alone: it is the reading that always exists.
   const age = formatAge(lastUpdated, now);
-  const heartbeat = age ? ` | ${paint(age, ONELINE_COLOR.age, color)}` : "";
-  return `${parts.join(" | ")}${alert}${heartbeat}`;
+  const clock = formatClock(now);
+  const tail = age ? `${age} @ ${clock}` : clock;
+  return `${parts.join(" | ")}${alert} | ${paint(tail, ONELINE_COLOR.tail, color)}`;
 }
 
 const USAGE = [
@@ -335,9 +354,10 @@ const USAGE = [
   "--oneline      one ASCII line of counts for a host status bar (tmux, starship, a shell",
   "               prompt, the Claude Code statusLine). Always exits 0 and stays silent on",
   "               any problem: an error repeated on every refresh is worse than no line.",
-  "               Shows [done/total] tasks only when exactly one issue is in flight, and",
-  "               closes with how long ago the tracker was written (12s, 3m 12s, 1h 2m 12s):",
-  "               that age is the heartbeat that tells a live line from a frozen one.",
+  "               Shows [done/total] tasks only when exactly one issue is in flight, and closes",
+  "               with `3m 12s @ 16:34:50`: how long ago the tracker was written, and the local",
+  "               time of this render. The clock tells a live line from a frozen one at a glance",
+  "               — the host can stop invoking this command, and then nothing on the row moves.",
   "--color        add ANSI colour to --oneline. Off by default: the host may be a prompt",
   "               that renders the escape codes literally. No effect without --oneline.",
   "",

@@ -63,14 +63,15 @@ node "$SCRIPTS/status-cli.mjs" --oneline [--color]
 ```
 
 ```
-1 in corso [2/9] | 4 backlog | 12 chiuse | 12s
-1 in corso | 1 in verifica | 3 backlog | 9 chiuse ! | 1h 2m 12s
+1 in corso [2/9] | 4 backlog | 12 chiuse | 12s @ 16:34:50
+1 in corso | 1 in verifica | 3 backlog | 9 chiuse ! | 1h 2m 12s @ 16:34:50
 ```
 
 Una riga sola: i conteggi per stato, gli stati a zero omessi, `!` quando c'è un'allerta — un ciclo
-o una dipendenza che non risolve — e in coda l'**età del tracker**. Su un tracker vuoto la riga è
-**vuota**: una barra di stato che dice «zero» spende per l'assenza di notizie la riga che le era
-stata data, e l'età da sola sarebbe il battito di conteggi che nessuno sta mostrando.
+o una dipendenza che non risolve — e in coda **da quanto il tracker non viene scritto** e **l'ora
+di questa lettura**. Su un tracker vuoto la riga è **vuota**: una barra di stato che dice «zero»
+spende per l'assenza di notizie la riga che le era stata data, e «niente, alle 16:34:50» la spende
+lo stesso.
 
 ### Il conteggio dei task, e quando sparisce
 
@@ -87,9 +88,43 @@ Una issue in volo **senza task** non stampa parentesi: `[-]` occuperebbe spazio 
 c'è niente da dire. E una issue `blocked` da sola non porta il conteggio, perché non è ciò su cui
 si sta lavorando.
 
-### L'età del tracker: il battito, e cosa dice
+### La coda della riga: `3m 12s @ 16:34:50`
 
-In coda alla riga sta da quanto tempo `issues.json` è stato scritto l'ultima volta — il campo
+Due dati, e rispondono a due domande diverse. **L'età** dice da quanto nessuno scrive sul tracker;
+**l'ora** dice quando questa riga è stata prodotta. L'età è il dato, l'ora dice quando è stato
+preso — che è il motivo per cui stanno attaccate da una `@` invece di essere due campi separati da
+`|`.
+
+Se `last_updated` manca, resta la sola ora. Il contrario non succede: l'ora c'è sempre, perché
+«adesso» è sempre conoscibile.
+
+#### L'ora del render, e perché è lei a fare il lavoro
+
+**L'ospite può smettere di invocare il comando.** Non è un'ipotesi: il 2026-08-13 è stato misurato
+con una sonda strumentata — 23 invocazioni regolari, poi **zero per otto minuti**, mentre il
+tracker veniva scritto tre volte. Il comando non veniva ucciso a metà: non veniva chiamato. Il
+referto sta in [docs/superpowers/analisi/2026-08-13-riga-di-stato-ferma.md](../../../docs/superpowers/analisi/2026-08-13-riga-di-stato-ferma.md).
+
+Quando succede, **tutta la riga si congela, età compresa**. E un'età ferma somiglia a un dato: per
+smascherarla bisogna guardarla due volte, a quindici secondi di distanza, e sapere già che c'è
+qualcosa da sospettare.
+
+L'ora del render no. Si confronta con l'**orologio che hai già sotto gli occhi**, in un colpo
+d'occhio e senza aspettare: se la riga dice `16:34:50` e sono le 16:45, quella riga è di dieci
+minuti fa e non c'è altro da stabilire.
+
+E funziona per una ragione precisa, non per fortuna: **questo comando non ha cache**. Rilegge
+`issues.json` a ogni esecuzione e il processo esce, quindi l'istante del render *è* la freschezza
+dei conteggi. Un solo dato risponde a entrambe le domande.
+
+Il caso peggiore, che il 2026-08-13 si è presentato davvero: la riga congelata mostrava
+`7 backlog | 12 chiuse`, e il tracker in quel momento aveva **esattamente** sette backlog e dodici
+chiuse. Numeri giusti su una riga morta da dieci minuti. Senza qualcosa che dicesse *quando*,
+nessun numero di sguardi avrebbe potuto rivelarlo.
+
+#### L'età del tracker
+
+In coda alla riga sta anche da quanto tempo `issues.json` è stato scritto l'ultima volta — il campo
 `last_updated`, reso in tre scaglioni:
 
 | età | forma |
@@ -98,40 +133,34 @@ In coda alla riga sta da quanto tempo `issues.json` è stato scritto l'ultima vo
 | sotto l'ora | `3m 12s` |
 | oltre | `1h 2m 12s` |
 
-**I secondi non spariscono mai**, in nessuno dei tre. Non è simmetria: è l'unico modo perché il
-numero cambi a ogni refresh. Togliendoli sopra il minuto il battito si fermerebbe per sessanta
-secondi alla volta, e in quei sessanta secondi una riga viva tornerebbe indistinguibile da una
-morta — cioè esattamente il problema per cui l'età esiste.
+**I secondi non spariscono mai**, in nessuno dei tre. Sopra il minuto un'età senza secondi
+resterebbe ferma per sessanta secondi alla volta, e in quei sessanta secondi sarebbe di nuovo
+impossibile distinguerla da un'età congelata.
 
-**Perché serve un battito, se la riga non ha cache.** Il comando rilegge `issues.json` a ogni
-esecuzione e non tiene stato: se gira, è allineato per costruzione, e l'unico disallineamento
-possibile è **non girare**. Ma una riga ferma e una riga aggiornata che mostrano gli stessi
-conteggi sono lo stesso identico testo, e si può guardare per minuti una riga morta credendola
-fresca. L'età è l'unica cosa sulla riga che cambia da sola, quindi è l'unica che risponde a
-«questo l'ho appena letto o è lì da stamattina?».
-
-**Quando sospetti una riga morta**, guardala per qualche secondo: se il numero non sale, non è il
-tracker a essere fermo — è l'ospite che non sta più lanciando il comando. Quanto fine sia il
-battito lo decide il refresh dell'ospite, non harness: con `status-interval 15` di tmux l'età sale
-a scatti di quindici secondi, e va bene così, perché quello che si sta verificando è che salga.
+**L'età non misura la riga: misura il tracker.** Dice da quanto nessuno ci scrive, che è
+un'informazione sul lavoro — «è un'ora che non si muove niente» è una cosa che vale la pena
+sapere. Chi la legge come «quanto è fresca questa riga» le sta chiedendo la domanda dell'ora, e le
+due coincidono soltanto finché l'ospite continua a invocare il comando.
 
 **Il ritorno a `0s` è la conferma che una modifica è atterrata.** Ogni scrittura del tracker
 riporta `last_updated` ad adesso — `issue-manager.mjs` lo aggiorna a ogni `--insert`, `--update`,
 `--delete` — quindi dopo un comando che ha toccato le issue l'età riparte da zero. È una ricevuta
-che non serve chiedere: se il numero non è ripartito, la scrittura non c'è stata.
+che non serve chiedere: se il numero non è ripartito, la scrittura non c'è stata. Vale, come tutto
+il resto, **a patto che la riga sia stata rieseguita**: è l'ora accanto a dirlo.
 
 Se `last_updated` manca o non è una data interpretabile, **l'età non compare affatto**: niente
-punto interrogativo, niente segnaposto. È la stessa regola delle parentesi dei task — quando non
-c'è niente da dire non si occupa spazio per dirlo. Un tracker scritto nel futuro (orologi
-disallineati fra chi scrive e chi legge) si legge `0s` invece che con un'età negativa: non è una
-notizia che meriti la riga.
+punto interrogativo, niente segnaposto, e resta la sola ora. È la stessa regola delle parentesi dei
+task — quando non c'è niente da dire non si occupa spazio per dirlo. Un tracker scritto nel futuro
+(orologi disallineati fra chi scrive e chi legge) si legge `0s` invece che con un'età negativa: non
+è una notizia che meriti la riga.
 
 ### `--color`
 
 Aggiunge ANSI: ciano su ciò che si muove, giallo su ciò che aspetta il giudizio di qualcun altro,
 rosso su ciò che è fermo e sul marcatore `!`, grigio sul backlog che nessuno ha ancora toccato,
-verde sulle chiuse. Grigia anche l'età, ma per un'altra ragione: non è una delle cose contate, è
-metadato della riga, e non deve competere per l'attenzione con il lavoro.
+verde sulle chiuse. Grigia anche la coda — età e ora insieme, come un blocco solo — ma per
+un'altra ragione: non sono cose contate, sono metadato della lettura, e non devono competere per
+l'attenzione con il lavoro.
 
 **È opt-in, e resta tale.** Il default non emette un solo byte di escape, perché l'ospite può
 essere un prompt che li rende alla lettera invece di interpretarli — e una riga di stato piena di
@@ -188,10 +217,20 @@ ovunque:
 {
   "statusLine": {
     "type": "command",
-    "command": "node \"<plugin>/scripts/status-cli.mjs\" --oneline --project-dir \"<progetto>\""
+    "command": "node \"<plugin>/scripts/status-cli.mjs\" --oneline --project-dir \"<progetto>\"",
+    "refreshInterval": 10
   }
 }
 ```
+
+`refreshInterval` è in secondi e **va messo**: senza, il comando gira solo sui trigger a evento, e
+dentro un turno lungo — che è quando il tracker si muove di più — di eventi può non arrivarne
+nessuno. Misurato: col timer attivo scatta a **10,0 secondi esatti**.
+
+E **non basta**, il che è la ragione della raccomandazione qui sotto: nella stessa misura, con lo
+stesso `refreshInterval: 10`, c'è stata una finestra di **otto minuti senza una sola invocazione**.
+Quando succede non c'è niente da correggere nella configurazione — si riconosce dall'ora ferma, e
+si esce riavviando la sessione.
 
 **tmux** — in `~/.tmux.conf`. La seconda riga non è decorativa: il default di `status-interval` è
 15 secondi, ed è quello, non harness, a decidere quanto fine sia il battito.
@@ -201,7 +240,7 @@ set -g status-right '#(node "<plugin>/scripts/status-cli.mjs" --oneline --projec
 set -g status-interval 5
 ```
 
-**Ovunque, senza integrazione** — un pannello a fianco. `--color` qui ha senso: un terminale gli
+**Un pannello a fianco, e questa è la rete di sicurezza.** `--color` qui ha senso: un terminale gli
 escape li rende.
 
 ```bash
@@ -214,10 +253,16 @@ Su Windows `watch` non esiste, e il ciclo equivalente in PowerShell è una riga:
 while ($true) { Clear-Host; node "<plugin>\scripts\status-cli.mjs" --oneline --project-dir "<progetto>"; Start-Sleep 5 }
 ```
 
-Il refresh avviene quando l'ospite lo chiede — al confine di turno, per la statusline di Claude
-Code. Coincide con l'unico momento in cui i conteggi possono essere cambiati davvero, perché
-cambiano solo quando qualcuno scrive sul tracker. L'età invece sale a ogni refresh, ed è per questo
-che distingue una barra che gira da una che si è fermata.
+**Non è la terza ricetta alla pari: è l'unica che non dipende dall'ospite.** Il ciclo è un processo
+tuo, e continua a girare anche quando la statusline di Claude Code smette di invocare il comando —
+che è il modo di fallire misurato il 2026-08-13. Se hai bisogno di un dato di cui fidarti mentre
+lavori, è questo, e la statusline è la comodità che ci sta accanto.
+
+**Il refresh non coincide con i momenti in cui i conteggi cambiano.** È la cosa che questo
+documento dichiarava e che la misura ha smentito: dentro un solo turno lungo il tracker è stato
+scritto cinque volte, e tre di quelle scritture sono cadute in una finestra in cui il comando non è
+stato invocato nemmeno una volta. Il refresh lo decide l'ospite, e l'ospite può anche fermarsi:
+per questo la coda della riga porta l'ora, e per questo il pannello qui sopra esiste.
 
 ## Come si legge l'output
 
