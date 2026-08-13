@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-13T10:10:55Z",
+  "last_updated": "2026-08-13T10:17:45Z",
   "rules": {
     "single_active_issue": false
   },
@@ -670,6 +670,60 @@
       },
       "created_at": "2026-08-13T09:40:01Z",
       "updated_at": "2026-08-13T09:40:01Z"
+    },
+    {
+      "id": "bfb0a23f-50ff-4e44-873e-585b1bcedbd8",
+      "title": "Il verificatore non spunta i validation.tasks, e l'agent non sa di doverlo",
+      "description": "Due issue chiuse su due (e6836699 e b2c59231) hanno tutti i validation.tasks a checked:false dopo il pass. Non e' la dimenticanza di un giro: e' sistematico, e la causa e' localizzata.\n\nIl dovere esiste in references/verification.md, che assegna al verificatore \"eseguire il gate, spuntare i validation.tasks, chiudere la issue\" (riga 12) e lo ripete al punto 2 di riga 29. Ma agents/harness-verifier.md non nomina validation.tasks nemmeno una volta, e il payload di chiusura che mostra al punto 5 e' {status, validation:{criteria, state}} - che per contratto della CLI li conserva invariati. L'agent non impara il dovere, e l'esempio che segue lo cementa.\n\nE' il difetto che issues.md ha gia' nominato altrove: una regola scritta solo dove la legge l'orchestratore e' invisibile al lettore piu' frequente, che e' l'agent.\n\nIl danno e' silenzioso. La issue si chiude done/pass, le caselle non spuntate sembrano normali, e chi rilegge non distingue \"il verificatore non ha guardato\" da \"ha guardato e non era soddisfatto\": la checklist del giudizio e' dato morto che sembra vivo.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [],
+      "covers": [],
+      "tasks": [],
+      "validation": {
+        "criteria": [
+          "agents/harness-verifier.md nomina validation.tasks nella procedura, con l'istruzione di spuntare quelli verificati e lasciare non spuntati gli altri",
+          "il payload di chiusura mostrato nell'agent include validation.tasks, non piu' il solo {criteria, state}",
+          "un test asserisce che agents/harness-verifier.md nomina validation.tasks: senza, la prescrizione puo' sparire di nuovo in silenzio",
+          "npm test e' verde",
+          "i validation.tasks di e6836699 e b2c59231 restano non spuntati: non si spunta a posteriori cio' che nessuno ha verificato"
+        ],
+        "tasks": [
+          {
+            "id": 1,
+            "short_title": "L'agent impara il dovere",
+            "full_description": "agents/harness-verifier.md nomina validation.tasks nella procedura: spuntare quelli verificati davvero, lasciare non spuntati gli altri, e mai spuntarli tutti per chiudere.",
+            "checked": false
+          },
+          {
+            "id": 2,
+            "short_title": "Il payload d'esempio smette di cementare l'omissione",
+            "full_description": "L'esempio di chiusura al punto 5 include validation.tasks. Oggi mostra {criteria, state}, che per contratto della CLI li conserva invariati: l'esempio insegna a non farlo.",
+            "checked": false
+          },
+          {
+            "id": 3,
+            "short_title": "Un test difende la prescrizione",
+            "full_description": "Un test asserisce che agents/harness-verifier.md nomina validation.tasks e che il payload d'esempio li include. Senza, la riga puo' essere tolta da una riscrittura e nessuno se ne accorge - che e' esattamente come ci siamo arrivati.",
+            "checked": false
+          },
+          {
+            "id": 4,
+            "short_title": "Suite verde",
+            "full_description": "npm test verde, che e' anche il gate di .harness/config.json.",
+            "checked": false
+          },
+          {
+            "id": 5,
+            "short_title": "La storia non viene ritoccata",
+            "full_description": "I validation.tasks delle due issue gia' chiuse restano non spuntati. Spuntarli adesso significherebbe fabbricare evidenza di una verifica che nessuno ha fatto, che e' un difetto peggiore di quello che stiamo correggendo.",
+            "checked": false
+          }
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-13T10:17:45Z",
+      "updated_at": "2026-08-13T10:17:45Z"
     }
   ]
 }
