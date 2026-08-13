@@ -206,6 +206,94 @@ un `status-cli` con output compatto. E l'80% che non ha bisogno del live è esat
 export statico serve **meglio** di un server. **Il board come servizio resta senza nessuno dei due
 usi da coprire.**
 
+### La statusline: harness stampa una riga, l'ospite la mostra
+
+Il confine è tutto qui, e rende la portabilità un non-problema: **harness non implementa una
+statusline, implementa un comando che stampa una riga.** Il resto è configurazione dell'ospite, e
+non è codice di harness.
+
+| Ospite | Cosa serve |
+|---|---|
+| Claude Code | `statusLine` in `settings.json` → il comando |
+| tmux | `set -g status-right '#(node … --oneline)'` |
+| starship | un modulo `custom`, ~4 righe di TOML |
+| bash/zsh `PS1`, PowerShell `prompt` | una chiamata nella funzione di prompt |
+| ovunque, senza integrazione | `watch -n 5 node status-cli.mjs --oneline` in un pannello |
+
+È la stessa architettura del resto — CLI più documenti — cioè quella che `AGENTS.md` dichiara già
+come strategia di portabilità. Staccarsi da Claude Code non costa niente perché non ci si è mai
+attaccati.
+
+**Eccezione deliberata al contratto di output, da motivare dove il contratto vive.** Il resto della
+CLI risponde «una riga JSON, exit 1 sull'errore». Un comando da statusline deve fare l'opposto:
+gira di continuo, e un errore ripetuto a ogni refresh è peggio del silenzio. Quindi `--oneline`
+stampa **testo semplice senza ANSI** di default, **esce sempre 0**, degrada a riga vuota su
+qualunque problema e non tocca mai stderr. Senza questa riga scritta, qualcuno lo "aggiusterà"
+riportandolo al contratto generale.
+
+### Mermaid non copre l'80%. Il markdown sì
+
+Mermaid disegna grafi ed è pessimo con la prosa: le etichette dei nodi sono corte, e una
+`description` o dei `validation.criteria` dentro un nodo sono illeggibili. L'uso principale
+dichiarato è **leggere testo**, quindi Mermaid da solo non sostituisce niente.
+
+Il markdown invece sì: il dettaglio di una issue — titolo, stato, tier, descrizione, criteri, task
+con le spunte — *è* un documento markdown. La ripartizione corretta è a tre:
+
+| Bisogno | Formato | Chi renderizza |
+|---|---|---|
+| Conteggi live (20%) | una riga di testo | statusline, tmux, prompt |
+| Grafo e catene | Mermaid `flowchart` | GitHub, GitLab, Obsidian, artifact |
+| Dettaglio issue (80%) | Markdown | qualunque viewer, e qualunque agente |
+
+**Il grafo è un guadagno, non un pareggio.** Oggi `renderDependsOn` mostra le dipendenze come lista
+su una card: **il grafo non lo disegna nessuno**. Mermaid renderebbe visibile per la prima volta la
+regola 1-WIP, che è calcolata da 111 righe e mai mostrata come tale.
+
+**`board.html` rompe il criterio 3 e nessuno se n'era accorto.** Carica tre dipendenze a runtime —
+`cdn.tailwindcss.com`, `daisyui@4.12.10` da jsDelivr e **`lucide@latest` da unpkg, non pinnato**.
+Il board non funziona offline, e il suo aspetto può cambiare senza un commit. È l'unico componente
+di harness che dipende dalla rete.
+
+### Se un domani l'export lo consuma un sito statico
+
+Direzione scelta dal committente: **opzione A (markdown + Mermaid)**, condizionata al fatto che
+resti aperta la strada di un generatore statico separato (AstroJS o simile) che li renderizzi
+meglio e ci aggiunga altro. È fattibile, ma **impone come si scrive l'export adesso**: un export
+nato «carino» non è consumabile, uno nato «dato» sì.
+
+I vincoli, che vanno decisi ora e non dopo:
+
+- **Un file per issue**, non un documento unico. È la forma che una content collection si aspetta,
+  ed è anche quella che rende leggibile un `git diff` dell'export.
+- **Frontmatter = il record, non un riassunto.** `id`, `status`, `tier`, `depends_on`, `covers`,
+  `tasks`, `validation` come YAML strutturato — array e oggetti annidati, non stringhe. È il
+  criterio 1 applicato alla proiezione: se il frontmatter appiattisce, il sito dovrà riparsare.
+- **Il corpo porta solo la prosa**, più criteri e task resi leggibili per i viewer stupidi. Il sito
+  userà il frontmatter e ignorerà il corpo.
+- **Mai semantica nella formattazione.** `status: blocked` nel frontmatter, non testo rosso in
+  grassetto: il renderer decide come mostrarlo.
+- **Slug stabili** derivati dall'`id`, perché diventano URL.
+- **`schema_version` nell'indice.** Harness ce l'ha già: l'export lo porta e il sito ci si pinna
+  contro, esattamente come fa l'archivio di `--compact`.
+- **Il blocco Mermaid è una comodità per i viewer stupidi**, non la fonte: un sito rigenera il
+  grafo dal frontmatter e lo rende cliccabile. Va scritto sapendo che verrà ignorato.
+- **Id corti nel diagramma.** I GUID rendono il grafo illeggibile: servono alias brevi e stabili.
+- **Il grafo va limitato per default alle issue non chiuse.** Questo repository ha superato le 88
+  issue: un flowchart di 88 nodi è rumore, non informazione. Una catena per sottografo.
+
+*Conseguenza notevole:* la forma che ne esce — markdown con frontmatter strutturato — è quella di
+Backlog.md, ma **senza il suo difetto**: i criteri restano dato nel frontmatter invece di diventare
+checkbox dentro un commento HTML. Harness otterrebbe la compatibilità con il tooling markdown
+esistente (Obsidian, content collection, estensioni frontmatter) **come proiezione, non come
+migrazione**, tenendosi `issues.json` come fonte. È l'unico punto emerso finora in cui si prende
+l'interoperabilità senza cedere il criterio 1.
+
+*Un sito Astro, concretamente:* content collection con schema `zod` che rispecchia lo schema della
+issue — il che regala una **validazione in build** che oggi non c'è — e Mermaid renderizzato a
+build time in SVG (`rehype-mermaid`) invece che con JS sulla pagina. Vive in un progetto separato:
+harness emette, il sito consuma, e il contratto fra i due è il frontmatter versionato.
+
 ## 3. La rubrica
 
 I criteri con cui giudicare qualunque candidato, oggi e ai giri successivi. I primi tre sono
@@ -443,8 +531,10 @@ constatazione che il campo dei sostituti è più stretto di quanto sembrasse.
 - La statusline: che cosa ci sta davvero in una riga, e `status-cli` cresce di un flag o di un
   comando? Il refresh avviene al confine di turno, non in continuo — coincide con l'unico momento
   in cui i conteggi cambiano davvero (una mutazione del tracker), ma va confermato sull'uso reale.
-- L'export statico: un HTML autocontenuto (conserva `board.html`, che è lavoro appena fatto) o
-  markdown + Mermaid (renderizzato da altri, ma perde il layout)? I due non si escludono.
+- L'export markdown va committato o generato in una directory ignorata? Committarlo dà uno storico
+  leggibile in `git diff`, ma duplica `issues.json` nel repository e produce rumore a ogni giro.
+- Il generatore statico separato: quando, e in che repository? Non è lavoro di harness, ma il
+  formato dell'export va deciso **prima**, non dopo.
 - Cosa si perde cancellando il servizio: aggiornamento live del *dettaglio*, filtri, ricerca,
   espansione dei task. Il committente ha dichiarato che il dettaglio non gli serve live — resta da
   verificare se filtri e ricerca pesino.
