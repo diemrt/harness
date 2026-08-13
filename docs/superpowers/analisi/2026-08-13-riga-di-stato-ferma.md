@@ -174,10 +174,12 @@ meno, è **l'unica informazione vera presente sulla riga**.
 La causa a monte non è di harness e non è riparabile da qui. Quello che era riparabile è il fatto
 che **non ci fosse modo di accorgersene**, e le tre cose seguite sono tutte lì:
 
-1. **La riga chiude con l'ora del render**, non solo con l'età: `3m 12s @ 16:34:50`. L'età si
-   smaschera solo guardandola cambiare; l'ora si confronta con un orologio che chi guarda ha già,
-   in un colpo d'occhio e senza aspettare. Funziona perché il comando non ha cache — l'istante del
-   render *è* la freschezza dei conteggi.
+1. **La riga chiude con l'ora del render**: `T @ 16:34:50`. L'età si smaschera solo guardandola
+   cambiare; l'ora si confronta con un orologio che chi guarda ha già, in un colpo d'occhio e
+   senza aspettare. Funziona perché il comando non ha cache — l'istante del render *è* la
+   freschezza dei conteggi. Per qualche ora la coda ha portato tutte e due (`3m 12s @ 16:34:50`);
+   poi l'età è stata tolta, perché chiedeva il secondo sguardo che l'ora aveva appena reso
+   inutile.
 2. **Il pannello `watch` diventa la rete di sicurezza** in
    [references/status.md](../../../skills/harness/references/status.md), invece di essere la terza
    ricetta alla pari: è un processo dell'utente, e sopravvive a un ospite congelato.
@@ -190,8 +192,13 @@ frase che insegnava a considerare innocua una riga ferma.
 
 ### Nota sull'età, che qui si è misurata da sola
 
-Durante il blocco la riga mostrava `2m 43s` fermo. È il limite dichiarato della feature — un'età
-congelata somiglia a un dato — ed è anche la sua difesa: senza l'età la riga avrebbe detto
-`7 backlog | 12 chiuse`, indistinguibile da un dato corretto **per sempre**. Con l'età bastano
-quindici secondi di osservazione per sapere che è morta. Il costo di riconoscerla passa da
-«impossibile» a «due sguardi».
+Durante il blocco la riga mostrava `2m 43s` fermo, ed è l'unica cosa che l'ha smascherata: senza,
+avrebbe detto `7 backlog | 12 chiuse`, indistinguibile da un dato corretto **per sempre**. Il
+costo di riconoscerla passava da «impossibile» a «due sguardi», ed è da qui che è nata l'idea che
+la coda debba dire *quando*.
+
+Non è però il motivo per cui l'età è rimasta, perché **non è rimasta**. La proprietà che qui la
+salva — un'età congelata si riconosce guardandola non muoversi — chiede appunto due sguardi a
+quindici secondi di distanza, e l'ora del render ne chiede uno solo. Fatto il confronto, la coda
+ha tenuto solo l'ora: la decisione e la sua ragione stanno in
+[references/status.md](../../../skills/harness/references/status.md).
