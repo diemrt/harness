@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-13T13:03:32Z",
+  "last_updated": "2026-08-13T13:39:00Z",
   "rules": {
     "single_active_issue": false
   },
@@ -936,6 +936,205 @@
       },
       "created_at": "2026-08-13T10:55:22Z",
       "updated_at": "2026-08-13T13:03:32Z"
+    },
+    {
+      "id": "6a0ee313-df2e-4899-bdc3-3dcc1132836e",
+      "title": "L'eta' del tracker nella riga di stato, e come agganciarla",
+      "description": "La riga di stato non dice se e' viva. Il comando rilegge issues.json a ogni esecuzione e non ha cache, quindi se gira e' allineato per costruzione: l'unico disallineamento possibile e' non girare. Ma una riga ferma e una riga aggiornata che mostra lo stesso valore sono indistinguibili, e il 2026-08-13 il committente ha guardato per minuti una riga morta credendola aggiornata.\n\nServe un battito che sia anche informazione: l'eta' di last_updated in coda alla riga. Formato 12s, poi 3m 12s, poi 1h 2m 12s - i secondi restano sempre, altrimenti sopra il minuto il battito si ferma per sessanta secondi e non si distingue piu' da una riga morta. Appena il tracker viene scritto torna a 0s, ed e' la conferma che la modifica e' atterrata.\n\nNello stesso giro la sezione sugli ospiti di references/status.md diventa un vero 'come lo agganci al tuo progetto': oggi le ricette ci sono ma abbozzate, e chi installa harness deve ricordarsele.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [],
+      "covers": [],
+      "tasks": [],
+      "validation": {
+        "criteria": [
+          "renderOneline chiude la riga con l'eta' di last_updated nei tre scaglioni: 12s, 3m 12s, 1h 2m 12s - i secondi non spariscono mai",
+          "se last_updated manca o non e' una data valida l'eta' non compare affatto: nessun punto interrogativo, nessun segnaposto",
+          "la riga resta dentro [\\x20-\\x7e] con e senza eta', e --color continua a non emettere ANSI quando non e' passato",
+          "un test di processo mostra l'eta' crescere fra due letture separate da un'attesa",
+          "references/status.md documenta l'eta' come battito e come conferma che una modifica e' atterrata",
+          "references/status.md porta le ricette d'aggancio per statusLine di Claude Code, tmux e watch, ognuna copiabile senza modifiche oltre ai path",
+          "npm test e' verde"
+        ],
+        "tasks": [
+          {
+            "id": 1,
+            "short_title": "L'eta' nei tre scaglioni, secondi sempre presenti",
+            "full_description": "12s sotto il minuto, 3m 12s sotto l'ora, 1h 2m 12s oltre. I secondi restano in tutti e tre: senza, sopra il minuto il battito si ferma e non si distingue da una riga morta.",
+            "checked": false
+          },
+          {
+            "id": 2,
+            "short_title": "last_updated assente non produce segnaposto",
+            "full_description": "Coerente con le parentesi dei task: quando non c'e' niente da dire non si occupa spazio per dirlo.",
+            "checked": false
+          },
+          {
+            "id": 3,
+            "short_title": "Il contratto ASCII e opt-in regge",
+            "full_description": "L'aggiunta non deve incrinare i criteri gia' verificati di b2c59231 e 38eb7b1a: solo ASCII di default, ANSI solo con --color.",
+            "checked": false
+          },
+          {
+            "id": 4,
+            "short_title": "Un test vede l'eta' crescere",
+            "full_description": "Due letture del processo separate da un'attesa, e la seconda mostra un'eta' maggiore. E' il test che dimostra il battito, non solo il formato.",
+            "checked": false
+          },
+          {
+            "id": 5,
+            "short_title": "La documentazione dell'eta'",
+            "full_description": "references/status.md spiega che l'eta' e' battito e informazione insieme, e come si legge quando si sospetta una riga morta.",
+            "checked": false
+          },
+          {
+            "id": 6,
+            "short_title": "Le ricette d'aggancio, complete",
+            "full_description": "statusLine di Claude Code, tmux status-right, watch in un pannello. Copiabili senza modifiche oltre ai path, cosi' chi installa harness non deve ricordarsele.",
+            "checked": false
+          },
+          {
+            "id": 7,
+            "short_title": "Suite verde",
+            "full_description": "npm test verde, che e' anche il gate di .harness/config.json.",
+            "checked": false
+          }
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-13T13:39:00Z",
+      "updated_at": "2026-08-13T13:39:00Z"
+    },
+    {
+      "id": "f57521cb-3a57-4c45-a029-4fa608c23d98",
+      "title": "La skill sa dove sono i propri script invece di indovinarli",
+      "description": "Le reference definiscono $SCRIPTS come ${CLAUDE_PLUGIN_ROOT}/scripts, ma CLAUDE_PLUGIN_ROOT non e' una variabile d'ambiente: non esiste nel processo shell. Claude Code la sostituisce nei file dentro commands/, e li' funziona; nella skill, nelle reference e nell'agent resta testo. L'agente che le legge non puo' espanderla, e ripiega sull'unica cosa che conosce - il path letterale del progetto in cui si trova harness.\n\nIl danno si vede negli altri progetti: comandi con un path assoluto scritto a mano. E il path del plugin installato contiene la versione (.claude/plugins/cache/<owner>/harness/<versione>/), quindi ogni rilascio lo cambia e il path scritto a mano continua a puntare a una copia vecchia che esiste ancora - un errore silenzioso.\n\nLa ricetta esiste gia' e non era stata vista: il tool Skill annuncia la propria base directory quando la skill viene invocata. $SCRIPTS e' <base della skill>/../../scripts, e vale identico per plugin installato, repo clonato e documenti letti da una CLI esterna. AGENTS.md lo dice gia' a meta', ma solo al worker esterno.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [
+        "bfb0a23f-50ff-4e44-873e-585b1bcedbd8"
+      ],
+      "covers": [],
+      "tasks": [],
+      "validation": {
+        "criteria": [
+          "SKILL.md, dove definisce $SCRIPTS, dice come si calcola: la base directory annunciata dal tool Skill, piu' ../../scripts",
+          "SKILL.md vieta esplicitamente di inventare un path o di riusarne uno assoluto visto altrove",
+          "agents/harness-verifier.md porta la stessa regola: anche lui usa ${CLAUDE_PLUGIN_ROOT} in comandi che qualcuno deve risolvere",
+          "esiste una sezione marcata come consiglio su richiesta, non come passo, su come installare harness perche' i comandi siano raggiungibili",
+          "un test asserisce che la regola di risoluzione e' presente in SKILL.md e nell'agent, ancorato alla frase e non alla sola parola path",
+          "nessuno script viene modificato: git diff --stat non nomina scripts/",
+          "npm test e' verde"
+        ],
+        "tasks": [
+          {
+            "id": 1,
+            "short_title": "La regola di risoluzione in SKILL.md",
+            "full_description": "Accanto alla definizione di $SCRIPTS: la base directory annunciata dal tool Skill piu' ../../scripts. Non cambia l'interfaccia, aggiunge come si calcola.",
+            "checked": false
+          },
+          {
+            "id": 2,
+            "short_title": "Il divieto di indovinare",
+            "full_description": "Scritto che un path assoluto visto in un'altra sessione o in un altro progetto non e' una risposta: punta a una copia che puo' essere di un'altra versione.",
+            "checked": false
+          },
+          {
+            "id": 3,
+            "short_title": "La stessa regola nell'agent",
+            "full_description": "agents/harness-verifier.md mostra comandi con ${CLAUDE_PLUGIN_ROOT} e nessuno gli dice come risolverlo.",
+            "checked": false
+          },
+          {
+            "id": 4,
+            "short_title": "Il consiglio d'installazione, su richiesta",
+            "full_description": "Una sezione breve e marcata come consiglio: serve perche' l'agente abbia una risposta invece di improvvisarne una, non perche' l'installazione sia un passo del workflow.",
+            "checked": false
+          },
+          {
+            "id": 5,
+            "short_title": "Un test difende la regola",
+            "full_description": "Ancorato alla frase come gia' fanno i test dell'agent: un test sulla parola path passerebbe anche con la regola cancellata.",
+            "checked": false
+          },
+          {
+            "id": 6,
+            "short_title": "Nessuno script toccato",
+            "full_description": "E' un lavoro documentale: git diff --stat non deve nominare scripts/.",
+            "checked": false
+          },
+          {
+            "id": 7,
+            "short_title": "Suite verde",
+            "full_description": "npm test verde.",
+            "checked": false
+          }
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-13T13:39:00Z",
+      "updated_at": "2026-08-13T13:39:00Z"
+    },
+    {
+      "id": "24f39ab4-6401-434c-a780-506d13c498d8",
+      "title": "Il plugin pubblicato e il repository sono divergenti",
+      "description": "La copia installata in .claude/plugins/cache/diemrt/harness/0.6.0/ contiene hooks/, src/, template/, init.mjs, issues.html e .harness-manifest.json: componenti che questo repository non ha piu'. Dichiara la stessa versione del repository, 0.6.0, e ha un contenuto diverso.\n\nChi usa harness in un altro progetto sta quindi eseguendo un issue-manager.mjs diverso da quello che qui viene corretto e verificato. E' costoso e invisibile nella forma peggiore: non fallisce, funziona - solo su un'altra versione del codice, contro un issues.json scritto secondo uno schema che quella copia potrebbe non conoscere. Nessun test lo vede, perche' la suite gira sul repository e non sulla copia pubblicata.\n\nVa indagato prima che corretto: non e' noto se la causa sia il ref che la marketplace pubblica, una versione mai incrementata, o un rilascio fatto da uno stato di lavoro diverso. Il committente chiede un'indagine condotta con le skill superpowers, non una toppa.",
+      "status": "backlog",
+      "tier": "reasoning",
+      "depends_on": [],
+      "covers": [],
+      "tasks": [],
+      "validation": {
+        "criteria": [
+          "un documento in docs/ nomina la causa della divergenza con le prove: quale riferimento viene pubblicato e quale stato ha il repository",
+          "il documento cita comandi rieseguibili da chiunque, cosi' la constatazione si puo' riprodurre invece di doverla credere",
+          "esiste un controllo o un passo che impedisce alla divergenza di ripetersi, scritto dove chi rilascia lo legge",
+          "la copia che un utente installa dopo il rimedio porta gli stessi componenti del repository: niente hooks/, src/, template/, init.mjs, issues.html",
+          "e' scritto cosa deve fare chi ha gia' una copia divergente installata, perche' non se ne accorgerebbe da solo",
+          "npm test e' verde"
+        ],
+        "tasks": [
+          {
+            "id": 1,
+            "short_title": "Indagine sulla causa, non sul sintomo",
+            "full_description": "Capire da dove viene la copia pubblicata: marketplace.json, il ref che dichiara, la storia dei rilasci. Condotta con le skill superpowers come chiesto dal committente, non a intuito.",
+            "checked": false
+          },
+          {
+            "id": 2,
+            "short_title": "Le prove sono riproducibili",
+            "full_description": "Il documento porta i comandi che chiunque puo' rieseguire per vedere la divergenza con i propri occhi.",
+            "checked": false
+          },
+          {
+            "id": 3,
+            "short_title": "Una guardia contro il ripetersi",
+            "full_description": "Un controllo eseguibile o un passo di rilascio, scritto dove chi rilascia lo legge - non in un documento che nessuno riapre.",
+            "checked": false
+          },
+          {
+            "id": 4,
+            "short_title": "La copia pubblicata torna allineata",
+            "full_description": "Dopo il rimedio, un'installazione pulita porta gli stessi componenti del repository.",
+            "checked": false
+          },
+          {
+            "id": 5,
+            "short_title": "Chi ha gia' la copia sbagliata",
+            "full_description": "Scritto cosa deve fare: da solo non se ne accorge, perche' la copia divergente funziona.",
+            "checked": false
+          },
+          {
+            "id": 6,
+            "short_title": "Suite verde",
+            "full_description": "npm test verde.",
+            "checked": false
+          }
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-13T13:39:00Z",
+      "updated_at": "2026-08-13T13:39:00Z"
     }
   ]
 }
