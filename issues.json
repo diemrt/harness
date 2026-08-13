@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-13T15:26:29Z",
+  "last_updated": "2026-08-13T15:38:41Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1276,7 +1276,7 @@
       "id": "90a882a6-71a4-4739-bdb3-a71ddc4e0e3f",
       "title": "La coda della riga di stato e' 'T @ orario', l'eta' sparisce",
       "description": "La riga di --oneline chiude con \"3m 12s @ 16:34:50\": l'eta' del tracker piu' l'orario del render. L'eta' non serve a chi legge — dice quanto fa che il tracker e' stato scritto, che e' una domanda che nessuno si pone guardando una status bar. L'orario del render risponde da solo alla domanda vera, cioe' se la riga e' viva o congelata, e lo fa in una lettura sola contro un orologio che il lettore ha gia'.\n\nLa coda diventa \"T @ 16:34:50\", sempre, senza rami: la T e' l'etichetta abbreviata dell'orario. Cade il ramo che oggi sceglie fra coda con eta' e coda senza, e con lui cade il motivo per cui renderOneline riceve lastUpdated.\n\nSi rimuove quindi anche cio' che l'eta' si portava dietro: la funzione formatAge, l'opzione lastUpdated di renderOneline, il passaggio di data.last_updated in onelineFor, i test di formatAge e il testo di USAGE che promette la vecchia forma. Lasciarli sarebbe codice morto esportato e testato, cioe' un contratto che nessuno onora piu'.\n\nResta invariato tutto il resto della riga: conteggi, parentesi dei task, marcatore ! delle allerte, riga vuota su tracker vuoto, ASCII puro e nessun ANSI senza --color.",
-      "status": "in_progress",
+      "status": "done",
       "tier": "standard",
       "depends_on": [],
       "covers": [],
@@ -1313,45 +1313,121 @@
         }
       ],
       "validation": {
-        "criteria": [
-          "renderOneline({counts:{in_progress:1,done:9},alerts:[]},{now}) torna una riga che finisce con 'T @ HH:mm:ss' e non contiene nessuna eta' (nessun match di /\\d+[hms]/ nella coda)",
-          "La coda e' identica passando o non passando lastUpdated: nessun ramo residuo la reintroduce; l'opzione lastUpdated non e' piu' nella firma di renderOneline",
-          "formatAge non esiste piu' in scripts/status-cli.mjs e nessun file di scripts/ o test/ la nomina",
-          "Il testo di USAGE per --oneline descrive la coda come 'T @ 16:34:50' e non nomina piu' l'eta' del tracker",
-          "npm run test esce 0: i test di formatAge sono rimossi, quelli della coda asseriscono la forma nuova, e restano verdi i test su ASCII, assenza di ANSI e riga vuota su tracker vuoto",
-          "node scripts/status-cli.mjs --oneline su questo repository stampa una riga che termina con 'T @ ' seguito da HH:mm:ss",
-          "Sotto --color la coda resta grigia e togliendo gli escape si riottiene esattamente la riga in chiaro"
-        ],
+        "criteria": "Verifica indipendente sul commit acb9885 (main), gate .harness/config.json \"npm run test\": tests 408, pass 408, fail 0, duration_ms 26471; seconda esecuzione con exit code catturato = 0. (1) Coda senza eta: probe in scratchpad che importa scripts/status-cli.mjs, renderOneline({counts:{in_progress:1,done:9},alerts:[]},{now: 2026-08-13 16:34:50 locale}) rende \"1 in corso | 9 chiuse | T @ 16:34:50\"; coda estratta \"T @ 16:34:50\", test sul pattern ancorato \"T @ due cifre:due cifre:due cifre\" = true, test sul pattern di durata (una o piu cifre seguite da h, m o s) = false. (2) Nessun ramo residuo: firma stampata a runtime \"function renderOneline(snapshot, { color = false, now = Date.now() } = {})\" — lastUpdated non e piu nella firma (scripts/status-cli.mjs:294) e il tail e incondizionato a :316, \"T @ \" piu formatClock(now); passando lastUpdated \"2026-08-13T11:56:48.000Z\" oppure lastUpdated null la riga e identica (confronto di identita true in entrambi i casi). onelineFor a :370 chiama renderOneline(buildSnapshot(issues), { color }), senza data.last_updated. (3) formatAge: Select-String \"formatAge\" su scripts e test = zero occorrenze; Object.keys del modulo = BAR_INNER,BAR_ORDER,IN_FLIGHT_ORDER,ONELINE_COLOR,ONELINE_LABEL,ONELINE_ORDER,STATUS_ICON,TASKS_COL,TIER_ICON,TITLE_MAX,WIDTH,WORKABLE_SHOWN,buildSnapshot,formatClock,renderOneline,renderSnapshot,shortId,taskProgress, e (\"formatAge\" in mod) = false. Le occorrenze residue di lastUpdated in scripts e test appartengono a renderSnapshot e formatWhen (status-cli.mjs:116-118, 238, 245, 433 e i test di renderSnapshot), cioe la vista a schermo intero, fuori dai criteri. (4) USAGE: node scripts/status-cli.mjs --help stampa \"closes with T @ 16:34:50: the local time of this render, and nothing else\" (scripts/status-cli.mjs:332-335), senza piu alcuna menzione dell eta del tracker ne della forma \"3m 12s\". (5) Test: i sei test di formatAge sono rimossi nel diff del commit; i sostituti asseriscono la forma nuova (test/plugin-status-cli.test.mjs:935-947, coda \"T @ HH:mm:ss\" con assert.doesNotMatch sul pattern di durata; :957-965, stessa riga qualunque cosa passi il chiamante), e restano verdi ASCII (:973-982), assenza di ANSI di default (:988) e riga vuota su tracker vuoto (:967-971). (6) Smoke sul repository: node scripts/status-cli.mjs --oneline rende \"1 in verifica [5/5] | 6 backlog | 13 chiuse | T @ 17:29:49\", il pattern in coda \"T @ due cifre:due cifre:due cifre\" combacia, nessuna eta. (7) Colore: renderOneline con color:true rende ESC[36m1 in corso ESC[0m | ESC[32m9 chiuse ESC[0m | ESC[90mT @ 16:34:50 ESC[0m (ESC = byte 0x1b; nell output reale non ci sono spazi attorno agli escape): la coda porta SGR 90, il grigio, e rimuovendo tutti gli escape SGR si riottiene esattamente la riga in chiaro (confronto di identita true). Danni collaterali: il commit tocca solo scripts/status-cli.mjs, test/plugin-status-cli.test.mjs e il record di questa issue in issues.json (unico id presente nelle hunk); git status --short mostra solo \" M issues.json\", il passaggio a in_review. Nessun segreto nel diff; il probe e stato eseguito in scratchpad, il tracker reale non e stato scritto se non da questa chiusura. Osservazione fuori scope, non bloccante: skills/harness/references/status.md:91-99 e 125-138 documentano ancora la coda \"3m 12s @ 16:34:50\" e i tre scaglioni dell eta, ora disallineati dal comportamento; nessun criterio nomina quel file.",
         "tasks": [
           {
             "id": 1,
             "short_title": "La coda e' sempre 'T @ orario'",
-            "full_description": "renderOneline chiude la riga con `T @ ${clock}` in ogni caso, senza il ternario sull'eta'. Il resto della riga (conteggi, parentesi dei task, marcatore !, riga vuota su tracker vuoto) non cambia.",
-            "checked": false
+            "full_description": "renderOneline chiude la riga con T @ clock in ogni caso, senza il ternario sull'eta'. Il resto della riga (conteggi, parentesi dei task, marcatore !, riga vuota su tracker vuoto) non cambia.",
+            "checked": true
           },
           {
             "id": 2,
             "short_title": "Niente eta' residua nel codice",
             "full_description": "formatAge rimossa, opzione lastUpdated tolta dalla firma di renderOneline, onelineFor non legge piu' data.last_updated. Un grep di formatAge e lastUpdated su scripts/ e test/ non trova nulla.",
-            "checked": false
+            "checked": true
           },
           {
             "id": 3,
             "short_title": "USAGE aggiornata",
             "full_description": "La riga di USAGE che descrive --oneline promette 'T @ 16:34:50' e non piu' '3m 12s @ 16:34:50', e non parla piu' di quanto fa che il tracker e' stato scritto.",
-            "checked": false
+            "checked": true
           },
           {
             "id": 4,
             "short_title": "Test allineati e verde",
             "full_description": "I test di formatAge spariscono, i test della coda asseriscono 'T @ HH:mm:ss' anche con lastUpdated assente, e npm run test esce 0.",
+            "checked": true
+          }
+        ],
+        "state": "pass"
+      },
+      "created_at": "2026-08-13T15:21:32Z",
+      "updated_at": "2026-08-13T15:33:45Z"
+    },
+    {
+      "id": "a6f38a91-e7fe-415b-907d-9c524a368952",
+      "title": "status.md descrive ancora l'eta' del tracker in coda alla riga",
+      "description": "skills/harness/references/status.md promette una coda che il comando non stampa piu'. Gli esempi mostrano \"12s @ 16:34:50\" e \"1h 2m 12s @ 16:34:50\", il capitolo \"La coda della riga\" spiega due dati invece di uno, e un intero capitolo (\"L'eta' del tracker\", con la tabella dei tre scaglioni e il ritorno a 0s come ricevuta di scrittura) descrive un campo rimosso. Chi legge la reference prima di guardare l'output impara una cosa falsa.\n\nCopre due commit che il gate documentale segnala scoperti. In acb9885 la coda e' diventata \"T @ 16:34:50\" e l'eta' e' sparita dal codice; in 995a502 era nata l'ora del render, e la sua parte di status.md era stata scritta nello stesso commit senza che nessuna issue la dichiarasse. Il capitolo si riscrive una volta sola e chiude entrambi.\n\nQuello che resta vero non si tocca: il capitolo sull'ora del render regge parola per parola, tolto il riferimento all'eta' che si congela con la riga. I documenti sotto docs/superpowers/ (referto, spec, piano) restano com'erano: registrano decisioni prese in un momento, non sono reference da mantenere allineata.",
+      "status": "in_progress",
+      "tier": "economy",
+      "depends_on": [],
+      "covers": [
+        "acb9885",
+        "995a502"
+      ],
+      "tasks": [
+        {
+          "id": 1,
+          "short_title": "Esempi della riga e paragrafo sotto",
+          "full_description": "In skills/harness/references/status.md, capitolo '--oneline': le due righe di esempio finiscono con 'T @ 16:34:50', e il paragrafo che le segue dice che in coda c'e' l'ora di questa lettura, non piu' da quanto il tracker non viene scritto.",
+          "checked": true
+        },
+        {
+          "id": 2,
+          "short_title": "Titolo e corpo del capitolo coda",
+          "full_description": "'### La coda della riga: 3m 12s @ 16:34:50' diventa '### La coda della riga: T @ 16:34:50'. Il corpo spiega un dato solo — l'istante del render — e perche' non ha rami: 'adesso' e' sempre conoscibile. Via i due paragrafi sui due dati e sul last_updated mancante.",
+          "checked": true
+        },
+        {
+          "id": 3,
+          "short_title": "Rimuovere il capitolo dell'eta'",
+          "full_description": "Cancellare per intero \"#### L'eta' del tracker\" (righe ~125-149): tabella dei tre scaglioni, secondi che non spariscono, eta' che misura il tracker, ritorno a 0s come ricevuta.",
+          "checked": true
+        },
+        {
+          "id": 4,
+          "short_title": "Ripulire il riferimento all'eta' congelata",
+          "full_description": "Nel capitolo sull'ora del render, la frase 'tutta la riga si congela, eta' compresa' e il paragrafo che smaschera un'eta' ferma vanno riscritti senza nominare l'eta'. Idem la riga di --color che descriveva la coda come 'eta' e ora insieme'. Il resto dei capitoli resta intatto.",
+          "checked": true
+        },
+        {
+          "id": 5,
+          "short_title": "Gate, test e coerenza degli esempi",
+          "full_description": "node scripts/docs-gate.mjs non elenca piu' acb9885 ne' 995a502; npm run test esce 0; gli esempi in status.md coincidono con l'output reale di node scripts/status-cli.mjs --oneline.",
+          "checked": true
+        }
+      ],
+      "validation": {
+        "criteria": [
+          "In skills/harness/references/status.md nessuna occorrenza di '12s @', '3m 12s' o '1h 2m 12s': gli esempi di --oneline mostrano la coda 'T @ 16:34:50'",
+          "Il capitolo 'La coda della riga' ha per titolo la forma nuova e descrive un solo dato, l'ora del render, senza promettere che manchi quando manca last_updated",
+          "Il capitolo \"L'eta' del tracker\" con la tabella dei tre scaglioni non esiste piu' nel file",
+          "Il capitolo sull'ora del render e la misura del 2026-08-13 sono ancora nel file, senza piu' il riferimento all'eta' che si congela insieme alla riga",
+          "Gli esempi di riga in status.md coincidono con quello che il comando stampa davvero: verificabile eseguendo node scripts/status-cli.mjs --oneline",
+          "node scripts/docs-gate.mjs non elenca piu' acb9885 ne' 995a502 fra i commit non coperti",
+          "npm run test esce 0"
+        ],
+        "tasks": [
+          {
+            "id": 1,
+            "short_title": "Esempi e prosa di --oneline",
+            "full_description": "Le due righe di esempio del capitolo --oneline e il paragrafo che le segue parlano della sola ora della lettura, non piu' di 'da quanto il tracker non viene scritto'.",
+            "checked": false
+          },
+          {
+            "id": 2,
+            "short_title": "Capitolo della coda riscritto",
+            "full_description": "'### La coda della riga' porta il titolo 'T @ 16:34:50' e spiega un dato solo: l'istante del render, che c'e' sempre perche' 'adesso' e' sempre conoscibile. Via il paragrafo dei due dati attaccati dalla @.",
+            "checked": false
+          },
+          {
+            "id": 3,
+            "short_title": "Via il capitolo dell'eta'",
+            "full_description": "Rimosso per intero \"#### L'eta' del tracker\": tabella dei tre scaglioni, secondi che non spariscono, eta' che misura il tracker, ritorno a 0s come ricevuta.",
+            "checked": false
+          },
+          {
+            "id": 4,
+            "short_title": "Gate e test",
+            "full_description": "node scripts/docs-gate.mjs non elenca piu' i due commit, e npm run test esce 0.",
             "checked": false
           }
         ],
         "state": "unknown"
       },
-      "created_at": "2026-08-13T15:21:32Z",
-      "updated_at": "2026-08-13T15:26:29Z"
+      "created_at": "2026-08-13T15:35:48Z",
+      "updated_at": "2026-08-13T15:38:41Z"
     }
   ]
 }

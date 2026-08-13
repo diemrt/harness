@@ -63,15 +63,14 @@ node "$SCRIPTS/status-cli.mjs" --oneline [--color]
 ```
 
 ```
-1 in corso [2/9] | 4 backlog | 12 chiuse | 12s @ 16:34:50
-1 in corso | 1 in verifica | 3 backlog | 9 chiuse ! | 1h 2m 12s @ 16:34:50
+1 in corso [2/9] | 4 backlog | 12 chiuse | T @ 16:34:50
+1 in corso | 1 in verifica | 3 backlog | 9 chiuse ! | T @ 16:34:50
 ```
 
 Una riga sola: i conteggi per stato, gli stati a zero omessi, `!` quando c'è un'allerta — un ciclo
-o una dipendenza che non risolve — e in coda **da quanto il tracker non viene scritto** e **l'ora
-di questa lettura**. Su un tracker vuoto la riga è **vuota**: una barra di stato che dice «zero»
-spende per l'assenza di notizie la riga che le era stata data, e «niente, alle 16:34:50» la spende
-lo stesso.
+o una dipendenza che non risolve — e in coda **l'ora di questa lettura**. Su un tracker vuoto la
+riga è **vuota**: una barra di stato che dice «zero» spende per l'assenza di notizie la riga che le
+era stata data, e «niente, alle 16:34:50» la spende lo stesso.
 
 ### Il conteggio dei task, e quando sparisce
 
@@ -88,15 +87,18 @@ Una issue in volo **senza task** non stampa parentesi: `[-]` occuperebbe spazio 
 c'è niente da dire. E una issue `blocked` da sola non porta il conteggio, perché non è ciò su cui
 si sta lavorando.
 
-### La coda della riga: `3m 12s @ 16:34:50`
+### La coda della riga: `T @ 16:34:50`
 
-Due dati, e rispondono a due domande diverse. **L'età** dice da quanto nessuno scrive sul tracker;
-**l'ora** dice quando questa riga è stata prodotta. L'età è il dato, l'ora dice quando è stato
-preso — che è il motivo per cui stanno attaccate da una `@` invece di essere due campi separati da
-`|`.
+Un dato solo: **l'ora in cui questa riga è stata prodotta**. La `T` è l'etichetta, abbreviata
+perché in una barra di stato la riga è la risorsa scarsa, e l'ora accanto si spiega da sé.
 
-Se `last_updated` manca, resta la sola ora. Il contrario non succede: l'ora c'è sempre, perché
-«adesso» è sempre conoscibile.
+Non ha rami: c'è sempre, su qualunque tracker, perché «adesso» è sempre conoscibile. Niente di
+quello che sta scritto in `issues.json` la cambia.
+
+Per un tratto la coda ha portato anche da quanto il tracker non veniva riscritto. Rispondeva a una
+domanda che nessuno pone a una barra di stato, e per rispondere chiedeva due sguardi — una durata
+va guardata muoversi. Non c'è più, e il capitolo qui sotto è la ragione per cui quella che resta è
+la metà giusta.
 
 #### L'ora del render, e perché è lei a fare il lavoro
 
@@ -105,9 +107,9 @@ con una sonda strumentata — 23 invocazioni regolari, poi **zero per otto minut
 tracker veniva scritto tre volte. Il comando non veniva ucciso a metà: non veniva chiamato. Il
 referto sta in [docs/superpowers/analisi/2026-08-13-riga-di-stato-ferma.md](../../../docs/superpowers/analisi/2026-08-13-riga-di-stato-ferma.md).
 
-Quando succede, **tutta la riga si congela, età compresa**. E un'età ferma somiglia a un dato: per
-smascherarla bisogna guardarla due volte, a quindici secondi di distanza, e sapere già che c'è
-qualcosa da sospettare.
+Quando succede, **tutta la riga si congela**, e ogni campo che si legge in un colpo d'occhio
+somiglia ancora a un dato: per smascherarlo bisognerebbe guardarlo due volte, a quindici secondi di
+distanza, e sapere già che c'è qualcosa da sospettare.
 
 L'ora del render no. Si confronta con l'**orologio che hai già sotto gli occhi**, in un colpo
 d'occhio e senza aspettare: se la riga dice `16:34:50` e sono le 16:45, quella riga è di dieci
@@ -122,44 +124,12 @@ Il caso peggiore, che il 2026-08-13 si è presentato davvero: la riga congelata 
 chiuse. Numeri giusti su una riga morta da dieci minuti. Senza qualcosa che dicesse *quando*,
 nessun numero di sguardi avrebbe potuto rivelarlo.
 
-#### L'età del tracker
-
-In coda alla riga sta anche da quanto tempo `issues.json` è stato scritto l'ultima volta — il campo
-`last_updated`, reso in tre scaglioni:
-
-| età | forma |
-|---|---|
-| sotto il minuto | `12s` |
-| sotto l'ora | `3m 12s` |
-| oltre | `1h 2m 12s` |
-
-**I secondi non spariscono mai**, in nessuno dei tre. Sopra il minuto un'età senza secondi
-resterebbe ferma per sessanta secondi alla volta, e in quei sessanta secondi sarebbe di nuovo
-impossibile distinguerla da un'età congelata.
-
-**L'età non misura la riga: misura il tracker.** Dice da quanto nessuno ci scrive, che è
-un'informazione sul lavoro — «è un'ora che non si muove niente» è una cosa che vale la pena
-sapere. Chi la legge come «quanto è fresca questa riga» le sta chiedendo la domanda dell'ora, e le
-due coincidono soltanto finché l'ospite continua a invocare il comando.
-
-**Il ritorno a `0s` è la conferma che una modifica è atterrata.** Ogni scrittura del tracker
-riporta `last_updated` ad adesso — `issue-manager.mjs` lo aggiorna a ogni `--insert`, `--update`,
-`--delete` — quindi dopo un comando che ha toccato le issue l'età riparte da zero. È una ricevuta
-che non serve chiedere: se il numero non è ripartito, la scrittura non c'è stata. Vale, come tutto
-il resto, **a patto che la riga sia stata rieseguita**: è l'ora accanto a dirlo.
-
-Se `last_updated` manca o non è una data interpretabile, **l'età non compare affatto**: niente
-punto interrogativo, niente segnaposto, e resta la sola ora. È la stessa regola delle parentesi dei
-task — quando non c'è niente da dire non si occupa spazio per dirlo. Un tracker scritto nel futuro
-(orologi disallineati fra chi scrive e chi legge) si legge `0s` invece che con un'età negativa: non
-è una notizia che meriti la riga.
-
 ### `--color`
 
 Aggiunge ANSI: ciano su ciò che si muove, giallo su ciò che aspetta il giudizio di qualcun altro,
 rosso su ciò che è fermo e sul marcatore `!`, grigio sul backlog che nessuno ha ancora toccato,
-verde sulle chiuse. Grigia anche la coda — età e ora insieme, come un blocco solo — ma per
-un'altra ragione: non sono cose contate, sono metadato della lettura, e non devono competere per
+verde sulle chiuse. Grigia anche la coda — etichetta e ora insieme, come un blocco solo — ma per
+un'altra ragione: non è una cosa contata, è metadato della lettura, e non deve competere per
 l'attenzione con il lavoro.
 
 **È opt-in, e resta tale.** Il default non emette un solo byte di escape, perché l'ospite può
