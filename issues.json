@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-13T09:58:56Z",
+  "last_updated": "2026-08-13T10:07:11Z",
   "rules": {
     "single_active_issue": false
   },
@@ -399,13 +399,62 @@
       "id": "b2c59231-709d-469a-8746-1d0b290ee427",
       "title": "--oneline, e il contratto che deve restare invertito",
       "description": "Il 20 per cento dell'uso del board e' guardare i conteggi mentre il lavoro procede, e il motivo dichiarato non e' che serva un board: e' che la CLI non offre un punto fisso da guardare. --oneline e' quella riga.\n\nIl contratto e' l'opposto di quello del resto della CLI: esce sempre 0, non scrive mai su stderr, degrada a riga vuota, e resta dentro ASCII perche' finisce in tmux o in un prompt PowerShell. Gira a ogni refresh di una barra di stato, e un errore ripetuto li' e' peggio del silenzio. La spec nomina il rischio: senza la motivazione scritta dove vive il contratto, qualcuno lo riportera' alla forma generale.\n\nSpec: docs/superpowers/specs/2026-08-13-ergonomia-emessa-design.md\nPiano: docs/superpowers/plans/2026-08-13-ergonomia-emessa.md (task 3, e il passo 3 del task 9)",
-      "status": "backlog",
+      "status": "in_progress",
       "tier": "economy",
       "depends_on": [
         "e6836699-8a91-40c2-9db5-ed544f9eb7fc"
       ],
       "covers": [],
-      "tasks": [],
+      "tasks": [
+        {
+          "id": 1,
+          "short_title": "Test di renderOneline, rosso",
+          "full_description": "In test/plugin-status-cli.test.mjs: ordine di lettura degli stati, stati a zero omessi, ! solo con allerte, riga vuota su tracker vuoto, e nessun carattere fuori da /^[\\x20-\\x7e]*$/. Deve fallire perche' renderOneline non esiste.",
+          "checked": true
+        },
+        {
+          "id": 2,
+          "short_title": "Test di processo su --oneline, rosso",
+          "full_description": "Tre casi con spawnSync su una directory temporanea: tracker assente, tracker malformato, tracker vero. In tutti exit 0 e stderr vuoto. Deve fallire perche' parseArgs e' strict e rifiuta il flag.",
+          "checked": true
+        },
+        {
+          "id": 3,
+          "short_title": "ONELINE_ORDER, ONELINE_LABEL e renderOneline",
+          "full_description": "Costanti accanto a BAR_ORDER: l'ordine e' in_progress, in_review, blocked, backlog, done — NON BAR_ORDER, perche' quella riempie la barra col lavoro chiuso a sinistra mentre questa risponde a 'dove siamo adesso'. Separatore | e non un carattere fuori ASCII.",
+          "checked": true
+        },
+        {
+          "id": 4,
+          "short_title": "Flag cablato in main, prima di resolveProjectDir",
+          "full_description": "Il ramo values.oneline va subito dopo values.help e PRIMA di resolveProjectDir, che chiama fail() e uscirebbe 1. Tutta la degradazione sta in onelineFor(), che cattura ogni errore e torna stringa vuota.",
+          "checked": true
+        },
+        {
+          "id": 5,
+          "short_title": "USAGE aggiornato",
+          "full_description": "Riga d'uso col flag, spiegazione del contratto invertito, e la nota che --oneline esce sempre 0 nella sezione dei codici d'uscita.",
+          "checked": true
+        },
+        {
+          "id": 6,
+          "short_title": "Suite verde",
+          "full_description": "npm test verde su tutta la suite, che e' anche il gate di .harness/config.json.",
+          "checked": true
+        },
+        {
+          "id": 7,
+          "short_title": "references/status.md: la motivazione, non la descrizione",
+          "full_description": "Il criterio 5 chiede il PERCHE': gira a ogni refresh, un errore ripetuto li' e' peggio del silenzio, quindi esce sempre 0 e tace. Piu' gli esempi di configurazione dell'ospite (statusLine di Claude Code e tmux), che sono il punto in cui la portabilita' smette di essere una promessa.",
+          "checked": true
+        },
+        {
+          "id": 8,
+          "short_title": "Commit",
+          "full_description": "git add di scripts/status-cli.mjs, test/plugin-status-cli.test.mjs, skills/harness/references/status.md e issues.json. Allineare i task prima di committare.",
+          "checked": true
+        }
+      ],
       "validation": {
         "criteria": [
           "su una directory senza issues.json: exit 0, stdout vuoto, stderr vuoto",
@@ -449,7 +498,7 @@
         "state": "unknown"
       },
       "created_at": "2026-08-13T09:40:01Z",
-      "updated_at": "2026-08-13T09:40:01Z"
+      "updated_at": "2026-08-13T10:07:11Z"
     },
     {
       "id": "284d96c3-bd3c-4d7d-920d-0e6769dd96a5",

@@ -56,6 +56,71 @@ Un tracker vuoto **non** è un errore: è un progetto che non ha ancora aperto u
 sia quando `issues.json` manca sia quando esiste con `issues: []`, come lo scrive `--init`: in
 entrambi i casi la riga è la stessa e non si stampa né barra né sezioni.
 
+## `--oneline`: il contratto qui si inverte
+
+```bash
+node "$SCRIPTS/status-cli.mjs" --oneline
+```
+
+```
+1 in corso | 2 in verifica | 4 backlog | 12 chiuse
+1 in corso | 3 backlog | 9 chiuse !
+```
+
+Una riga sola: i conteggi per stato, gli stati a zero omessi, e `!` quando c'è un'allerta — un
+ciclo o una dipendenza che non risolve. Su un tracker vuoto la riga è **vuota**: una barra di stato
+che dice «zero» spende per l'assenza di notizie la riga che le era stata data.
+
+L'ordine non è quello della barra. La barra risponde a «quanto è arrivato avanti il progetto» e
+apre col lavoro chiuso; questa riga risponde a «dove siamo adesso», e il lavoro chiuso è la cosa
+meno urgente che ci sta sopra.
+
+**Tutto quello che la tabella qui sopra dice, per `--oneline` non vale.**
+
+| caso | uscita |
+|---|---|
+| qualunque cosa accada | **0**, e mai niente su stderr |
+| `--project-dir` inesistente | 0, riga vuota |
+| `issues.json` illeggibile o non valido | 0, riga vuota |
+
+**Perché**, e non è un dettaglio d'implementazione. Questo comando gira a ogni aggiornamento di una
+barra di stato, cioè di continuo. Un messaggio d'errore ripetuto lì è **peggio del silenzio**:
+occupa la riga che esisteva per mostrare il lavoro, non si può chiudere, e non porta nessuna
+informazione che chi guarda non possa ottenere lanciando il riepilogo intero. Quindi non fallisce
+mai, non scrive mai su stderr, e degrada a riga vuota.
+
+Il separatore è `|` e non `·`: il riepilogo a schermo intero può permettersi caratteri non ASCII
+perché finisce in un blocco di codice markdown, questa riga finisce in una barra di tmux o in un
+prompt PowerShell, dove la codifica non è garantita.
+
+**È un'eccezione deliberata, non una svista da correggere.** Chi la trova e la "sistema"
+riportandola al contratto generale rompe l'unica cosa per cui il flag esiste.
+
+### L'ospite mostra, harness stampa
+
+Harness non implementa una statusline: implementa un comando che stampa una riga. Tutto il resto è
+configurazione dell'ospite, e non è codice di harness — è anche il motivo per cui staccarsi da
+Claude Code non costa niente.
+
+```jsonc
+// .claude/settings.json
+{ "statusLine": { "type": "command", "command": "node \"$SCRIPTS/status-cli.mjs\" --oneline" } }
+```
+
+```bash
+# tmux
+set -g status-right '#(node "$SCRIPTS/status-cli.mjs" --oneline)'
+```
+
+```bash
+# ovunque, senza integrazione: un pannello a fianco
+watch -n 5 node "$SCRIPTS/status-cli.mjs" --oneline
+```
+
+Il refresh avviene quando l'ospite lo chiede — al confine di turno, per la statusline di Claude
+Code. Coincide con l'unico momento in cui i conteggi possono essere cambiati davvero, perché
+cambiano solo quando qualcuno scrive sul tracker.
+
 ## Come si legge l'output
 
 Questo esempio è output reale dello script su un tracker di 17 issue, non un disegno: 6 chiuse,

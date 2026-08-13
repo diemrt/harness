@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import {
   buildSnapshot,
   renderSnapshot,
+  renderOneline,
   STATUS_ICON,
   TIER_ICON,
   WIDTH,
@@ -703,4 +704,92 @@ test("the workable rows carry no count: a backlog issue has no tasks yet, by des
   );
   const row = rendered.split("\n").find((line) => line.includes("dddddddd"));
   assert.ok(!/\d\/\d/.test(row), `a workable row must not carry a count: ${JSON.stringify(row)}`);
+});
+
+// --oneline is the other surface: one line for a host status bar. Its output contract is the
+// INVERSE of everything above — it never fails, never writes to stderr, and prints nothing rather
+// than an error. These tests are what stops someone from "fixing" it back to the general contract.
+
+const counts = (over = {}) => ({
+  backlog: 0,
+  in_progress: 0,
+  in_review: 0,
+  blocked: 0,
+  done: 0,
+  ...over,
+});
+
+test("renderOneline lists the non-empty statuses in reading order", () => {
+  const line = renderOneline({
+    counts: counts({ backlog: 4, in_progress: 1, in_review: 2, done: 12 }),
+    alerts: [],
+  });
+  assert.equal(line, "1 in corso | 2 in verifica | 4 backlog | 12 chiuse");
+});
+
+test("renderOneline drops the statuses nothing is in", () => {
+  const line = renderOneline({
+    counts: counts({ backlog: 3, in_progress: 1, done: 9 }),
+    alerts: [],
+  });
+  assert.equal(line, "1 in corso | 3 backlog | 9 chiuse");
+});
+
+test("renderOneline marks alerts and only alerts", () => {
+  const only = counts({ backlog: 1 });
+  assert.equal(renderOneline({ counts: only, alerts: [] }), "1 backlog");
+  assert.equal(renderOneline({ counts: only, alerts: ["ciclo nei depends_on: a b"] }), "1 backlog !");
+});
+
+test("renderOneline on an empty tracker is the empty line", () => {
+  // A status bar saying "zero" spends the row it was given on the absence of news.
+  assert.equal(renderOneline({ counts: counts(), alerts: [] }), "");
+});
+
+test("renderOneline stays inside ASCII: it lands in tmux, not in a code block", () => {
+  const line = renderOneline({
+    counts: counts({ backlog: 1, in_progress: 1, in_review: 1, blocked: 1, done: 1 }),
+    alerts: ["x"],
+  });
+  assert.match(line, /^[\x20-\x7e]*$/, `non-ASCII in the status line: ${JSON.stringify(line)}`);
+});
+
+test("--oneline exits 0 and stays silent when there is no tracker", () => {
+  const run = runIn(tempProject(), ["--oneline"]);
+  assert.equal(run.status, 0, "a status bar command must never fail");
+  assert.equal(run.stderr, "");
+  assert.equal(run.stdout.trim(), "");
+});
+
+test("--oneline exits 0 and stays silent on a malformed tracker", () => {
+  const run = runIn(tempProject("{ not json at all"), ["--oneline"]);
+  assert.equal(run.status, 0, "an error repeated on every refresh is worse than silence");
+  assert.equal(run.stderr, "");
+  assert.equal(run.stdout.trim(), "");
+});
+
+test("--oneline prints the counts of a real tracker", () => {
+  const run = runIn(
+    tempProject(
+      JSON.stringify({
+        schema_version: 3,
+        issues: [
+          issue("aaaaaaaa-0000-0000-0000-000000000000", { status: "in_progress" }),
+          issue("bbbbbbbb-0000-0000-0000-000000000000", { status: "done" }),
+        ],
+      })
+    ),
+    ["--oneline"]
+  );
+  assert.equal(run.status, 0);
+  assert.equal(run.stderr, "");
+  assert.equal(run.stdout.trim(), "1 in corso | 1 chiuse");
+});
+
+test("--oneline exits 0 even when the project directory does not exist", () => {
+  // resolveProjectDir() calls fail(), which exits 1. The flag must be handled before it.
+  const run = runIn(path.join(tmpdir(), "harness-does-not-exist-at-all"), ["--oneline"]);
+  assert.equal(run.status, 0);
+  assert.equal(run.stderr, "");
+  assert.equal(run.stdout.trim(), "");
 });

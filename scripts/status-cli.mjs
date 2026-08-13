@@ -48,6 +48,19 @@ export const IN_FLIGHT_ORDER = ["in_progress", "in_review", "blocked"];
 // right, so the bar fills left to right as the project advances.
 export const BAR_ORDER = ["done", "in_progress", "in_review", "blocked", "backlog"];
 
+// Reading order of the one-line summary, and deliberately NOT BAR_ORDER. The bar answers "how far
+// has this project got", so it opens with the closed work; this line answers "where are we right
+// now", and closed work is the least urgent thing on it.
+export const ONELINE_ORDER = ["in_progress", "in_review", "blocked", "backlog", "done"];
+
+export const ONELINE_LABEL = {
+  in_progress: "in corso",
+  in_review: "in verifica",
+  blocked: "bloccate",
+  backlog: "backlog",
+  done: "chiuse",
+};
+
 export const WIDTH = 80;
 export const BAR_INNER = 77; // WIDTH minus the leading space and the two brackets
 // Narrower than it was: the count column took seven columns, and a title that runs past the edge
@@ -219,18 +232,35 @@ export function renderSnapshot(snapshot, { project, lastUpdated }) {
   ].join("\n");
 }
 
+// One line for a host status bar: tmux, starship, a shell prompt, the Claude Code statusLine.
+// ASCII only and no ANSI — the full-screen summary can afford box drawing because it lands in a
+// markdown code block, this lands in a prompt where the encoding is not guaranteed.
+//
+// An empty tracker prints nothing at all: a status bar saying "zero" spends the row it was given
+// on the absence of news.
+export function renderOneline(snapshot) {
+  const parts = ONELINE_ORDER.filter((status) => snapshot.counts[status] > 0).map(
+    (status) => `${snapshot.counts[status]} ${ONELINE_LABEL[status]}`
+  );
+  if (parts.length === 0) return "";
+  return `${parts.join(" | ")}${snapshot.alerts.length > 0 ? " !" : ""}`;
+}
+
 const USAGE = [
   "Usage:",
-  "  node status-cli.mjs [--project-dir <path>] [--help]",
+  "  node status-cli.mjs [--project-dir <path>] [--oneline] [--help]",
   "",
   "Prints one screen of tracker status: counts, what is in flight, what can be taken now.",
   "Output is text, not JSON, and nothing is ever written to stderr.",
   "",
   "--project-dir  directory holding issues.json (default: the current directory).",
   "               A project without issues.json reads as an empty tracker, not an error.",
+  "--oneline      one ASCII line of counts for a host status bar (tmux, starship, a shell",
+  "               prompt, the Claude Code statusLine). Always exits 0 and stays silent on",
+  "               any problem: an error repeated on every refresh is worse than no line.",
   "",
   "Exit codes: 0 on success and on an empty tracker; 1 on a missing project directory, an",
-  "unreadable issues.json, or an unknown flag.",
+  "unreadable issues.json, or an unknown flag. --oneline always exits 0.",
   "",
 ].join("\n");
 
@@ -247,6 +277,25 @@ function resolveProjectDir(projectDir) {
   return dir;
 }
 
+// Every way this can go wrong, collected in one place and turned into an empty line. It does not
+// share resolveProjectDir() on purpose: that one calls fail(), which exits 1, and this command must
+// not — see the branch in main() for why.
+function onelineFor(projectDirArg) {
+  try {
+    const dir = path.resolve(projectDirArg ?? process.cwd());
+    if (!existsSync(dir) || !statSync(dir).isDirectory()) return "";
+    const trackerPath = path.join(dir, "issues.json");
+    // A missing tracker is not an error: issue-manager.mjs reads it as an empty tracker, and so
+    // does this. The line comes out empty because every count is zero, not because we gave up.
+    if (!existsSync(trackerPath)) return "";
+    const data = JSON.parse(readFileSync(trackerPath, "utf8"));
+    const issues = Array.isArray(data.issues) ? data.issues : [];
+    return renderOneline(buildSnapshot(issues));
+  } catch {
+    return "";
+  }
+}
+
 function main() {
   let values;
   try {
@@ -255,6 +304,7 @@ function main() {
       strict: true,
       options: {
         "project-dir": { type: "string" },
+        oneline: { type: "boolean", default: false },
         help: { type: "boolean", default: false },
       },
     }));
@@ -268,6 +318,17 @@ function main() {
 
   if (values.help) {
     process.stdout.write(USAGE);
+    return;
+  }
+
+  // Inverted output contract, on purpose, and it must stay before resolveProjectDir() — that one
+  // calls fail(), which exits 1. This command runs on every refresh of a host status bar, and an
+  // error message repeated there is worse than silence: it occupies the row that existed to show
+  // the work, and cannot be dismissed. So it never fails, never writes to stderr, and degrades to
+  // an empty line. Do not "fix" this back to the contract of the rest of the CLI: the reason is
+  // written in references/status.md, not only here.
+  if (values.oneline) {
+    process.stdout.write(`${onelineFor(values["project-dir"])}\n`);
     return;
   }
 
