@@ -111,6 +111,15 @@ test("chains groups the connected issues, whichever way the edge points", () => 
   assert.deepEqual(chains(issues), [["a", "b"], ["c", "d"], ["e"]]);
 });
 
+// The case above, and every other one here, lists the declarer AFTER its dependency — so a walk
+// that only followed the edge backwards would pass all of them. This is the mirror: the declarer
+// comes first, and the group still forms. The two together pin both directions, and each one kills
+// the mutant the other misses.
+test("chains groups a pair whose declarer comes first in the list", () => {
+  const issues = [issue("x", "backlog", ["y"]), issue("y")];
+  assert.deepEqual(chains(issues), [["x", "y"]]);
+});
+
 test("chains walks a path of three, not just the direct neighbours", () => {
   const issues = [issue("a"), issue("b", "backlog", ["a"]), issue("c", "backlog", ["b"])];
   assert.deepEqual(chains(issues), [["a", "b", "c"]]);

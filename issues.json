@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-13T09:48:17Z",
+  "last_updated": "2026-08-13T09:56:39Z",
   "rules": {
     "single_active_issue": false
   },
@@ -289,7 +289,7 @@
     {
       "id": "e6836699-8a91-40c2-9db5-ed544f9eb7fc",
       "title": "Il calcolo del grafo diventa un modulo, e le catene un dato",
-      "description": "Le 111 righe di calcolo sul grafo (dependsOn, danglingDeps, isWorkable, findCycle, buildAlerts) vivono dentro status-cli.mjs. L'export markdown ha bisogno delle stesse risposte, e due copie della regola 1-WIP divergerebbero senza che niente lo dica.\n\nL'estrazione da sola sarebbe rumorosa: la suite esistente su status-cli andrebbe rossa. La issue esiste per chains(), che e' codice nuovo senza rete. La catena e' la componente connessa del grafo depends_on, la definizione che SKILL.md da' della regola 1-WIP, e oggi non la calcola nessuno: un raggruppamento sbagliato produce un grafo plausibile e falso.\n\nSpec: docs/superpowers/specs/2026-08-13-ergonomia-emessa-design.md\nPiano: docs/superpowers/plans/2026-08-13-ergonomia-emessa.md (task 1-2)",
+      "description": "Le 111 righe di calcolo sul grafo (dependsOn, danglingDeps, isWorkable, findCycle, buildAlerts) vivono dentro status-cli.mjs. L'export markdown ha bisogno delle stesse risposte, e due copie della regola 1-WIP divergerebbero senza che niente lo dica.\n\nL'estrazione da sola sarebbe rumorosa: la suite esistente su status-cli andrebbe rossa. La issue esiste per chains(), che e' codice nuovo senza rete. La catena e' la componente connessa del grafo depends_on, la definizione che SKILL.md da' della regola 1-WIP, e oggi non la calcola nessuno: un raggruppamento sbagliato produce un grafo plausibile e falso.\n\nSpec: docs/superpowers/specs/2026-08-13-ergonomia-emessa-design.md\nPiano: docs/superpowers/plans/2026-08-13-ergonomia-emessa.md (task 1-2)\n\nRiaperta il 2026-08-13 dopo un fail in verifica. L'implementazione era giusta, il test no: tutti i casi di chains mettevano la issue che dichiara depends_on dopo la sua dipendenza, quindi una camminata orientata nel verso inverso passava la suite. Il verificatore l'ha provato per mutazione. Manca il caso col dichiarante per primo.",
       "status": "in_review",
       "tier": "standard",
       "depends_on": [],
@@ -348,6 +348,12 @@
           "short_title": "Commit di chains",
           "full_description": "git add dei due file e commit, dopo aver allineato i task.",
           "checked": true
+        },
+        {
+          "id": 10,
+          "short_title": "Caso col dichiarante per primo nella lista",
+          "full_description": "Aggiungere a test/plugin-tracker-graph.test.mjs un caso in cui la issue che dichiara depends_on compare PRIMA della sua dipendenza (x deps y, con x per primo nella lista). Senza, una camminata orientata nel verso inverso passa la suite, come il verificatore ha provato per mutazione.",
+          "checked": true
         }
       ],
       "validation": {
@@ -393,7 +399,7 @@
         "state": "unknown"
       },
       "created_at": "2026-08-13T09:40:01Z",
-      "updated_at": "2026-08-13T09:48:17Z"
+      "updated_at": "2026-08-13T09:56:39Z"
     },
     {
       "id": "b2c59231-709d-469a-8746-1d0b290ee427",
