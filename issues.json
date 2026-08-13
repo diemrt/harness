@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-13T10:07:11Z",
+  "last_updated": "2026-08-13T10:07:29Z",
   "rules": {
     "single_active_issue": false
   },
@@ -399,7 +399,7 @@
       "id": "b2c59231-709d-469a-8746-1d0b290ee427",
       "title": "--oneline, e il contratto che deve restare invertito",
       "description": "Il 20 per cento dell'uso del board e' guardare i conteggi mentre il lavoro procede, e il motivo dichiarato non e' che serva un board: e' che la CLI non offre un punto fisso da guardare. --oneline e' quella riga.\n\nIl contratto e' l'opposto di quello del resto della CLI: esce sempre 0, non scrive mai su stderr, degrada a riga vuota, e resta dentro ASCII perche' finisce in tmux o in un prompt PowerShell. Gira a ogni refresh di una barra di stato, e un errore ripetuto li' e' peggio del silenzio. La spec nomina il rischio: senza la motivazione scritta dove vive il contratto, qualcuno lo riportera' alla forma generale.\n\nSpec: docs/superpowers/specs/2026-08-13-ergonomia-emessa-design.md\nPiano: docs/superpowers/plans/2026-08-13-ergonomia-emessa.md (task 3, e il passo 3 del task 9)",
-      "status": "in_progress",
+      "status": "in_review",
       "tier": "economy",
       "depends_on": [
         "e6836699-8a91-40c2-9db5-ed544f9eb7fc"
@@ -498,7 +498,7 @@
         "state": "unknown"
       },
       "created_at": "2026-08-13T09:40:01Z",
-      "updated_at": "2026-08-13T10:07:11Z"
+      "updated_at": "2026-08-13T10:07:29Z"
     },
     {
       "id": "284d96c3-bd3c-4d7d-920d-0e6769dd96a5",
