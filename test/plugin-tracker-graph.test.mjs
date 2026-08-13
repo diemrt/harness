@@ -7,6 +7,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildAlerts,
+  chains,
   countByStatus,
   danglingDeps,
   dependsOn,
@@ -93,4 +94,38 @@ test("buildAlerts names the missing ids, not just their number", () => {
     alerts.some((alert) => alert.includes("ghost123")),
     true
   );
+});
+
+// A chain is what the 1-WIP rule is written around, and the rule says two issues joined by a path
+// are the same chain no matter which of them declared the edge. That is the whole reason these
+// tests assert on direction: a directed walk would split a chain in half and let two issues of the
+// same chain look independent.
+test("chains groups the connected issues, whichever way the edge points", () => {
+  const issues = [
+    issue("a"),
+    issue("b", "backlog", ["a"]),
+    issue("c"),
+    issue("d", "backlog", ["c"]),
+    issue("e"),
+  ];
+  assert.deepEqual(chains(issues), [["a", "b"], ["c", "d"], ["e"]]);
+});
+
+test("chains walks a path of three, not just the direct neighbours", () => {
+  const issues = [issue("a"), issue("b", "backlog", ["a"]), issue("c", "backlog", ["b"])];
+  assert.deepEqual(chains(issues), [["a", "b", "c"]]);
+});
+
+test("chains ignores edges that leave the given set", () => {
+  const issues = [issue("b", "backlog", ["fuori"]), issue("c")];
+  assert.deepEqual(chains(issues), [["b"], ["c"]]);
+});
+
+test("chains is deterministic: the export gets diffed", () => {
+  const issues = [issue("a"), issue("b", "backlog", ["a"])];
+  assert.deepEqual(chains(issues), chains(issues));
+});
+
+test("chains on an empty list is an empty list", () => {
+  assert.deepEqual(chains([]), []);
 });

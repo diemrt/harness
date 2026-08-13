@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-13T09:46:42Z",
+  "last_updated": "2026-08-13T09:48:17Z",
   "rules": {
     "single_active_issue": false
   },
@@ -290,7 +290,7 @@
       "id": "e6836699-8a91-40c2-9db5-ed544f9eb7fc",
       "title": "Il calcolo del grafo diventa un modulo, e le catene un dato",
       "description": "Le 111 righe di calcolo sul grafo (dependsOn, danglingDeps, isWorkable, findCycle, buildAlerts) vivono dentro status-cli.mjs. L'export markdown ha bisogno delle stesse risposte, e due copie della regola 1-WIP divergerebbero senza che niente lo dica.\n\nL'estrazione da sola sarebbe rumorosa: la suite esistente su status-cli andrebbe rossa. La issue esiste per chains(), che e' codice nuovo senza rete. La catena e' la componente connessa del grafo depends_on, la definizione che SKILL.md da' della regola 1-WIP, e oggi non la calcola nessuno: un raggruppamento sbagliato produce un grafo plausibile e falso.\n\nSpec: docs/superpowers/specs/2026-08-13-ergonomia-emessa-design.md\nPiano: docs/superpowers/plans/2026-08-13-ergonomia-emessa.md (task 1-2)",
-      "status": "in_progress",
+      "status": "in_review",
       "tier": "standard",
       "depends_on": [],
       "covers": [],
@@ -329,25 +329,25 @@
           "id": 6,
           "short_title": "Test di chains, rosso",
           "full_description": "Aggiungere i casi su chains: raggruppamento in qualunque verso dell'arco, archi che escono dall'insieme ignorati, determinismo, lista vuota. Deve fallire perche' chains non esiste.",
-          "checked": false
+          "checked": true
         },
         {
           "id": 7,
           "short_title": "chains implementato",
           "full_description": "BFS sulla versione non orientata del grafo depends_on, seguendo solo archi con entrambi i capi nell'insieme ricevuto. Iterazione nell'ordine di issues per restare deterministico: l'export viene diffato.",
-          "checked": false
+          "checked": true
         },
         {
           "id": 8,
           "short_title": "Suite verde con chains",
           "full_description": "npm test verde su tutta la suite.",
-          "checked": false
+          "checked": true
         },
         {
           "id": 9,
           "short_title": "Commit di chains",
           "full_description": "git add dei due file e commit, dopo aver allineato i task.",
-          "checked": false
+          "checked": true
         }
       ],
       "validation": {
@@ -393,7 +393,7 @@
         "state": "unknown"
       },
       "created_at": "2026-08-13T09:40:01Z",
-      "updated_at": "2026-08-13T09:46:42Z"
+      "updated_at": "2026-08-13T09:48:17Z"
     },
     {
       "id": "b2c59231-709d-469a-8746-1d0b290ee427",

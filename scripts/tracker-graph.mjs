@@ -101,3 +101,49 @@ export function buildAlerts(issues, byId, counts, workableTotal) {
 
   return alerts;
 }
+
+// A chain is the connected component of the depends_on graph, walked in BOTH directions: SKILL.md
+// defines it that way, because two issues joined by a path are the same chain no matter which of
+// them declared the edge. A directed walk would split a chain in half and let two issues of the
+// same chain look independent — which is exactly the mistake the 1-WIP rule exists to prevent.
+//
+// Only edges with both ends inside the given list are followed, so a caller can pass a filtered set
+// — the open issues, say — and get the components of that set rather than of the whole tracker.
+//
+// Iteration follows the order of `issues`, not of a Map or a Set: the export built on top of this
+// gets committed and diffed, and a group order that shifted between runs would produce a diff that
+// means nothing.
+export function chains(issues) {
+  const ids = new Set(issues.map((issue) => issue.id));
+  const neighbours = new Map(issues.map((issue) => [issue.id, new Set()]));
+
+  for (const issue of issues) {
+    for (const dep of dependsOn(issue)) {
+      if (!ids.has(dep)) continue;
+      neighbours.get(issue.id).add(dep);
+      neighbours.get(dep).add(issue.id);
+    }
+  }
+
+  const seen = new Set();
+  const groups = [];
+
+  for (const issue of issues) {
+    if (seen.has(issue.id)) continue;
+    const group = [];
+    const queue = [issue.id];
+    seen.add(issue.id);
+    while (queue.length > 0) {
+      const id = queue.shift();
+      group.push(id);
+      for (const next of neighbours.get(id)) {
+        if (seen.has(next)) continue;
+        seen.add(next);
+        queue.push(next);
+      }
+    }
+    groups.push(group);
+  }
+
+  return groups;
+}
