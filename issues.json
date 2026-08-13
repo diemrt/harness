@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-13T09:56:39Z",
+  "last_updated": "2026-08-13T09:58:56Z",
   "rules": {
     "single_active_issue": false
   },
@@ -290,7 +290,7 @@
       "id": "e6836699-8a91-40c2-9db5-ed544f9eb7fc",
       "title": "Il calcolo del grafo diventa un modulo, e le catene un dato",
       "description": "Le 111 righe di calcolo sul grafo (dependsOn, danglingDeps, isWorkable, findCycle, buildAlerts) vivono dentro status-cli.mjs. L'export markdown ha bisogno delle stesse risposte, e due copie della regola 1-WIP divergerebbero senza che niente lo dica.\n\nL'estrazione da sola sarebbe rumorosa: la suite esistente su status-cli andrebbe rossa. La issue esiste per chains(), che e' codice nuovo senza rete. La catena e' la componente connessa del grafo depends_on, la definizione che SKILL.md da' della regola 1-WIP, e oggi non la calcola nessuno: un raggruppamento sbagliato produce un grafo plausibile e falso.\n\nSpec: docs/superpowers/specs/2026-08-13-ergonomia-emessa-design.md\nPiano: docs/superpowers/plans/2026-08-13-ergonomia-emessa.md (task 1-2)\n\nRiaperta il 2026-08-13 dopo un fail in verifica. L'implementazione era giusta, il test no: tutti i casi di chains mettevano la issue che dichiara depends_on dopo la sua dipendenza, quindi una camminata orientata nel verso inverso passava la suite. Il verificatore l'ha provato per mutazione. Manca il caso col dichiarante per primo.",
-      "status": "in_review",
+      "status": "done",
       "tier": "standard",
       "depends_on": [],
       "covers": [],
@@ -357,13 +357,7 @@
         }
       ],
       "validation": {
-        "criteria": [
-          "node --test test/plugin-tracker-graph.test.mjs esce 0",
-          "npm test e' verde e git diff main -- test/plugin-status-cli.test.mjs e' vuoto: l'estrazione non ha cambiato comportamento",
-          "scripts/tracker-graph.mjs esporta dependsOn, indexById, emptyCounts, countByStatus, shortId, danglingDeps, isWorkable, findCycle, buildAlerts, chains",
-          "grep -c \"function findCycle\" scripts/status-cli.mjs torna 0",
-          "un test dimostra che due issue collegate finiscono nello stesso gruppo in qualunque verso sia dichiarato l'arco"
-        ],
+        "criteria": "Ri-verifica dopo il fix f4bdaa9 (tocca solo test/plugin-tracker-graph.test.mjs e issues.json; `git diff 01a768e..HEAD -- scripts/ skills/` vuoto: implementazione non toccata). Criteri invariati dall'apertura: confronto programmatico di validation.criteria e validation.tasks fra 7d4ce00 e HEAD -> true/true. (1) node --test test/plugin-tracker-graph.test.mjs -> exit 0, tests 15 pass 15 fail 0. (2) Gate `npm run test` di .harness/config.json -> tests 378, pass 378, fail 0; `git diff main -- test/plugin-status-cli.test.mjs` vuoto (nessun output); `git diff --stat main..HEAD` su test/ e scripts/ elenca solo status-cli.mjs, tracker-graph.mjs, references/status.md e il nuovo file di test. (3) grep 'export function' su scripts/tracker-graph.mjs: dependsOn:9, indexById:13, emptyCounts:17, countByStatus:21, shortId:31, danglingDeps:38, isWorkable:42, findCycle:52, buildAlerts:77, chains:116 - dieci su dieci. (4) `grep -c \"function findCycle\" scripts/status-cli.mjs` -> 0; nessuna delle altre estratte ridefinita (grep -E su dependsOn|danglingDeps|isWorkable|buildAlerts|emptyCounts|countByStatus|shortId|indexById|chains: nessun match); shortId ri-esportato, non ridefinito. (5) ORA SODDISFATTO: test/plugin-tracker-graph.test.mjs:120 'chains groups a pair whose declarer comes first in the list' con issues=[x deps y, y] asserisce [[x,y]], speculare al caso a:103 dove il dichiarante viene dopo. Verifica per mutazione ripetuta in proprio su tre copie fuori dal repo: originale 15/15 verde; mutante con solo l'arco inverso (tolta `neighbours.get(issue.id).add(dep)`) -> 1 fail, ucciso esattamente dal nuovo test; mutante con solo l'arco diretto (tolta `neighbours.get(dep).add(issue.id)`) -> 2 fail, ucciso dai due casi preesistenti. Entrambi i versi di dichiarazione sono ora vincolati. Danni collaterali: nessuno - `git status --short` vuoto prima della chiusura, issues.json modificato dal solo record di questa issue.",
         "tasks": [
           {
             "id": 1,
@@ -396,10 +390,10 @@
             "checked": false
           }
         ],
-        "state": "unknown"
+        "state": "pass"
       },
       "created_at": "2026-08-13T09:40:01Z",
-      "updated_at": "2026-08-13T09:56:39Z"
+      "updated_at": "2026-08-13T09:58:56Z"
     },
     {
       "id": "b2c59231-709d-469a-8746-1d0b290ee427",
