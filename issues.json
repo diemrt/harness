@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-13T15:38:41Z",
+  "last_updated": "2026-08-13T15:42:28Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1349,7 +1349,7 @@
       "id": "a6f38a91-e7fe-415b-907d-9c524a368952",
       "title": "status.md descrive ancora l'eta' del tracker in coda alla riga",
       "description": "skills/harness/references/status.md promette una coda che il comando non stampa piu'. Gli esempi mostrano \"12s @ 16:34:50\" e \"1h 2m 12s @ 16:34:50\", il capitolo \"La coda della riga\" spiega due dati invece di uno, e un intero capitolo (\"L'eta' del tracker\", con la tabella dei tre scaglioni e il ritorno a 0s come ricevuta di scrittura) descrive un campo rimosso. Chi legge la reference prima di guardare l'output impara una cosa falsa.\n\nCopre due commit che il gate documentale segnala scoperti. In acb9885 la coda e' diventata \"T @ 16:34:50\" e l'eta' e' sparita dal codice; in 995a502 era nata l'ora del render, e la sua parte di status.md era stata scritta nello stesso commit senza che nessuna issue la dichiarasse. Il capitolo si riscrive una volta sola e chiude entrambi.\n\nQuello che resta vero non si tocca: il capitolo sull'ora del render regge parola per parola, tolto il riferimento all'eta' che si congela con la riga. I documenti sotto docs/superpowers/ (referto, spec, piano) restano com'erano: registrano decisioni prese in un momento, non sono reference da mantenere allineata.",
-      "status": "in_progress",
+      "status": "done",
       "tier": "economy",
       "depends_on": [],
       "covers": [
@@ -1389,15 +1389,7 @@
         }
       ],
       "validation": {
-        "criteria": [
-          "In skills/harness/references/status.md nessuna occorrenza di '12s @', '3m 12s' o '1h 2m 12s': gli esempi di --oneline mostrano la coda 'T @ 16:34:50'",
-          "Il capitolo 'La coda della riga' ha per titolo la forma nuova e descrive un solo dato, l'ora del render, senza promettere che manchi quando manca last_updated",
-          "Il capitolo \"L'eta' del tracker\" con la tabella dei tre scaglioni non esiste piu' nel file",
-          "Il capitolo sull'ora del render e la misura del 2026-08-13 sono ancora nel file, senza piu' il riferimento all'eta' che si congela insieme alla riga",
-          "Gli esempi di riga in status.md coincidono con quello che il comando stampa davvero: verificabile eseguendo node scripts/status-cli.mjs --oneline",
-          "node scripts/docs-gate.mjs non elenca piu' acb9885 ne' 995a502 fra i commit non coperti",
-          "npm run test esce 0"
-        ],
+        "criteria": "npm run test: 408/408 pass, exit 0. node scripts/docs-gate.mjs: 0 non coperti (acb9885 e 995a502 non piu elencati). skills/harness/references/status.md: nessuna occorrenza di 12s @, 3m 12s, 1h 2m 12s (grep vuoto); capitolo La coda della riga (riga 90) titolato T @ 16:34:50 e descrive un solo dato senza menzionare last_updated mancante; capitolo su L'eta del tracker con tabella dei tre scaglioni assente dal file (grep vuoto); capitolo sull'ora del render (righe 103-125, misura 2026-08-13) presente parola per parola tranne il riferimento all'eta congelata, rimosso anche nella riga --color (riga 131: etichetta e ora insieme). Esempi di riga (righe 66-67, formato ...T @ 16:34:50) coincidono nella forma con l'output reale di node scripts/status-cli.mjs --oneline eseguito ora: 1 in verifica [5/5] | 6 backlog | 14 chiuse | T @ 17:40:06. git show --stat 7324803: solo issues.json e status.md toccati, docs/superpowers/ intatti. Nessun file modificato dalla verifica oltre alla chiusura della issue; la modifica non committata di issues.json (last_updated, status in_progress-in_review) era gia presente prima della verifica.",
         "tasks": [
           {
             "id": 1,
@@ -1424,10 +1416,10 @@
             "checked": false
           }
         ],
-        "state": "unknown"
+        "state": "pass"
       },
       "created_at": "2026-08-13T15:35:48Z",
-      "updated_at": "2026-08-13T15:38:41Z"
+      "updated_at": "2026-08-13T15:42:28Z"
     }
   ]
 }
