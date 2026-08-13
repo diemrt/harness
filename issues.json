@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-13T15:42:28Z",
+  "last_updated": "2026-08-13T16:50:49Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1114,11 +1114,69 @@
       "id": "24f39ab4-6401-434c-a780-506d13c498d8",
       "title": "Il plugin pubblicato e il repository sono divergenti",
       "description": "La copia installata in .claude/plugins/cache/diemrt/harness/0.6.0/ contiene hooks/, src/, template/, init.mjs, issues.html e .harness-manifest.json: componenti che questo repository non ha piu'. Dichiara la stessa versione del repository, 0.6.0, e ha un contenuto diverso.\n\nChi usa harness in un altro progetto sta quindi eseguendo un issue-manager.mjs diverso da quello che qui viene corretto e verificato. E' costoso e invisibile nella forma peggiore: non fallisce, funziona - solo su un'altra versione del codice, contro un issues.json scritto secondo uno schema che quella copia potrebbe non conoscere. Nessun test lo vede, perche' la suite gira sul repository e non sulla copia pubblicata.\n\nVa indagato prima che corretto: non e' noto se la causa sia il ref che la marketplace pubblica, una versione mai incrementata, o un rilascio fatto da uno stato di lavoro diverso. Il committente chiede un'indagine condotta con le skill superpowers, non una toppa.",
-      "status": "backlog",
+      "status": "in_progress",
       "tier": "reasoning",
       "depends_on": [],
-      "covers": [],
-      "tasks": [],
+      "covers": [
+        "2781812dd2c4fffcc0152bd8161e46f1aeb07b49",
+        "b893262e4cc2c6b38541ab2f112f8845dd32026e"
+      ],
+      "tasks": [
+        {
+          "id": 1,
+          "short_title": "Inventario della copia pubblicata",
+          "full_description": "Elencare i file della copia in .claude/plugins/cache/diemrt/harness/0.6.0/ e confrontarli con il repository: cosa c'e' in piu', cosa manca, quale versione dichiara il manifest interno.",
+          "checked": true
+        },
+        {
+          "id": 2,
+          "short_title": "Da dove viene la copia: registro di installazione",
+          "full_description": "Leggere installed_plugins.json e known_marketplaces.json: sorgente del marketplace, sha del commit installato, data di installazione e di ultimo aggiornamento. Confrontare con lo stesso dato sugli altri plugin installati, che invece si aggiornano.",
+          "checked": true
+        },
+        {
+          "id": 3,
+          "short_title": "Riproduzione: quale tracker legge la copia pubblicata",
+          "full_description": "Eseguire in sola lettura la copia pubblicata e quella del repository dalla stessa cartella di un progetto consumer, e mostrare che rispondono su due tracker diversi. E' la prova che si puo' rieseguire invece di doverla credere.",
+          "checked": true
+        },
+        {
+          "id": 4,
+          "short_title": "Il caso reale: activitymanager",
+          "full_description": "Analizzare il progetto C:/Users/diego_martignoni/Documents/Workspace/Projects/activitymanager: schema del suo issues.json, campi presenti, e quale copia degli script puo' averli scritti. Stabilire con una prova, non per esclusione, se abbia mai eseguito la copia pubblicata.",
+          "checked": true
+        },
+        {
+          "id": 5,
+          "short_title": "La causa, distinta dal sintomo",
+          "full_description": "Nominare il meccanismo che tiene ferma la copia: sorgente del marketplace, chiave di cache, versione mai incrementata. Distinguere cosa e' causa e cosa e' conseguenza, e dire cosa resta non dimostrato.",
+          "checked": true
+        },
+        {
+          "id": 6,
+          "short_title": "Il documento in docs/",
+          "full_description": "Scrivere il referto: prove, comandi rieseguibili, causa, danno osservato sul caso reale, e cosa deve fare chi ha gia' una copia divergente installata.",
+          "checked": true
+        },
+        {
+          "id": 7,
+          "short_title": "La guardia contro il ripetersi",
+          "full_description": "Un controllo eseguibile che confronta la copia installata con il repository e fallisce quando divergono, piu' il passo scritto dove chi rilascia lo legge (CONTRIBUTING.md). Non un documento che nessuno riapre.",
+          "checked": true
+        },
+        {
+          "id": 8,
+          "short_title": "Il rimedio, e la sua verifica",
+          "full_description": "Richiede un'azione umana che l'agente non puo' eseguire: /plugin marketplace remove diemrt, /plugin marketplace add diemrt/harness, /plugin install harness@diemrt, poi riavvio della sessione. Verifica: node scripts/install-check.mjs deve uscire 0 con state aligned. Nello stesso momento si misura da quale path la skill viene annunciata, che decide se lo sviluppo locale sopravvive alla sorgente remota.",
+          "checked": false
+        },
+        {
+          "id": 9,
+          "short_title": "Suite verde",
+          "full_description": "npm test verde, compresi i test nuovi della guardia.",
+          "checked": true
+        }
+      ],
       "validation": {
         "criteria": [
           "un documento in docs/ nomina la causa della divergenza con le prove: quale riferimento viene pubblicato e quale stato ha il repository",
@@ -1169,7 +1227,7 @@
         "state": "unknown"
       },
       "created_at": "2026-08-13T13:39:00Z",
-      "updated_at": "2026-08-13T13:39:00Z"
+      "updated_at": "2026-08-13T16:50:49Z"
     },
     {
       "id": "d3d32a5d-ca41-447b-aae3-fc254351964d",
