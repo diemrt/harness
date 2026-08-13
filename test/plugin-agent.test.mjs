@@ -50,6 +50,44 @@ test("harness-verifier cannot edit files", () => {
   assert.ok(granted.includes("Bash"), "the verifier must be able to run the verification gate");
 });
 
+test("harness-verifier has more than one shell", () => {
+  // Verifying means executing: without a shell that starts, the agent can run neither the gate nor
+  // the closure. One shell makes independent verification not degraded but impossible — which is
+  // what happened the day Git Bash stopped initialising and a verification was lost.
+  const fm = frontmatter(readAgent());
+  const granted = fm
+    .match(/^tools:\s*\[(.*)\]$/m)[1]
+    .split(",")
+    .map((t) => t.trim());
+  const shells = granted.filter((tool) => ["Bash", "PowerShell"].includes(tool));
+  assert.ok(
+    shells.length >= 2,
+    `the verifier declares only ${JSON.stringify(shells)}: one broken interpreter and it cannot verify at all`
+  );
+});
+
+test("harness-verifier is told to switch shell when one will not start", () => {
+  // Anchored to the distinction, not to the word "shell": the prompt names shells in several
+  // places, and a bare /shell/ would still pass with the whole rule deleted. What must survive is
+  // that a failing COMMAND and a failing INTERPRETER are told apart, and that retrying is refused.
+  const body = readAgent();
+  assert.match(
+    body,
+    /la\s+shell\s+non\s+parte/i,
+    "the prompt must name the failure mode where the interpreter itself is broken"
+  );
+  assert.match(
+    body,
+    /non\s+ritentare\s+lo\s+stesso\s+comando\s+sulla\s+stessa\s+shell/i,
+    "retrying a dead interpreter must be forbidden in so many words"
+  );
+  assert.match(
+    body,
+    /non\s+dichiarare\s+`?pass`?/i,
+    "a verification that could not run must be told never to pass"
+  );
+});
+
 test("harness-verifier is told not to correct the work", () => {
   const body = readAgent().split(/\r?\n---\r?\n/).slice(1).join("\n");
   assert.match(body, /non corregg/i, "the prompt must forbid fixing the work in so many words");

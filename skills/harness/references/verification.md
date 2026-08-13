@@ -22,6 +22,36 @@ contesto di cosa è stato prodotto.
 
 Tier del verificatore **>=** tier del worker, mai inferiore.
 
+## Di cosa ha bisogno un verificatore per esistere
+
+**Di una shell che parta.** Verificare significa eseguire: il gate è un comando, e anche la
+chiusura della issue lo è. Un verificatore che non può eseguire nulla non è un verificatore
+degradato — non è un verificatore.
+
+Per questo l'agent ne dichiara **due**, `Bash` e `PowerShell`, e ha l'istruzione di cambiare al
+primo errore di *avvio* dell'interprete, distinguendolo da un comando che semplicemente fallisce.
+Il prerequisito è scritto qui perché non è ovvio: si scopre quando manca, ed è il giorno peggiore
+per scoprirlo. Il 2026-08-13 su questo progetto Git Bash ha smesso di inizializzarsi a metà
+sessione, e una verifica è andata persa non perché il lavoro fosse sbagliato ma perché nessuno
+poteva guardarlo.
+
+### Quando non parte nessuna shell
+
+Succede, e ha una regola sola perché la tentazione è una sola.
+
+- **La issue resta a `in_review` / `unknown`.** Non è un `pass` mancato per poco: è una issue il cui
+  lavoro è finito e che **nessuno ha ancora giudicato**. Lo stato lo dice già, e va lasciato dire.
+- **Nessun `validation.tasks` viene spuntato.** Spuntare ciò che non si è verificato è fabbricare
+  evidenza, ed è esattamente il difetto che la spunta esiste per rendere visibile.
+- **L'orchestratore non chiude al posto del verificatore.** È la tentazione, e va nominata per
+  poterla rifiutare: chiudere una issue che si è fatti verificare da nessuno è self-validation con
+  un passaggio in più, e il fatto che passi da due agenti invece che da uno non la rende
+  indipendente. Si ripara la shell e si ridispaccia.
+
+Una verifica che non ha potuto girare **non è un fallimento del verificatore**, e non si tratta come
+tale: si riporta all'orchestratore dicendo quali controlli restano scoperti, così chi riprende sa da
+dove ripartire invece di rifare tutto.
+
 ## Cosa deve fare il verificatore
 
 1. **Leggere i criteri** della issue (`validation.criteria`) e confrontarli con gli

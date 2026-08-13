@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-13T12:36:06Z",
+  "last_updated": "2026-08-13T12:56:49Z",
   "rules": {
     "single_active_issue": false
   },
@@ -838,11 +838,60 @@
       "id": "eb5c82a2-f2eb-43a5-bc71-4af0ae519f63",
       "title": "Il verificatore ha una sola shell, e senza quella non verifica",
       "description": "L'agent harness-verifier dichiara tools: [Read, Grep, Glob, Bash]. Una sola shell, e nessuna alternativa.\n\nIl 2026-08-13 bash ha smesso di inizializzarsi su questa macchina (mount table msys, errno 1). Riproducibile lanciando bash.exe --version direttamente da PowerShell, e sopravvissuto a un riavvio della sessione: e' l'installazione, non il sandbox e non Claude Code. Il verificatore della issue 38eb7b1a ha tentato 26 comandi, non ne ha eseguito nessuno, ha correttamente rifiutato di dichiarare pass, e non ha potuto scrivere nemmeno il fail perche' la chiusura passa da issue-manager.mjs. La issue e' rimasta in_review senza che niente nel tracker dicesse perche'.\n\nIl difetto non e' che bash si sia rotto. E' che un invariante di harness - verifica indipendente su OGNI issue - dipende da un solo binario che harness non nomina fra i propri prerequisiti e per cui non prevede alternativa. Su Windows PowerShell c'e' sempre, e il verificatore non puo' usarlo.\n\nE' la stessa specie di difetto della issue bfb0a23f: una prescrizione che regge finche' l'ambiente sta fermo.",
-      "status": "backlog",
+      "status": "in_review",
       "tier": "standard",
       "depends_on": [],
       "covers": [],
-      "tasks": [],
+      "tasks": [
+        {
+          "id": 1,
+          "short_title": "PowerShell entra nei tools dell'agent",
+          "full_description": "agents/harness-verifier.md: il frontmatter tools passa da [Read, Grep, Glob, Bash] a includere anche PowerShell. Su Windows c'e' sempre, e oggi e' l'unica via quando bash non parte. Edit e Write restano fuori: il verificatore non deve poter correggere.",
+          "checked": true
+        },
+        {
+          "id": 2,
+          "short_title": "La sezione sulla shell, con il ripiego",
+          "full_description": "Nel corpo dell'agent: quale shell provare per prima, e soprattutto che davanti a un errore di AVVIO della shell - non del comando - deve passare all'altra invece di insistere. Il verificatore che ci e' cascato ha ritentato 26 volte lo stesso comando.",
+          "checked": true
+        },
+        {
+          "id": 3,
+          "short_title": "Test: piu' di una shell nel frontmatter",
+          "full_description": "In test/plugin-agent.test.mjs, un test asserisce che i tools elencano almeno due shell. Senza, la riga puo' sparire da una riscrittura e nessuno se ne accorge finche' una shell non si rompe.",
+          "checked": true
+        },
+        {
+          "id": 4,
+          "short_title": "Test: l'istruzione di ripiego e' scritta",
+          "full_description": "Un test ancorato alla frase, non alla parola: deve asserire che l'agent distingue shell che non parte da comando che fallisce, come gia' fanno gli altri test di questo file.",
+          "checked": true
+        },
+        {
+          "id": 5,
+          "short_title": "Il prerequisito in references/verification.md",
+          "full_description": "La reference nomina di cosa ha bisogno un verificatore per esistere - una shell che parta - e dichiara cosa resta vero quando non ce l'ha. Oggi il prerequisito non e' scritto da nessuna parte.",
+          "checked": true
+        },
+        {
+          "id": 6,
+          "short_title": "La regola del 'non ho potuto verificare'",
+          "full_description": "Scritto che una verifica che non ha potuto girare lascia la issue in in_review, che non e' un pass, e che l'orchestratore non la chiude al posto del verificatore: sarebbe self-validation con un passaggio in piu'.",
+          "checked": true
+        },
+        {
+          "id": 7,
+          "short_title": "Suite verde",
+          "full_description": "npm test verde, che e' anche il gate di .harness/config.json.",
+          "checked": true
+        },
+        {
+          "id": 8,
+          "short_title": "Commit",
+          "full_description": "git add di agents/harness-verifier.md, test/plugin-agent.test.mjs, skills/harness/references/verification.md e issues.json. Allineare i task prima di committare.",
+          "checked": true
+        }
+      ],
       "validation": {
         "criteria": [
           "agents/harness-verifier.md dichiara nei tools una shell alternativa oltre a Bash, cosi' che una shell rotta non azzeri la verifica",
@@ -893,7 +942,7 @@
         "state": "unknown"
       },
       "created_at": "2026-08-13T10:55:22Z",
-      "updated_at": "2026-08-13T10:55:22Z"
+      "updated_at": "2026-08-13T12:56:49Z"
     }
   ]
 }
