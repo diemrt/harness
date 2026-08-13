@@ -124,40 +124,18 @@ function formatWhen(lastUpdated) {
   );
 }
 
-// How long ago the tracker was last written, for the status line. This is the line's heartbeat:
-// the command has no cache and rereads issues.json every run, so a line that RUNS is aligned by
-// construction and the only possible mismatch is not running at all — which a frozen line and a
-// fresh one showing the same counts cannot be told apart by.
+// The instant of the render, in local time, and the whole tail of the status line.
 //
-// The seconds are in all three brackets on purpose. Drop them above the minute and the heartbeat
-// stops for sixty seconds at a time, which is exactly the dead line this exists to rule out.
+// It is the line's heartbeat: the command has no cache — every run rereads issues.json and exits —
+// so a line that RUNS is aligned by construction, and the only possible mismatch is not running at
+// all, which a frozen line and a fresh one showing the same counts cannot be told apart by.
 //
-// A timestamp in the future is clock skew between whoever wrote and whoever reads, not news: it
-// flattens to 0s rather than spending the row on a negative number.
-export function formatAge(lastUpdated, now = Date.now()) {
-  if (!lastUpdated) return null;
-  const when = new Date(lastUpdated);
-  if (Number.isNaN(when.getTime())) return null;
-
-  const total = Math.max(0, Math.floor((now - when.getTime()) / 1000));
-  const seconds = total % 60;
-  const minutes = Math.floor(total / 60) % 60;
-  const hours = Math.floor(total / 3600);
-
-  if (total < 60) return `${seconds}s`;
-  if (total < 3600) return `${minutes}m ${seconds}s`;
-  return `${hours}h ${minutes}m ${seconds}s`;
-}
-
-// The instant of the render, in local time. It answers the question the age can only answer
-// across two glances: the age has to be watched moving, this is checked against a clock the
-// reader already has, in one reading and with no waiting.
+// The line used to carry the age of the tracker beside it — how long ago issues.json was written.
+// That answered a question nobody asks of a status bar, and it took a reading to answer: an age has
+// to be watched moving. The clock is checked against a clock the reader already has, in one glance,
+// and it is the only one of the two that the reader wanted.
 //
-// And because this command has no cache — every run rereads issues.json and exits — the instant
-// of the render IS the freshness of the counts. One field, both questions.
-//
-// It never returns null: unlike the age, which depends on a field that may be missing from the
-// tracker, "now" is always knowable.
+// It never returns null: "now" is always knowable, so the tail has no branch.
 export function formatClock(now = Date.now()) {
   const when = new Date(now);
   const pad = (n) => String(n).padStart(2, "0");
@@ -311,10 +289,9 @@ function soleInFlight(snapshot) {
 // An empty tracker prints nothing at all: a status bar saying "zero" spends the row it was given
 // on the absence of news.
 //
-// The age of the tracker closes the line, and is the one field here that changes on its own: see
-// formatAge() for why it is a heartbeat and not decoration. Absent or unparseable last_updated
-// prints nothing rather than a placeholder — the same rule the task brackets follow.
-export function renderOneline(snapshot, { color = false, lastUpdated = null, now = Date.now() } = {}) {
+// The instant of the render closes the line, and is the one field here that changes on its own:
+// see formatClock() for why it is a heartbeat and not decoration.
+export function renderOneline(snapshot, { color = false, now = Date.now() } = {}) {
   const sole = soleInFlight(snapshot);
   const soleProgress = sole ? taskProgress(sole) : "-";
 
@@ -334,11 +311,9 @@ export function renderOneline(snapshot, { color = false, lastUpdated = null, now
   if (parts.length === 0) return "";
   const alert = snapshot.alerts.length > 0 ? ` ${paint("!", ONELINE_COLOR.alert, color)}` : "";
 
-  // `3m 12s @ 16:34:50` — the age is the datum, the clock says when it was taken. With no
-  // last_updated the clock stands alone: it is the reading that always exists.
-  const age = formatAge(lastUpdated, now);
-  const clock = formatClock(now);
-  const tail = age ? `${age} @ ${clock}` : clock;
+  // `T @ 16:34:50` — the instant of the reading, and nothing about the tracker: no branch, because
+  // "now" is the one thing that is always knowable.
+  const tail = `T @ ${formatClock(now)}`;
   return `${parts.join(" | ")}${alert} | ${paint(tail, ONELINE_COLOR.tail, color)}`;
 }
 
@@ -355,9 +330,9 @@ const USAGE = [
   "               prompt, the Claude Code statusLine). Always exits 0 and stays silent on",
   "               any problem: an error repeated on every refresh is worse than no line.",
   "               Shows [done/total] tasks only when exactly one issue is in flight, and closes",
-  "               with `3m 12s @ 16:34:50`: how long ago the tracker was written, and the local",
-  "               time of this render. The clock tells a live line from a frozen one at a glance",
-  "               — the host can stop invoking this command, and then nothing on the row moves.",
+  "               with `T @ 16:34:50`: the local time of this render, and nothing else. It tells",
+  "               a live line from a frozen one at a glance — the host can stop invoking this",
+  "               command, and then nothing on the row moves.",
   "--color        add ANSI colour to --oneline. Off by default: the host may be a prompt",
   "               that renders the escape codes literally. No effect without --oneline.",
   "",
@@ -392,7 +367,7 @@ function onelineFor(projectDirArg, color) {
     if (!existsSync(trackerPath)) return "";
     const data = JSON.parse(readFileSync(trackerPath, "utf8"));
     const issues = Array.isArray(data.issues) ? data.issues : [];
-    return renderOneline(buildSnapshot(issues), { color, lastUpdated: data.last_updated ?? null });
+    return renderOneline(buildSnapshot(issues), { color });
   } catch {
     return "";
   }

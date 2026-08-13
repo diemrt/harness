@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-13T15:08:03Z",
+  "last_updated": "2026-08-13T15:26:29Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1271,6 +1271,87 @@
       },
       "created_at": "2026-08-13T14:43:25Z",
       "updated_at": "2026-08-13T15:08:03Z"
+    },
+    {
+      "id": "90a882a6-71a4-4739-bdb3-a71ddc4e0e3f",
+      "title": "La coda della riga di stato e' 'T @ orario', l'eta' sparisce",
+      "description": "La riga di --oneline chiude con \"3m 12s @ 16:34:50\": l'eta' del tracker piu' l'orario del render. L'eta' non serve a chi legge — dice quanto fa che il tracker e' stato scritto, che e' una domanda che nessuno si pone guardando una status bar. L'orario del render risponde da solo alla domanda vera, cioe' se la riga e' viva o congelata, e lo fa in una lettura sola contro un orologio che il lettore ha gia'.\n\nLa coda diventa \"T @ 16:34:50\", sempre, senza rami: la T e' l'etichetta abbreviata dell'orario. Cade il ramo che oggi sceglie fra coda con eta' e coda senza, e con lui cade il motivo per cui renderOneline riceve lastUpdated.\n\nSi rimuove quindi anche cio' che l'eta' si portava dietro: la funzione formatAge, l'opzione lastUpdated di renderOneline, il passaggio di data.last_updated in onelineFor, i test di formatAge e il testo di USAGE che promette la vecchia forma. Lasciarli sarebbe codice morto esportato e testato, cioe' un contratto che nessuno onora piu'.\n\nResta invariato tutto il resto della riga: conteggi, parentesi dei task, marcatore ! delle allerte, riga vuota su tracker vuoto, ASCII puro e nessun ANSI senza --color.",
+      "status": "in_progress",
+      "tier": "standard",
+      "depends_on": [],
+      "covers": [],
+      "tasks": [
+        {
+          "id": 1,
+          "short_title": "Test rossi sulla coda nuova",
+          "full_description": "In test/plugin-status-cli.test.mjs: i test della coda asseriscono 'T @ HH:mm:ss' con e senza lastUpdated, i test di formatAge e il suo import spariscono, il test --color asserisce la coda grigia nuova. Attesi rossi prima di toccare lo script.",
+          "checked": true
+        },
+        {
+          "id": 2,
+          "short_title": "renderOneline: coda incondizionata",
+          "full_description": "In scripts/status-cli.mjs: tail = `T @ ${clock}` senza ternario, opzione lastUpdated fuori dalla firma, commento sopra la funzione riscritto su cosa la coda dice adesso.",
+          "checked": true
+        },
+        {
+          "id": 3,
+          "short_title": "Via formatAge e last_updated",
+          "full_description": "Rimuovere la funzione formatAge e il suo commento; in onelineFor togliere lastUpdated: data.last_updated. Verificare con grep che formatAge non compaia piu' in scripts/ e test/.",
+          "checked": true
+        },
+        {
+          "id": 4,
+          "short_title": "USAGE riscritta",
+          "full_description": "Le righe di USAGE su --oneline promettono 'T @ 16:34:50' e non parlano piu' di quanto fa che il tracker e' stato scritto. Controllo con --help.",
+          "checked": true
+        },
+        {
+          "id": 5,
+          "short_title": "npm run test verde e smoke",
+          "full_description": "npm run test esce 0, e node scripts/status-cli.mjs --oneline sul repo stampa una riga che finisce con 'T @ HH:mm:ss'.",
+          "checked": true
+        }
+      ],
+      "validation": {
+        "criteria": [
+          "renderOneline({counts:{in_progress:1,done:9},alerts:[]},{now}) torna una riga che finisce con 'T @ HH:mm:ss' e non contiene nessuna eta' (nessun match di /\\d+[hms]/ nella coda)",
+          "La coda e' identica passando o non passando lastUpdated: nessun ramo residuo la reintroduce; l'opzione lastUpdated non e' piu' nella firma di renderOneline",
+          "formatAge non esiste piu' in scripts/status-cli.mjs e nessun file di scripts/ o test/ la nomina",
+          "Il testo di USAGE per --oneline descrive la coda come 'T @ 16:34:50' e non nomina piu' l'eta' del tracker",
+          "npm run test esce 0: i test di formatAge sono rimossi, quelli della coda asseriscono la forma nuova, e restano verdi i test su ASCII, assenza di ANSI e riga vuota su tracker vuoto",
+          "node scripts/status-cli.mjs --oneline su questo repository stampa una riga che termina con 'T @ ' seguito da HH:mm:ss",
+          "Sotto --color la coda resta grigia e togliendo gli escape si riottiene esattamente la riga in chiaro"
+        ],
+        "tasks": [
+          {
+            "id": 1,
+            "short_title": "La coda e' sempre 'T @ orario'",
+            "full_description": "renderOneline chiude la riga con `T @ ${clock}` in ogni caso, senza il ternario sull'eta'. Il resto della riga (conteggi, parentesi dei task, marcatore !, riga vuota su tracker vuoto) non cambia.",
+            "checked": false
+          },
+          {
+            "id": 2,
+            "short_title": "Niente eta' residua nel codice",
+            "full_description": "formatAge rimossa, opzione lastUpdated tolta dalla firma di renderOneline, onelineFor non legge piu' data.last_updated. Un grep di formatAge e lastUpdated su scripts/ e test/ non trova nulla.",
+            "checked": false
+          },
+          {
+            "id": 3,
+            "short_title": "USAGE aggiornata",
+            "full_description": "La riga di USAGE che descrive --oneline promette 'T @ 16:34:50' e non piu' '3m 12s @ 16:34:50', e non parla piu' di quanto fa che il tracker e' stato scritto.",
+            "checked": false
+          },
+          {
+            "id": 4,
+            "short_title": "Test allineati e verde",
+            "full_description": "I test di formatAge spariscono, i test della coda asseriscono 'T @ HH:mm:ss' anche con lastUpdated assente, e npm run test esce 0.",
+            "checked": false
+          }
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-13T15:21:32Z",
+      "updated_at": "2026-08-13T15:26:29Z"
     }
   ]
 }
