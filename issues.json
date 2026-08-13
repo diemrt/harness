@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-13T14:12:23Z",
+  "last_updated": "2026-08-13T14:43:25Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1170,6 +1170,72 @@
       },
       "created_at": "2026-08-13T13:39:00Z",
       "updated_at": "2026-08-13T13:39:00Z"
+    },
+    {
+      "id": "d3d32a5d-ca41-447b-aae3-fc254351964d",
+      "title": "La riga di stato puo' restare ferma per minuti, e il documento dice il contrario",
+      "description": "Il 2026-08-13, mentre si lavorava 6a0ee313, la riga di stato e' rimasta ferma per minuti mostrando conteggi stantii. Una sonda strumentata ha misurato: senza subagent 23 invocazioni, con refreshInterval che scatta ogni 10.0s esatti; con un subagent in corso ZERO invocazioni in 6m40s, durante i quali il tracker e' stato scritto tre volte. Zero START senza END in tutto il log: il comando non viene ucciso a meta', non viene proprio chiamato. Ogni invocazione registrata ha restituito il valore corretto al millisecondo in cui e' avvenuta - non e' harness, che non ha cache.\n\nRestano tre cose da scrivere. references/status.md afferma che il confine di turno 'coincide con l'unico momento in cui i conteggi possono essere cambiati davvero': e' falso, e insegna a chi legge che una riga ferma e' innocua - la convinzione che e' costata i minuti persi. L'eta' misura il tracker, non la riga, e congelata somiglia a un dato. La ricetta di Claude Code non porta refreshInterval, che aiuta e non basta.\n\nIl referto della misura va committato: 'non e' harness' e' esattamente il tipo di conclusione che qualcuno rimettera' in discussione fra sei mesi.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [
+        "6a0ee313-df2e-4899-bdc3-3dcc1132836e"
+      ],
+      "covers": [
+        "7123928"
+      ],
+      "tasks": [],
+      "validation": {
+        "criteria": [
+          "references/status.md non afferma piu' che il confine di turno coincide con l'unico momento in cui i conteggi possono cambiare: al suo posto c'e' cio' che la misura ha mostrato",
+          "il documento dice che l'eta' misura il tracker e non la riga, e che un render congelato congela anche l'eta': la riga morta si riconosce in due sguardi, mai in uno",
+          "la ricetta di Claude Code porta refreshInterval col suo motivo, e dichiara che non basta: con un subagent in corso il timer non e' scattato nemmeno una volta",
+          "esiste un referto committato sotto docs/ coi numeri misurati il 2026-08-13: 23 invocazioni in fase 0, zero in 6m40s di fase 2, zero START senza END, 71-117ms per esecuzione",
+          "il referto distingue cio' che e' dimostrato da cio' che non lo e': la causa del blocco resta non stabilita, e il congelamento precede di circa un minuto l'avvio del subagent",
+          "il referto mostra perche' non e' harness: readFileSync a ogni lancio, nessuna cache, e ogni invocazione registrata ha restituito il valore corretto",
+          "npm test e' verde"
+        ],
+        "tasks": [
+          {
+            "id": 1,
+            "short_title": "La frase falsa sul refresh non c'e' piu'",
+            "full_description": "In references/status.md, il paragrafo che dichiara il confine di turno 'l'unico momento in cui i conteggi possono essere cambiati davvero'. Questa sessione lo smentisce: cinque scritture del tracker dentro un turno solo, e tre dentro una finestra di 6m40s senza nessuna invocazione.",
+            "checked": false
+          },
+          {
+            "id": 2,
+            "short_title": "Il limite dell'eta' scritto dove si legge",
+            "full_description": "L'eta' e' l'anzianita' del dato, non la freschezza della riga: se l'ospite congela il render, congela anche lei, e un '2m 43s' fermo somiglia a un dato. Va detto accanto all'eta', non in fondo.",
+            "checked": false
+          },
+          {
+            "id": 3,
+            "short_title": "refreshInterval nella ricetta, col suo limite",
+            "full_description": "La ricetta di Claude Code lo aggiunge e dice cosa compra: il timer scatta a 10s esatti quando l'ospite lo lascia scattare. E dice cosa non compra: in fase 2 non e' scattato nemmeno una volta in 6m40s.",
+            "checked": false
+          },
+          {
+            "id": 4,
+            "short_title": "Il referto committato coi numeri",
+            "full_description": "La misura va nel repository, non in una directory temporanea: e' la prova che regge la frase 'non e' harness' quando qualcuno la rimettera' in discussione. Numeri, timestamp, e il metodo con cui sono stati ottenuti.",
+            "checked": false
+          },
+          {
+            "id": 5,
+            "short_title": "Prova e correlazione tenute separate",
+            "full_description": "Dimostrato: l'ospite smette di chiamare, non uccide. Non dimostrato: la causa. Il blocco comincia circa un minuto prima che il subagent parta, quindi 'il subagent congela la riga' e' correlazione. Un referto che confonde le due cose vale meno di nessun referto.",
+            "checked": false
+          },
+          {
+            "id": 6,
+            "short_title": "Suite verde",
+            "full_description": "npm test verde, che e' il gate di .harness/config.json. Lavoro documentale, ma il gate resta quello.",
+            "checked": false
+          }
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-13T14:43:25Z",
+      "updated_at": "2026-08-13T14:43:25Z"
     }
   ]
 }
