@@ -420,5 +420,8 @@ codice): è il confronto con quello del clock-in, e dice in una schermata cosa s
 - [references/sweep.md](references/sweep.md) — setaccio dei documenti: cosa legge, cosa promuove,
   cosa fa delle occasioni che non promuove.
 - [references/board.md](references/board.md) — board delle issue con aggiornamento live.
+- [references/install-check.md](references/install-check.md) — confronto fra la copia di harness
+  installata e il repository da cui viene. Non è un passo del workflow: si esegue al rilascio, o
+  quando si sospetta di star eseguendo una copia diversa da quella che si sta leggendo.
 - [references/external-worker.md](references/external-worker.md) — delega opt-in a una CLI
   esterna.
