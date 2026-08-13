@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-13T09:40:01Z",
+  "last_updated": "2026-08-13T09:46:42Z",
   "rules": {
     "single_active_issue": false
   },
@@ -290,11 +290,66 @@
       "id": "e6836699-8a91-40c2-9db5-ed544f9eb7fc",
       "title": "Il calcolo del grafo diventa un modulo, e le catene un dato",
       "description": "Le 111 righe di calcolo sul grafo (dependsOn, danglingDeps, isWorkable, findCycle, buildAlerts) vivono dentro status-cli.mjs. L'export markdown ha bisogno delle stesse risposte, e due copie della regola 1-WIP divergerebbero senza che niente lo dica.\n\nL'estrazione da sola sarebbe rumorosa: la suite esistente su status-cli andrebbe rossa. La issue esiste per chains(), che e' codice nuovo senza rete. La catena e' la componente connessa del grafo depends_on, la definizione che SKILL.md da' della regola 1-WIP, e oggi non la calcola nessuno: un raggruppamento sbagliato produce un grafo plausibile e falso.\n\nSpec: docs/superpowers/specs/2026-08-13-ergonomia-emessa-design.md\nPiano: docs/superpowers/plans/2026-08-13-ergonomia-emessa.md (task 1-2)",
-      "status": "backlog",
+      "status": "in_progress",
       "tier": "standard",
       "depends_on": [],
       "covers": [],
-      "tasks": [],
+      "tasks": [
+        {
+          "id": 1,
+          "short_title": "Test del modulo, rosso",
+          "full_description": "Creare test/plugin-tracker-graph.test.mjs con i casi su dependsOn, countByStatus, shortId, isWorkable, danglingDeps, findCycle e buildAlerts. Deve fallire su 'Cannot find module ../scripts/tracker-graph.mjs'.",
+          "checked": true
+        },
+        {
+          "id": 2,
+          "short_title": "tracker-graph.mjs con le funzioni estratte",
+          "full_description": "Creare scripts/tracker-graph.mjs spostando verbatim da status-cli.mjs (righe 49-129 e 71-73) dependsOn, danglingDeps, isWorkable, findCycle, buildAlerts, shortId, piu' indexById, emptyCounts e countByStatus. I commenti vanno col codice: sono il motivo per cui la regola e' scritta cosi'.",
+          "checked": true
+        },
+        {
+          "id": 3,
+          "short_title": "status-cli ricablato sugli import",
+          "full_description": "Importare le funzioni da ./tracker-graph.mjs, cancellare le definizioni locali, ri-esportare shortId per non cambiare la superficie pubblica, e riscrivere buildSnapshot su countByStatus e indexById.",
+          "checked": true
+        },
+        {
+          "id": 4,
+          "short_title": "Suite verde coi test di status-cli intatti",
+          "full_description": "npm test verde. git diff main -- test/plugin-status-cli.test.mjs deve restare vuoto: se quel file cambia, e' l'estrazione ad aver cambiato comportamento, e va corretta l'estrazione.",
+          "checked": true
+        },
+        {
+          "id": 5,
+          "short_title": "Commit dell'estrazione",
+          "full_description": "git add dei tre file e commit. Allineare i task prima di committare.",
+          "checked": true
+        },
+        {
+          "id": 6,
+          "short_title": "Test di chains, rosso",
+          "full_description": "Aggiungere i casi su chains: raggruppamento in qualunque verso dell'arco, archi che escono dall'insieme ignorati, determinismo, lista vuota. Deve fallire perche' chains non esiste.",
+          "checked": false
+        },
+        {
+          "id": 7,
+          "short_title": "chains implementato",
+          "full_description": "BFS sulla versione non orientata del grafo depends_on, seguendo solo archi con entrambi i capi nell'insieme ricevuto. Iterazione nell'ordine di issues per restare deterministico: l'export viene diffato.",
+          "checked": false
+        },
+        {
+          "id": 8,
+          "short_title": "Suite verde con chains",
+          "full_description": "npm test verde su tutta la suite.",
+          "checked": false
+        },
+        {
+          "id": 9,
+          "short_title": "Commit di chains",
+          "full_description": "git add dei due file e commit, dopo aver allineato i task.",
+          "checked": false
+        }
+      ],
       "validation": {
         "criteria": [
           "node --test test/plugin-tracker-graph.test.mjs esce 0",
@@ -338,7 +393,7 @@
         "state": "unknown"
       },
       "created_at": "2026-08-13T09:40:01Z",
-      "updated_at": "2026-08-13T09:40:01Z"
+      "updated_at": "2026-08-13T09:46:42Z"
     },
     {
       "id": "b2c59231-709d-469a-8746-1d0b290ee427",

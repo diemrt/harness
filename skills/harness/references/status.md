@@ -10,6 +10,17 @@ Non scrive niente. Nessun flag lo fa scrivere.
 node "$SCRIPTS/status-cli.mjs" [--project-dir <path>] [--help]
 ```
 
+## Dove sta il calcolo
+
+Il riepilogo **rende**; a calcolare è `tracker-graph.mjs`, che non ha una riga di comando e non si
+invoca da solo. Ci vivono le risposte sul grafo — quali issue sono lavorabili, quali dipendenze non
+risolvono, se c'è un ciclo, e le catene su cui è scritta la regola 1-WIP — e ci vivono perché i
+consumatori sono due: questo riepilogo e l'export markdown. Due copie di quella regola
+divergerebbero senza che niente lo dica, ed è l'unico motivo per cui il modulo esiste.
+
+Nessuna funzione lì dentro legge o scrive un file: prendono issue e restituiscono dati. È ciò che
+permette di provare la regola con oggetti in memoria invece che leggendo una schermata.
+
 `--project-dir` serve solo se la cwd non è la radice del progetto. `--help` stampa l'uso ed
 esce 0. Non ci sono altri flag e non ci sono sottocomandi: `parseArgs` è in modalità `strict`,
 quindi un flag inventato fallisce invece di produrre un riepilogo che sembra giusto ma risponde

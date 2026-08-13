@@ -18,6 +18,18 @@ import { parseArgs } from "node:util";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import {
+  buildAlerts,
+  countByStatus,
+  indexById,
+  isWorkable,
+  shortId,
+} from "./tracker-graph.mjs";
+
+// Re-exported, not redefined: shortId moved to the graph module when the export needed it too, and
+// the importers of this file should not have to care where it lives now.
+export { shortId };
+
 export const STATUS_ICON = {
   backlog: "o",
   in_progress: "+",
@@ -46,95 +58,8 @@ export const TITLE_MAX = 38;
 export const TASKS_COL = 5;
 export const WORKABLE_SHOWN = 3;
 
-function emptyCounts() {
-  return { backlog: 0, in_progress: 0, in_review: 0, blocked: 0, done: 0 };
-}
-
-function dependsOn(issue) {
-  return Array.isArray(issue.depends_on) ? issue.depends_on : [];
-}
-
-// A dangling id — one that matches no issue in the tracker — leaves the issue unworkable. It
-// happens after a hand edit of issues.json, and after an archive that took away something still
-// referenced. Either way we do not know what is missing, so we do not clear the issue for work.
-function danglingDeps(issue, byId) {
-  return dependsOn(issue).filter((id) => !byId.has(id));
-}
-
-function isWorkable(issue, byId) {
-  if (issue.status !== "backlog") return false;
-  const deps = dependsOn(issue);
-  if (danglingDeps(issue, byId).length > 0) return false;
-  return deps.every((id) => byId.get(id).status === "done");
-}
-
-export function shortId(id) {
-  return String(id ?? "").slice(0, 8);
-}
-
-// Depth-first search restricted to open issues. A cycle among closed ones is a fact of history:
-// nothing is waiting on it any more, and reporting it every time would train the reader to skip
-// the alert line.
-function findCycle(issues, byId) {
-  const openIds = new Set(issues.filter((i) => i.status !== "done").map((i) => i.id));
-  const state = new Map(); // id -> "visiting" | "settled"
-  const stack = [];
-  let cycle = null;
-
-  function visit(id) {
-    if (cycle || state.get(id) === "settled") return;
-    if (state.get(id) === "visiting") {
-      cycle = stack.slice(stack.indexOf(id));
-      return;
-    }
-    state.set(id, "visiting");
-    stack.push(id);
-    for (const dep of dependsOn(byId.get(id))) {
-      if (openIds.has(dep)) visit(dep);
-    }
-    stack.pop();
-    state.set(id, "settled");
-  }
-
-  for (const id of openIds) visit(id);
-  return cycle;
-}
-
-function buildAlerts(issues, byId, counts, workableTotal) {
-  const alerts = [];
-
-  const cycle = findCycle(issues, byId);
-  if (cycle) {
-    alerts.push(`ciclo nei depends_on: ${cycle.map(shortId).join(" ")}`);
-  }
-
-  const broken = issues.filter((issue) => danglingDeps(issue, byId).length > 0);
-  if (broken.length > 0) {
-    const missing = [...new Set(broken.flatMap((issue) => danglingDeps(issue, byId)))]
-      .map(shortId)
-      .join(" ");
-    const verb =
-      broken.length === 1 ? "issue dipende da id inesistente" : "issue dipendono da id inesistenti";
-    alerts.push(`${broken.length} ${verb}: ${missing}`);
-  }
-
-  // Deliberately NOT "lavorabili 0 di <n>". That reads two lines above "LAVORABILI · 0 di 0",
-  // and the two "N di M" count different things — backlog here, workable there. Same shape, two
-  // denominators, no way to tell them apart on screen. The alert gives up the shape instead.
-  if (counts.backlog > 0 && workableTotal === 0) {
-    alerts.push(`backlog fermo: ${counts.backlog} issue, nessuna lavorabile — tutte attendono qualcosa`);
-  }
-
-  return alerts;
-}
-
 export function buildSnapshot(issues) {
-  const counts = emptyCounts();
-  for (const issue of issues) {
-    if (Object.hasOwn(counts, issue.status)) {
-      counts[issue.status] += 1;
-    }
-  }
+  const counts = countByStatus(issues);
 
   const inFlight = issues
     .filter((issue) => IN_FLIGHT_ORDER.includes(issue.status))
@@ -144,7 +69,7 @@ export function buildSnapshot(issues) {
         String(b.updated_at ?? "").localeCompare(String(a.updated_at ?? ""))
     );
 
-  const byId = new Map(issues.map((issue) => [issue.id, issue]));
+  const byId = indexById(issues);
 
   const workableAll = issues
     .filter((issue) => isWorkable(issue, byId))
