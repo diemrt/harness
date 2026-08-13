@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-13T10:36:32Z",
+  "last_updated": "2026-08-13T10:55:22Z",
   "rules": {
     "single_active_issue": false
   },
@@ -841,6 +841,67 @@
       },
       "created_at": "2026-08-13T10:35:10Z",
       "updated_at": "2026-08-13T10:36:32Z"
+    },
+    {
+      "id": "eb5c82a2-f2eb-43a5-bc71-4af0ae519f63",
+      "title": "Il verificatore ha una sola shell, e senza quella non verifica",
+      "description": "L'agent harness-verifier dichiara tools: [Read, Grep, Glob, Bash]. Una sola shell, e nessuna alternativa.\n\nIl 2026-08-13 bash ha smesso di inizializzarsi su questa macchina (mount table msys, errno 1). Riproducibile lanciando bash.exe --version direttamente da PowerShell, e sopravvissuto a un riavvio della sessione: e' l'installazione, non il sandbox e non Claude Code. Il verificatore della issue 38eb7b1a ha tentato 26 comandi, non ne ha eseguito nessuno, ha correttamente rifiutato di dichiarare pass, e non ha potuto scrivere nemmeno il fail perche' la chiusura passa da issue-manager.mjs. La issue e' rimasta in_review senza che niente nel tracker dicesse perche'.\n\nIl difetto non e' che bash si sia rotto. E' che un invariante di harness - verifica indipendente su OGNI issue - dipende da un solo binario che harness non nomina fra i propri prerequisiti e per cui non prevede alternativa. Su Windows PowerShell c'e' sempre, e il verificatore non puo' usarlo.\n\nE' la stessa specie di difetto della issue bfb0a23f: una prescrizione che regge finche' l'ambiente sta fermo.",
+      "status": "backlog",
+      "tier": "standard",
+      "depends_on": [],
+      "covers": [],
+      "tasks": [],
+      "validation": {
+        "criteria": [
+          "agents/harness-verifier.md dichiara nei tools una shell alternativa oltre a Bash, cosi' che una shell rotta non azzeri la verifica",
+          "l'agent dice quale shell provare, in che ordine, e cosa fare quando la prima non parte",
+          "un test asserisce che il frontmatter dell'agent elenca piu' di una shell: senza, la riga puo' sparire da una riscrittura",
+          "references/verification.md nomina il prerequisito e dichiara cosa succede quando nessuna shell funziona",
+          "e' scritto che una verifica che non ha potuto girare lascia la issue in in_review, non la porta a done, e l'orchestratore non la chiude al posto del verificatore",
+          "npm test e' verde"
+        ],
+        "tasks": [
+          {
+            "id": 1,
+            "short_title": "L'agent guadagna una seconda shell",
+            "full_description": "Il frontmatter di agents/harness-verifier.md elenca anche PowerShell. Su Windows c'e' sempre, e oggi e' l'unica via quando bash non parte.",
+            "checked": false
+          },
+          {
+            "id": 2,
+            "short_title": "L'ordine e il ripiego sono scritti",
+            "full_description": "L'agent dice quale provare per prima, e che davanti a un errore di avvio della shell - non del comando - deve passare all'altra invece di insistere. Il verificatore precedente ha ritentato 26 volte la stessa.",
+            "checked": false
+          },
+          {
+            "id": 3,
+            "short_title": "Un test difende la seconda shell",
+            "full_description": "Un test asserisce che il frontmatter elenca piu' di una shell, come gia' si fa per gli altri inventari del plugin.",
+            "checked": false
+          },
+          {
+            "id": 4,
+            "short_title": "Il prerequisito e' documentato",
+            "full_description": "references/verification.md nomina di cosa ha bisogno un verificatore per esistere, e cosa resta vero quando non ce l'ha.",
+            "checked": false
+          },
+          {
+            "id": 5,
+            "short_title": "Il caso 'non ho potuto verificare' ha una regola",
+            "full_description": "Scritto che la issue resta in_review, che non e' un pass, e che l'orchestratore non puo' chiuderla al posto del verificatore: sarebbe self-validation con un passaggio in piu'.",
+            "checked": false
+          },
+          {
+            "id": 6,
+            "short_title": "Suite verde",
+            "full_description": "npm test verde, che e' anche il gate di .harness/config.json.",
+            "checked": false
+          }
+        ],
+        "state": "unknown"
+      },
+      "created_at": "2026-08-13T10:55:22Z",
+      "updated_at": "2026-08-13T10:55:22Z"
     }
   ]
 }
