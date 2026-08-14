@@ -156,6 +156,55 @@ test("harness-verifier may not probe the project's own tracker", () => {
   );
 });
 
+test("harness-verifier is told to tick the validation.tasks it verified", () => {
+  // A bare /validation\.tasks/ would be worthless here: the prompt already named them in the
+  // no-shell-starts branch ("non spuntare nessun validation.tasks") while the procedure said
+  // nothing, and two issues closed pass with every box at false. The prohibition was never the
+  // missing half — the DUTY was. So the asserts are anchored to the duty and to the two edges
+  // that keep it honest: what stays unticked, and that ticking everything is not a shortcut.
+  const body = readAgent();
+  assert.match(
+    body,
+    /spunta\s+i\s+`?validation\.tasks`?\s+man\s+mano/i,
+    "the procedure must tell the verifier to tick the validation tasks as it verifies them"
+  );
+  assert.match(
+    body,
+    /lasci\s+non\s+spuntati\s+gli\s+altri/i,
+    "a task the verifier could not check must be told to stay unticked"
+  );
+  assert.match(
+    body,
+    /non\s+spuntarli\s+tutti\s+per\s+chiudere/i,
+    "ticking the whole checklist just to close must be forbidden in so many words"
+  );
+});
+
+test("the closure payload the verifier is shown carries validation.tasks", () => {
+  // The CLI keeps the stored tasks when the payload omits the field, so an example without them
+  // closes the issue done/pass with every box still false and nothing reports an error. The
+  // example is the thing the agent copies: prose asking for the tick loses to a payload showing
+  // it is not needed, which is exactly how this defect was built.
+  const body = readAgent();
+  const payloads = [...body.matchAll(/\{"status":"(?:done|blocked)"[^\n`]*/g)].map((m) => m[0]);
+  assert.equal(
+    payloads.length,
+    2,
+    "the agent must show both the passing and the failing closure payload"
+  );
+  for (const payload of payloads) {
+    assert.ok(
+      payload.includes('"tasks"'),
+      `'${payload}' omits validation.tasks: the closure would still succeed, with the checklist untouched`
+    );
+  }
+  assert.match(
+    body,
+    /rispedito\s+\*{0,2}per\s+intero/i,
+    "the prompt must say the tasks array has to be sent back whole for a tick to land"
+  );
+});
+
 test("the skill names an agent that exists", () => {
   const referenced = [
     path.join(skillDir, "SKILL.md"),

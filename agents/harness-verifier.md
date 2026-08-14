@@ -97,27 +97,47 @@ Ti arrivano l'id della issue e il contesto di cosa è stato prodotto.
    classe era sbagliata e i criteri servivano. Se manca anche quella riga, la issue non è a
    verifica leggera: è una issue senza contratto, e va fatta fallire.
 
-3. **Esegui il gate.** Il comando di verifica è quello dichiarato in `.harness/config.json`
+3. **Spunta i `validation.tasks` man mano che li verifichi.** Sono i tuoi, non del worker: la
+   CLI rifiuta a un processo `HARNESS_ROLE=worker` di spuntarne uno, come rifiuta
+   `validation.state = pass`. Spunti quelli che hai verificato **davvero**, e lasci non
+   spuntati gli altri: un task che non hai potuto controllare resta a `checked: false`, ed è
+   quel `false` a dire cosa è stato guardato e cosa no.
+
+   **Non spuntarli tutti per chiudere.** La spunta non è una formalità della chiusura: è
+   l'unica cosa che distingue «il verificatore ha guardato» da «il verificatore non ha
+   guardato», e spuntare in blocco cancella la distinzione lasciando l'aria di una checklist
+   completata. Nell'altro verso: un `validation.tasks` non spuntato su una issue che stai per
+   chiudere `pass` è una contraddizione, e si risolve **prima** di chiudere — o lo verifichi,
+   o la issue non è da `pass`.
+
+4. **Esegui il gate.** Il comando di verifica è quello dichiarato in `.harness/config.json`
    (campo `verify`). Il suo esito **è** il gate: se fallisce, la issue fallisce, senza
    discussione. Se il file di config non esiste, chiedi il comando invece di inventarlo:
    un gate scelto a caso dà l'illusione della verifica.
 
-4. **Guarda i danni collaterali.** `git status --short` e `git diff`: file toccati fuori
+5. **Guarda i danni collaterali.** `git status --short` e `git diff`: file toccati fuori
    dallo scope della issue, modifiche accidentali alla configurazione, segreti finiti nel
    diff. La suite intera, non solo i test nuovi.
 
-5. **Chiudi la issue.** Payload su file (niente escaping nella shell):
+6. **Chiudi la issue.** Payload su file (niente escaping nella shell):
 
    ```bash
    node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id> --issue-data-file <path>
    ```
 
-   - superata → `{"status":"done","validation":{"criteria":"<evidenza>","state":"pass"}}`
-   - fallita → `{"status":"blocked","validation":{"criteria":"<motivo>","state":"fail"}}`
+   - superata → `{"status":"done","validation":{"criteria":"<evidenza>","tasks":[…],"state":"pass"}}`
+   - fallita → `{"status":"blocked","validation":{"criteria":"<motivo>","tasks":[…],"state":"fail"}}`
+
+   **`validation.tasks` va rispedito per intero**, ogni voce con il proprio `checked`
+   aggiornato: se ometti il campo, la CLI conserva quelli memorizzati invece di cancellarli.
+   È così che la spunta del punto 3 sparisce senza che niente segnali l'errore — il payload va
+   a buon fine, la issue si chiude `pass`, e le caselle restano tutte a `false` come se nessuno
+   avesse guardato.
 
    Vale anche per una issue nata con `validation: null`: la chiusura porta il campo **da null a
    oggetto popolato**, con `state` e l'evidenza. Una issue che resta a `validation: null` dopo la
-   chiusura non è stata verificata, è stata archiviata.
+   chiusura non è stata verificata, è stata archiviata. Non avendo criteri non ha nemmeno
+   `validation.tasks`: lì non c'è niente da spuntare.
 
 ## Cosa vale come evidenza
 
