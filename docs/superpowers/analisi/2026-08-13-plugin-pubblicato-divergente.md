@@ -328,13 +328,34 @@ In quel momento il progetto consumer inizierebbe a scrivere le proprie issue den
 - **Se la copia in cache sia raggiungibile da qualche percorso.** L'evidenza dice che oggi non lo
   è (168 invocazioni contro 0, e l'espansione di `${CLAUDE_PLUGIN_ROOT}` sulla directory). Non
   dice che non possa esserlo mai.
-- **Perché questa sessione, aperta nella radice del plugin, carichi la skill dal working tree.**
-  Le due spiegazioni possibili — la sorgente `directory` registrata, oppure la cwd che coincide
-  con la radice del plugin — non sono separabili finché la registrazione resta com'è. La
-  distinzione non è oziosa: decide se, passando a una sorgente remota, lo sviluppo di harness su
-  sé stesso continui a funzionare dal vivo o richieda un giro di push per ogni iterazione.
-  Si falsifica in un minuto **dopo** il cambio, aprendo una sessione qui e guardando quale path
-  annuncia la skill.
+## Una domanda che era aperta, e non lo è più
+
+Restava da capire **perché** una sessione aperta nella radice del plugin caricasse la skill dal
+working tree: la sorgente `directory` registrata, oppure la cwd che coincide con la radice del
+plugin. Le due spiegazioni non erano separabili finché la registrazione restava com'era, e la
+distinzione non era oziosa — decideva se, passando a una sorgente remota, lo sviluppo di harness
+su sé stesso continuasse a funzionare dal vivo o richiedesse un giro di push per ogni iterazione.
+
+Il 2026-08-14 il marketplace è stato ri-registrato come `github: diemrt/harness` e la sessione
+riavviata, **dentro questo repository**. La skill ha annunciato:
+
+```text
+Base directory for this skill:
+  C:\Users\...\.claude\plugins\cache\diemrt\harness\0.6.0\skills\harness
+```
+
+Era la sorgente, non la cwd. **Il working tree non vince sulla registrazione**, nemmeno per il
+repository che è il plugin: da qui in avanti una sessione aperta qui legge la skill, gli agent, i
+comandi e gli script del **rilascio**, e le modifiche non pubblicate non le vede. Il documento
+servito lo conferma da solo: il suo elenco di reference non contiene
+`references/install-check.md`, aggiunto su questo ramo e non ancora su `main`.
+
+Non è un difetto da correggere, è il prezzo della pubblicazione — lo stesso che paga superpowers.
+Ma cambia il loop di sviluppo di harness, e va scritto dove chi sviluppa lo incontra
+([CONTRIBUTING.md](../../../CONTRIBUTING.md)): **provare una modifica ai componenti del plugin in
+una sessione reale ora richiede un giro di pubblicazione**, non solo un riavvio. Gli script si
+continuano a provare dal repository, invocandoli per path — è quello che fa `npm test`, ed è
+perché la suite resta cieca all'installato.
 
 ## Cosa deve fare chi ha già una copia divergente installata
 

@@ -29,8 +29,20 @@ of anything: what you edit is what ships.
    in the README are exactly the ones shipped. A renamed file or a dangling link fails here
    instead of failing silently at runtime, where a broken command simply never triggers.
 3. Exercise the change in this repository, which runs on harness itself. Committing a new
-   skill, agent or command is not proof it works — invoke it in a real session here. Newly
-   added plugin components are only picked up after restarting the Claude Code session.
+   skill, agent or command is not proof it works — invoke it in a real session here.
+
+**A session opened here does not load this working tree.** It loads the installed copy, even
+though the cwd *is* the plugin root: measured on 2026-08-14, right after the marketplace was
+re-registered as a remote, the harness skill announced its base directory as
+`~/.claude/plugins/cache/diemrt/harness/0.6.0/skills/harness`. The registered source wins over
+the current directory. Since `$SCRIPTS` is derived from that base directory, the workflow reaches
+the released scripts too.
+
+So step 3 costs a round of publication: merge, push, `/plugin marketplace update diemrt`, restart
+the session. A restart alone only picks up what has already landed. Two things are unaffected and
+are where most of the loop should stay — `npm test`, which runs on this repository, and any script
+you invoke by path (`node scripts/…`), which is the copy you just edited. That is also exactly why
+the suite is blind to the installed copy, and why the check below exists.
 
 `ci.yml` runs on every push and pull request: `npm ci`, `npm test`, then a read of this
 repository's own tracker through the shipped CLI. `.harness/config.json` declares `npm run

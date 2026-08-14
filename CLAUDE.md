@@ -13,8 +13,14 @@ niente sul ramo condiviso prima del `pass`).
 
 Conseguenza operativa: **ogni modifica al plugin va provata qui prima di essere rilasciata.**
 Averla scritta e committata non basta, e nemmeno `npm test` basta: una skill, un agent o un
-comando nuovo va invocato in una sessione reale di questo repository. I componenti appena
-aggiunti diventano invocabili solo dopo un riavvio della sessione di Claude Code.
+comando nuovo va invocato in una sessione reale di questo repository.
+
+**Ma una sessione aperta qui non carica questo working tree**: carica la copia installata, anche
+se la cwd è la radice del plugin. Misurato il 2026-08-14 — la skill harness annuncia come base
+directory `~/.claude/plugins/cache/diemrt/harness/0.6.0/skills/harness`, e da lì discende anche
+`$SCRIPTS`. Per provare davvero un componente serve quindi un giro di pubblicazione: merge, push,
+`/plugin marketplace update diemrt`, riavvio della sessione. Gli script si continuano a provare
+dal repository invocandoli per path (`node scripts/…`), che è la copia appena modificata.
 
 ## `issues.json` alla radice sono dati reali
 
