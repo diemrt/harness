@@ -328,6 +328,7 @@ In quel momento il progetto consumer inizierebbe a scrivere le proprie issue den
 - **Se la copia in cache sia raggiungibile da qualche percorso.** L'evidenza dice che oggi non lo
   è (168 invocazioni contro 0, e l'espansione di `${CLAUDE_PLUGIN_ROOT}` sulla directory). Non
   dice che non possa esserlo mai.
+
 ## Una domanda che era aperta, e non lo è più
 
 Restava da capire **perché** una sessione aperta nella radice del plugin caricasse la skill dal
