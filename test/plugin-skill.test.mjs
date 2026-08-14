@@ -213,6 +213,71 @@ test("the board is a tool you ask for, not a clock-in step", () => {
   );
 });
 
+test("the skill says how $SCRIPTS is computed, not just what it stands for", () => {
+  // ${CLAUDE_PLUGIN_ROOT} is not an environment variable: no shell expands it. Naming it without
+  // saying how to resolve it leaves the reader one option — reuse an absolute path seen somewhere
+  // else — and that path carries the plugin's version number, so it keeps working against a stale
+  // copy instead of failing. Anchored to the derivation and to the ban, never to the bare word
+  // "path": the skill says "path" dozens of times and a loose regex would pass with the rule gone.
+  const content = readSkill();
+  assert.match(
+    content,
+    /non\s+è\s+una\s+variabile\s+d['’]ambiente/i,
+    "the skill must say that CLAUDE_PLUGIN_ROOT is not something a shell can expand"
+  );
+  assert.match(
+    content,
+    /base\s+directory\s+che\s+il\s+tool\s+Skill\s+annuncia/i,
+    "the skill must name where the value actually comes from"
+  );
+  assert.match(
+    content,
+    /\.\.\/\.\.\/scripts/,
+    "the skill must give the derivation from the skill's own base directory"
+  );
+  assert.match(
+    content,
+    /non\s+indovinarlo,?\s+e\s+non\s+riusare\s+un\s+path\s+assoluto\s+visto\s+altrove/i,
+    "reusing an absolute path from elsewhere must be forbidden in so many words"
+  );
+  assert.match(
+    content,
+    /non\*{0,2}\s+fallisce/i,
+    "the skill must say the stale path runs instead of failing: that is why the ban is not advice"
+  );
+});
+
+test("installing harness is offered as advice, never as a step", () => {
+  // The question arrives, and without an answer in writing the agent invents one — usually copying
+  // the scripts into the project, which is the one thing harness does not do. It earns a section,
+  // but a section that reads as a step would put an install into every clock-in.
+  const content = readSkill();
+  const start = content.indexOf("## Consiglio, su richiesta: installare harness");
+  assert.ok(start !== -1, "the skill must carry the install section, marked as advice in its title");
+  const end = content.indexOf("## Reference", start);
+  const advice = content.slice(start, end === -1 ? undefined : end);
+
+  assert.match(
+    advice,
+    /non\s+è\s+un\s+passo\s+del\s+workflow/i,
+    "the section must disclaim being part of the workflow, in its own body and not only in its title"
+  );
+  assert.match(advice, /\/plugin\s+install\s+harness@diemrt/, "the section must give the command");
+  assert.match(
+    advice,
+    /non\s+è\s+attivo\s+nella\s+sessione\s+in\s+corso/i,
+    "a freshly installed plugin needs a restart, and that is the half everyone is bitten by"
+  );
+
+  // The clock-in must stay clear of it: an install that appears among the opening steps is exactly
+  // the outcome the marking exists to prevent.
+  const clockIn = content.slice(content.indexOf("## Clock in"), content.indexOf("## Regola 1-WIP"));
+  assert.ok(
+    !/\/plugin\s+install/.test(clockIn),
+    "clock-in names an install command: the advice leaked into the workflow"
+  );
+});
+
 test("the docs gate names the field and the script, not just the duty", () => {
   const content = readSkill();
   const start = content.indexOf("## Dopo il commit: gate documentale");

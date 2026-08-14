@@ -18,6 +18,24 @@ progetto — harness non scrive nessun `.gitignore`
 
 Nel resto del documento `$SCRIPTS` sta per `${CLAUDE_PLUGIN_ROOT}/scripts`.
 
+**Come si calcola.** `CLAUDE_PLUGIN_ROOT` **non è una variabile d'ambiente**: nessuna shell la
+espande, e un comando che la contiene così com'è parte con un path monco. Il valore si ricava dalla
+**base directory che il tool Skill annuncia quando questa skill viene invocata**: quella base è
+`<radice del plugin>/skills/harness`, quindi `$SCRIPTS` è `<base della skill>/../../scripts`. La
+regola è questa e non un path perché è l'unica che vale identica per il plugin installato, per il
+repository clonato e per questi documenti letti da una CLI esterna.
+
+Il testo che stai leggendo può arrivarti già risolto — dipende da come ti è stato consegnato — ma
+**le reference no**: aperte con un Read sono file su disco, e `${CLAUDE_PLUGIN_ROOT}` ci resta
+scritto alla lettera. Quando lo incontri, risolvilo con la regola qui sopra.
+
+**Non indovinarlo, e non riusare un path assoluto visto altrove.** Uno letto in un'altra sessione,
+in un altro progetto o in un esempio non è una risposta: il path del plugin installato contiene il
+numero di versione — `.../harness/<versione>/scripts` — quindi cambia a ogni rilascio, e la copia
+vecchia resta sul disco. Un comando che punta lì **non fallisce**: gira, e gira sulla versione
+sbagliata. È il modo silenzioso di verificare una cosa mentre se ne legge un'altra. Se la base
+directory non ti è stata annunciata, chiedila invece di ricostruirla.
+
 ## Clock in (inizio sessione)
 
 1. **Contesto di progetto** — leggi quello che il progetto ha già (`CLAUDE.md`, `AGENTS.md`,
@@ -403,6 +421,33 @@ avviato il board, fermalo adesso col `pid` della riga di avvio.
 
 Chiudi ristampando il riepilogo (`node "$SCRIPTS/status-cli.mjs"`, verbatim in un blocco di
 codice): è il confronto con quello del clock-in, e dice in una schermata cosa si è mosso.
+
+## Consiglio, su richiesta: installare harness
+
+**Questa sezione non è un passo del workflow.** Non si esegue al clock-in, non si propone a un
+progetto che non l'ha chiesto, e non è una checklist da spuntare. Sta qui per un motivo solo: la
+domanda «come lo installo sul mio progetto» arriva, e senza una risposta scritta l'agente ne
+improvvisa una — di solito copiando gli script dentro il progetto, che è esattamente ciò che
+harness non fa.
+
+Si installa come plugin, dal marketplace che lo pubblica:
+
+```
+/plugin marketplace add diemrt/harness
+/plugin install harness@diemrt
+```
+
+Da lì i comandi sono raggiungibili senza altro lavoro: il tool Skill annuncia la base directory a
+ogni invocazione e `$SCRIPTS` si calcola da quella. **Non** si copiano gli script nel progetto,
+**non** si tocca il `PATH`, **non** si scrive un path assoluto da nessuna parte — quello del plugin
+installato porta la versione, e a ogni rilascio punterebbe a una copia vecchia che esiste ancora.
+
+Nel progetto restano `issues.json` e `.harness/`, niente altro.
+
+Un plugin appena installato o appena aggiornato **non è attivo nella sessione in corso**: la
+sessione va riavviata perché la nuova copia venga caricata. Se il sospetto è di star eseguendo una
+copia diversa da quella che si sta leggendo — e succede — il confronto sta in
+[references/install-check.md](references/install-check.md).
 
 ## Reference
 

@@ -205,6 +205,37 @@ test("the closure payload the verifier is shown carries validation.tasks", () =>
   );
 });
 
+test("harness-verifier is told how to resolve the plugin root it is shown", () => {
+  // The agent's commands all carry ${CLAUDE_PLUGIN_ROOT}, which no shell expands. Shown without a
+  // resolution rule it leaves the verifier one move — reuse an absolute path from somewhere else —
+  // and that path carries the plugin's version, so it runs against a stale copy instead of
+  // failing. For a verifier that is the worst possible failure: a pass about code it never read.
+  //
+  // Anchored to the rule and to its consequence. The word "path" is everywhere in this prompt, and
+  // even /CLAUDE_PLUGIN_ROOT/ would match the command examples the rule exists to explain.
+  const body = readAgent();
+  assert.match(
+    body,
+    /non\s+è\s+una\s+variabile\s+d['’]ambiente/i,
+    "the agent must be told the token is not something a shell expands"
+  );
+  assert.match(
+    body,
+    /base\s+directory\s+della\s+skill\s+harness/i,
+    "the agent must be given where the value comes from when nobody hands it over"
+  );
+  assert.match(
+    body,
+    /non\s+indovinarlo\s+e\s+non\s+riusare\s+un\s+path\s+assoluto\s+visto\s+altrove/i,
+    "guessing the root must be forbidden in so many words"
+  );
+  assert.match(
+    body,
+    /gira\s+sulla\s+versione\s+sbagliata/i,
+    "the silent failure must be named: the command runs, against the wrong copy"
+  );
+});
+
 test("the skill names an agent that exists", () => {
   const referenced = [
     path.join(skillDir, "SKILL.md"),

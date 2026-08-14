@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-14T09:38:22Z",
+  "last_updated": "2026-08-14T09:48:51Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1077,13 +1077,62 @@
       "id": "f57521cb-3a57-4c45-a029-4fa608c23d98",
       "title": "La skill sa dove sono i propri script invece di indovinarli",
       "description": "Le reference definiscono $SCRIPTS come ${CLAUDE_PLUGIN_ROOT}/scripts, ma CLAUDE_PLUGIN_ROOT non e' una variabile d'ambiente: non esiste nel processo shell. Claude Code la sostituisce nei file dentro commands/, e li' funziona; nella skill, nelle reference e nell'agent resta testo. L'agente che le legge non puo' espanderla, e ripiega sull'unica cosa che conosce - il path letterale del progetto in cui si trova harness.\n\nIl danno si vede negli altri progetti: comandi con un path assoluto scritto a mano. E il path del plugin installato contiene la versione (.claude/plugins/cache/<owner>/harness/<versione>/), quindi ogni rilascio lo cambia e il path scritto a mano continua a puntare a una copia vecchia che esiste ancora - un errore silenzioso.\n\nLa ricetta esiste gia' e non era stata vista: il tool Skill annuncia la propria base directory quando la skill viene invocata. $SCRIPTS e' <base della skill>/../../scripts, e vale identico per plugin installato, repo clonato e documenti letti da una CLI esterna. AGENTS.md lo dice gia' a meta', ma solo al worker esterno.",
-      "status": "backlog",
+      "status": "in_progress",
       "tier": "standard",
       "depends_on": [
         "bfb0a23f-50ff-4e44-873e-585b1bcedbd8"
       ],
       "covers": [],
-      "tasks": [],
+      "tasks": [
+        {
+          "id": 1,
+          "short_title": "Misurare dove la sostituzione avviene davvero",
+          "full_description": "Prima di scrivere: la description sostiene che ${CLAUDE_PLUGIN_ROOT} resta testo nella skill. In questa sessione NON e' cosi' - SKILL.md arriva con il path gia' risolto. Va misurato punto per punto (SKILL.md iniettata, references lette da disco, agent) e la regola va scritta contro quello che si osserva, non contro la premessa. Il risultato va riportato all'utente: se la description sbaglia, e' lui a poterla correggere, non io.",
+          "checked": false
+        },
+        {
+          "id": 2,
+          "short_title": "La regola di risoluzione in SKILL.md",
+          "full_description": "Riga 19, accanto alla definizione di $SCRIPTS: come si calcola, cioe' la base directory che il tool Skill annuncia all'invocazione piu' ../../scripts. Non cambia l'interfaccia, aggiunge la derivazione - e vale identico per plugin installato, repo clonato e documenti letti da una CLI esterna.",
+          "checked": false
+        },
+        {
+          "id": 3,
+          "short_title": "Il divieto di indovinare",
+          "full_description": "Scritto che un path assoluto visto in un'altra sessione o in un altro progetto non e' una risposta: il path del plugin installato contiene la versione, quindi quello di ieri punta a una copia vecchia che esiste ancora. E' un errore silenzioso, che e' il motivo per cui va vietato invece di sconsigliato.",
+          "checked": false
+        },
+        {
+          "id": 4,
+          "short_title": "La stessa regola nell'agent",
+          "full_description": "agents/harness-verifier.md mostra comandi con ${CLAUDE_PLUGIN_ROOT} e non dice a nessuno come risolverlo. E' il lettore piu' frequente e quello che non puo' chiedere: la regola va dove la legge lui, non solo dove la legge l'orchestratore.",
+          "checked": false
+        },
+        {
+          "id": 5,
+          "short_title": "Il consiglio d'installazione, marcato come tale",
+          "full_description": "Sezione breve, dichiarata consiglio su richiesta e non passo del workflow: serve perche' l'agente abbia una risposta pronta quando gliela chiedono, non perche' installare sia parte del clock-in. La marcatura e' il contenuto: senza, diventa un passo che nessuno voleva.",
+          "checked": false
+        },
+        {
+          "id": 6,
+          "short_title": "I test, ancorati alla frase",
+          "full_description": "Un test su SKILL.md e uno sull'agent. Ancorati alla frase come gia' fanno i test dell'agent: un test sulla parola 'path' passerebbe con la regola cancellata, ed e' lo stesso errore da cui e' nata bfb0a23f. Verificati rossi sulla versione precedente prima di dichiararli buoni.",
+          "checked": false
+        },
+        {
+          "id": 7,
+          "short_title": "Nessuno script toccato",
+          "full_description": "Lavoro documentale: git diff --stat non deve nominare scripts/. Da controllare prima del commit, non dopo.",
+          "checked": false
+        },
+        {
+          "id": 8,
+          "short_title": "Suite verde, commit, consegna",
+          "full_description": "npm test verde, commit sul ramo, poi in_review. Il commit tocca solo .md e test/, quindi il gate documentale non chiede niente - da confermare con docs-gate.mjs invece che darlo per scontato.",
+          "checked": false
+        }
+      ],
       "validation": {
         "criteria": [
           "SKILL.md, dove definisce $SCRIPTS, dice come si calcola: la base directory annunciata dal tool Skill, piu' ../../scripts",
@@ -1141,7 +1190,7 @@
         "state": "unknown"
       },
       "created_at": "2026-08-13T13:39:00Z",
-      "updated_at": "2026-08-13T13:39:00Z"
+      "updated_at": "2026-08-14T09:48:51Z"
     },
     {
       "id": "24f39ab4-6401-434c-a780-506d13c498d8",
