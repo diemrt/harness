@@ -2,6 +2,4 @@ node_modules/
 *.tgz
 *.new
 .harness/runs/
-.harness/board.cmd
-.harness/board.sh
 .claude/settings.local.json

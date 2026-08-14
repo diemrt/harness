@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-14T09:57:44Z",
+  "last_updated": "2026-08-14T14:13:08Z",
   "rules": {
     "single_active_issue": false
   },
@@ -495,181 +495,95 @@
       "updated_at": "2026-08-13T10:10:55Z"
     },
     {
-      "id": "284d96c3-bd3c-4d7d-920d-0e6769dd96a5",
-      "title": "L'export conserva il record, non lo appiattisce",
-      "description": "L'export markdown copre l'80 per cento dell'uso del board: leggere descrizioni, validazioni, stati e completamento dei task, su richiesta e senza bisogno di live.\n\nIl rischio e' costoso e invisibile: se il frontmatter appiattisce tasks e validation in stringhe, l'artefatto sembra giusto e sparisce in silenzio il criterio per cui questa strada e' stata scelta al posto di un tracker markdown gia' fatto. Harness non ha dipendenze, quindi l'emettitore YAML si scrive: ogni scalare passa da JSON.stringify, che produce uno scalare YAML valido e chiude i buchi di escaping.\n\nSpec: docs/superpowers/specs/2026-08-13-ergonomia-emessa-design.md\nPiano: docs/superpowers/plans/2026-08-13-ergonomia-emessa.md (task 4-5-6)",
-      "status": "backlog",
-      "tier": "standard",
-      "depends_on": [
-        "e6836699-8a91-40c2-9db5-ed544f9eb7fc"
-      ],
-      "covers": [],
-      "tasks": [],
-      "validation": {
-        "criteria": [
-          "grep -A3 '^tasks:' su un file esportato mostra righe '  - id:' e '    short_title:', non una stringa",
-          "lo stesso per validation: criteria e tasks compaiono come blocchi annidati",
-          "un titolo con virgolette, due punti e un a capo non rompe il blocco frontmatter",
-          "il grafo esclude le done, produce un subgraph per catena di due o piu', e l'arco va dalla dipendenza alla issue che la dichiara",
-          "senza issue aperte non viene aperto nessun blocco mermaid",
-          "npm test e' verde"
-        ],
-        "tasks": [
-          {
-            "id": 1,
-            "short_title": "I task restano struttura nel frontmatter",
-            "full_description": "Il blocco tasks: esce come lista di oggetti YAML annidati, non come stringa JSON su una riga.",
-            "checked": false
-          },
-          {
-            "id": 2,
-            "short_title": "La validazione resta struttura",
-            "full_description": "validation.criteria e validation.tasks escono come blocchi annidati, con state accanto.",
-            "checked": false
-          },
-          {
-            "id": 3,
-            "short_title": "Le stringhe difficili non rompono il blocco",
-            "full_description": "Un test con virgolette, due punti e a capo nel titolo: il valore resta su una riga sola e il blocco resta valido.",
-            "checked": false
-          },
-          {
-            "id": 4,
-            "short_title": "Il grafo disegna le catene",
-            "full_description": "Solo issue non chiuse, un subgraph per componente connessa di due o piu', arco dalla dipendenza alla issue.",
-            "checked": false
-          },
-          {
-            "id": 5,
-            "short_title": "Grafo vuoto senza blocco mermaid",
-            "full_description": "Con sole issue done l'indice non apre un blocco mermaid ma scrive che non c'e' niente di aperto.",
-            "checked": false
-          }
-        ],
-        "state": "unknown"
-      },
-      "created_at": "2026-08-13T09:40:01Z",
-      "updated_at": "2026-08-13T09:40:01Z"
-    },
-    {
-      "id": "03082d03-c073-4a72-b414-3f1fa23d11cf",
-      "title": "L'export possiede la directory e non cancella mai l'altrui",
-      "description": "L'esportatore possiede .harness/export/ e la riscrive per intero: e' l'unico modo perche' una issue cancellata o compattata non lasci un file fantasma.\n\nPossedere una directory significa poterci cancellare dentro, ed e' li' il rischio: costoso perche' e' perdita di dati, invisibile perche' riesce in silenzio. Quindi rifiuta appena trova qualcosa che non ha scritto lui, invece di ripulire: un --project-dir sbagliato non deve diventare una cancellazione. Stessa logica per la collisione di short-id, dove allungare gli id in silenzio cambierebbe URL gia' pubblicati.\n\nSpec: docs/superpowers/specs/2026-08-13-ergonomia-emessa-design.md\nPiano: docs/superpowers/plans/2026-08-13-ergonomia-emessa.md (task 7)",
-      "status": "backlog",
-      "tier": "standard",
-      "depends_on": [
-        "284d96c3-bd3c-4d7d-920d-0e6769dd96a5"
-      ],
-      "covers": [],
-      "tasks": [],
-      "validation": {
-        "criteria": [
-          "due export con una issue rimossa in mezzo: il file della issue sparita non c'e' piu' e data.removed vale 1",
-          "con un note.txt dentro .harness/export/issues/: exit 1, code FOREIGN_CONTENT, e il file e' ancora li'",
-          "due id con gli stessi otto caratteri iniziali: exit 1, code ID_COLLISION, entrambi gli id nel messaggio",
-          "tracker assente: exit 0, ok true, scritto solo l'indice",
-          "stdout e' sempre una sola riga JSON e stderr e' sempre vuoto"
-        ],
-        "tasks": [
-          {
-            "id": 1,
-            "short_title": "I file delle issue sparite vengono rimossi",
-            "full_description": "Export, rimozione di una issue dal tracker, secondo export: il file non c'e' piu' e removed vale 1.",
-            "checked": false
-          },
-          {
-            "id": 2,
-            "short_title": "Un file estraneo fa rifiutare senza cancellare",
-            "full_description": "FOREIGN_CONTENT con exit 1, e il file estraneo e' ancora sul disco dopo il rifiuto.",
-            "checked": false
-          },
-          {
-            "id": 3,
-            "short_title": "La collisione di short-id fa rifiutare",
-            "full_description": "ID_COLLISION con exit 1, e il messaggio nomina entrambi gli id per esteso.",
-            "checked": false
-          },
-          {
-            "id": 4,
-            "short_title": "Tracker assente non e' un errore",
-            "full_description": "Exit 0 con ok true e il solo indice scritto, coerente con come issue-manager legge un tracker assente.",
-            "checked": false
-          },
-          {
-            "id": 5,
-            "short_title": "Contratto di output rispettato",
-            "full_description": "Una sola riga JSON su stdout in ogni esito, niente su stderr, exit 1 su ogni rifiuto.",
-            "checked": false
-          }
-        ],
-        "state": "unknown"
-      },
-      "created_at": "2026-08-13T09:40:01Z",
-      "updated_at": "2026-08-13T09:40:01Z"
-    },
-    {
       "id": "f59e8a5e-7382-4090-9489-dace5db15b38",
       "title": "Il board esce dal plugin senza lasciare riferimenti orfani",
-      "description": "Il board e' il 16,6 per cento della superficie mantenuta (1.873 righe fra sorgente e test) per un componente che il progetto stesso ha gia' declassato per iscritto, e l'unico che dipende dalla rete: carica tailwind, daisyUI e lucide@latest non pinnato da tre CDN. Con --oneline e l'export nessuno dei due usi che copriva resta scoperto.\n\nIl rischio non e' cancellare: e' cancellare a meta'. I test coprono l'inventario dei file, non la prosa, e un riferimento orfano in SKILL.md o in una reference resta invisibile finche' un agente non ci sbatte contro. Nello stesso giro nascono la reference e il comando dell'export, senza i quali un componente nuovo non lo trova nessuno.\n\nSpec: docs/superpowers/specs/2026-08-13-ergonomia-emessa-design.md\nPiano: docs/superpowers/plans/2026-08-13-ergonomia-emessa.md (task 8-9)",
-      "status": "backlog",
+      "description": "Il board e' il 16,6 per cento della superficie mantenuta (1.873 righe fra sorgente e test) per un componente che il progetto stesso ha gia' declassato per iscritto, e l'unico che dipende dalla rete: carica tailwind, daisyUI e lucide@latest non pinnato da tre CDN.\n\nDei due usi che copriva, lo sguardo ce l'ha gia' --oneline. Il record — descrizioni, criteri, stato dei task — si chiede all'agente, che lo legge dal tracker: il 2026-08-14 l'export markdown e' stato scartato e le due issue che lo portavano (03082d03, 284d96c3) cancellate, perche' sarebbe una customizzazione del progetto che consuma harness e non un componente del plugin — la stessa natura che ha gia' monitor.ps1. Da qui la deviazione dal piano, che ai task 8-9 dava l'export per fatto: quei due task non verranno svolti.\n\nIl rischio non e' cancellare: e' cancellare a meta'. I test coprono l'inventario dei file, non la prosa, e un riferimento orfano in SKILL.md o in una reference resta invisibile finche' un agente non ci sbatte contro.\n\nSpec: docs/superpowers/specs/2026-08-13-ergonomia-emessa-design.md\nPiano: docs/superpowers/plans/2026-08-13-ergonomia-emessa.md (task 8-9, export escluso)",
+      "status": "done",
       "tier": "standard",
       "depends_on": [
-        "b2c59231-709d-469a-8746-1d0b290ee427",
-        "03082d03-c073-4a72-b414-3f1fa23d11cf"
+        "b2c59231-709d-469a-8746-1d0b290ee427"
       ],
-      "covers": [],
-      "tasks": [],
+      "covers": [
+        "6ca0ba4ce89eb0be03ecde0ff52a5c4ce15aa32f"
+      ],
+      "tasks": [
+        {
+          "id": 1,
+          "short_title": "git rm dei cinque file del board",
+          "full_description": "scripts/board-server.mjs, scripts/board.html, test/plugin-board.test.mjs, commands/board.md, skills/harness/references/board.md.",
+          "checked": true
+        },
+        {
+          "id": 2,
+          "short_title": "Manifest e documentazione di primo livello",
+          "full_description": "La description gemella in .claude-plugin/plugin.json e .claude-plugin/marketplace.json, piu' le eco in README.md, CONTRIBUTING.md e skills/harness/SKILL.md (elenco reference e comandi compresi).",
+          "checked": true
+        },
+        {
+          "id": 3,
+          "short_title": "Reference residue, .gitignore e .gitkeep",
+          "full_description": "Menzioni in references/issues.md, references/status.md, references/docs-gate.md (anche la riga di esempio di git log), le due voci .harness/board.* in .gitignore e il placeholder in scripts/.gitkeep.",
+          "checked": true
+        },
+        {
+          "id": 4,
+          "short_title": "Commenti di prosa negli script",
+          "full_description": "issue-manager.mjs (quattro punti, help incluso) e status-cli.mjs (intestazione): il criterio 1 grep-a-zero include scripts/, quindi anche i commenti incidentali vanno riscritti senza indebolire cio' che spiegano.",
+          "checked": true
+        },
+        {
+          "id": 5,
+          "short_title": "Inventari di test aggiornati",
+          "full_description": "Sei file di test oltre a quello cancellato citano il board: plugin-commands, plugin-skill, plugin-docs-gate, plugin-issue-manager, plugin-status-cli, smoke. Gli inventari devono cercare un mondo senza board.",
+          "checked": true
+        },
+        {
+          "id": 6,
+          "short_title": "Chiusura: grep, suite, diff",
+          "full_description": "grep di criterio 1 a zero righe, npm test verde, git diff --stat che non nomina docs/, issues.json, .harness/archive/ ne' proposals/.",
+          "checked": true
+        }
+      ],
       "validation": {
         "criteria": [
-          "grep -rni board scripts/ skills/ commands/ .claude-plugin/ README.md CONTRIBUTING.md .gitignore torna 0 righe",
-          "board-server.mjs, board.html, plugin-board.test.mjs, commands/board.md e references/board.md non esistono piu'",
-          "skills/harness/references/export.md e commands/export.md esistono, e SKILL.md li referenzia",
-          "la description di .claude-plugin/plugin.json non promette piu' un board",
-          "docs/, issues.json, .harness/archive/ e proposals/ non compaiono in git diff --stat",
-          "npm test e' verde"
+          "Verifica indipendente sul ramo chore/remove-board (6ca0ba4 lavoro, b7c5b08 tracker), working tree pulito (git status --short vuoto). (1) grep -rni board scripts/ skills/ commands/ .claude-plugin/ README.md CONTRIBUTING.md .gitignore: nessuna riga, exit 1; tutte e sette le path esistono (commands/ contiene compact, docs-gate, issue, status, sweep, verify). (2) I cinque file assenti dal filesystem e da git ls-files: scripts/board-server.mjs, scripts/board.html, test/plugin-board.test.mjs, commands/board.md, skills/harness/references/board.md; git ls-files | grep -i board torna solo docs/superpowers/**(4 file) e proposals/board-minimal.html, cioe' la storia esclusa apposta. (3) .claude-plugin/plugin.json e .claude-plugin/marketplace.json portano la stessa description 'Controlled development harness for AI agents: issue tracker, independent verification, and agent operating rules', nessun board; eco aggiornate in README.md (sottotitolo, capitolo Install, elenco What it does, riga /harness:board rimossa dalla tabella comandi) e in CONTRIBUTING.md (riga scripts/: 'issue tracker CLI, status CLI, configuration CLI, external worker runner, installation check'). (4) git show --stat 6ca0ba4 - il commit che la issue dichiara in covers - elenca 23 file e non nomina docs/, issues.json, .harness/archive/ ne' proposals/: la rimozione del board non ha riscritto storia. In git diff --stat main...HEAD compare issues.json (184, +51/-133), e proviene per intero dal solo b7c5b08, il commit di tracker che il workflow impone (backlog->in_review, allineamento dei task prima del commit, SKILL.md L321) e che ogni chiusura riproduce - questa compresa. Quel commit contiene anche la cancellazione delle due issue mai lavorate 284d96c3 e 03082d03 e la riscrittura di description/criteri/task di questa issue (via CLI: last_updated e updated_at aggiornati), decisione documentata nella description e nel messaggio di commit; docs/, .harness/archive/ e proposals/ restano intatti. (5) npm run test (verify di .harness/config.json): tests 400, pass 400, fail 0, duration_ms 24495, exit 0. Gli inventari cercano davvero un mondo senza board: test/plugin-skill.test.mjs asserisce !existsSync(references/board.md) e !/board/i.test(SKILL.md); smoke.test.mjs promette scripts/status-cli.mjs al posto di board-server.mjs; plugin-commands.test.mjs elenca sei comandi senza board. Fuori scope, non bloccante: test/plugin-issue-manager.test.mjs L1784-1832 conserva la fixture 'Board e dipendenze' (test/ non e' fra le path del criterio 1, ma il task di esecuzione 5 dava per aggiornato anche quel file). Nessun file modificato dal verificatore oltre a questa chiusura."
         ],
         "tasks": [
           {
             "id": 1,
             "short_title": "Nessun riferimento vivo al board",
             "full_description": "Il grep sui sette percorsi vivi torna vuoto. docs/ e proposals/ sono esclusi apposta: sono storia.",
-            "checked": false
+            "checked": true
           },
           {
             "id": 2,
             "short_title": "I cinque file sono spariti",
             "full_description": "Sorgente, pagina, test, comando e reference rimossi con git rm.",
-            "checked": false
+            "checked": true
           },
           {
             "id": 3,
-            "short_title": "La documentazione dell'export esiste",
-            "full_description": "references/export.md copre formato, short-id, proprieta' della directory, codici di errore; commands/export.md esiste; SKILL.md li elenca.",
-            "checked": false
+            "short_title": "Il manifest non promette piu' un board",
+            "full_description": "La description di plugin.json, la sua gemella in marketplace.json e le eco in README.md e CONTRIBUTING.md sono aggiornate.",
+            "checked": true
           },
           {
             "id": 4,
-            "short_title": "Il manifest non promette piu' un board",
-            "full_description": "La description di plugin.json e le sue eco in README.md e CONTRIBUTING.md sono aggiornate.",
-            "checked": false
+            "short_title": "La storia non e' stata riscritta",
+            "full_description": "git diff --stat non nomina docs/, issues.json, .harness/archive/ ne' proposals/.",
+            "checked": true
           },
           {
             "id": 5,
-            "short_title": "La storia non e' stata riscritta",
-            "full_description": "git diff --stat non nomina docs/, issues.json, .harness/archive/ ne' proposals/.",
-            "checked": false
-          },
-          {
-            "id": 6,
             "short_title": "Suite verde con l'inventario aggiornato",
-            "full_description": "npm test verde: i test di inventario cercano un mondo senza board e con commands/export.md.",
-            "checked": false
+            "full_description": "npm test verde: i test di inventario cercano un mondo senza board.",
+            "checked": true
           }
         ],
-        "state": "unknown"
+        "state": "pass"
       },
       "created_at": "2026-08-13T09:40:01Z",
-      "updated_at": "2026-08-13T09:40:01Z"
+      "updated_at": "2026-08-14T14:13:08Z"
     },
     {
       "id": "bfb0a23f-50ff-4e44-873e-585b1bcedbd8",

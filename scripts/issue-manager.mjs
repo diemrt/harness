@@ -122,8 +122,8 @@ const LIMITS = {
   description: 1200,
   criterion: 200,
   criteriaCount: 7,
-  // Measured in characters and not in words: the real constraint is fitting one row of the summary
-  // and one row of the board, which is what the rendering measures. Counting words is ambiguous
+  // Measured in characters and not in words: the real constraint is fitting one row of the summary,
+  // which is what the rendering measures. Counting words is ambiguous
   // across languages, hyphens and acronyms; counting characters is not.
   taskTitle: 60,
   // Generous, not absent. High enough never to bite an index entry — a command, its expected
@@ -162,7 +162,7 @@ const SCHEMA_VERSION = 3;
 // Where --compact parks the issues it takes out of issues.json. `.harness/` is the project-local
 // directory the harness already uses for its own state (see scripts/harness-config.mjs), and an
 // archive is frozen history for whoever wants to read it back, not a second tracker. Nothing in
-// this script ever reads it — --get, --get-all and the board keep seeing issues.json and nothing
+// this script ever reads it — --get and --get-all keep seeing issues.json and nothing
 // else.
 //
 // Whether the archive is committed is the project's decision: harness writes no .gitignore, here
@@ -1338,7 +1338,7 @@ function showHelp() {
     "                schema_version they were stored under, removed from issues.json, and replaced",
     "                by one issue per block (status done, validation.state pass, criteria carrying",
     "                the archive path and the id + title of every issue covered). The archive is",
-    "                never read back: --get, --get-all and the board see issues.json only. Any",
+    "                never read back: --get and --get-all see issues.json only. Any",
     "                refusal writes nothing at all — neither issues.json nor the archive.",
     "",
     "Passing the payload:",
@@ -1464,7 +1464,7 @@ function insertIssue(issueData) {
     // tracker, and a missing key would push that check onto every reader instead of settling it
     // here — the same reason depends_on is materialized above.
     covers: hasProp(newIssue, "covers") ? newIssue.covers : [],
-    // Always an array, never absent: status-cli and the board read this on every issue they render,
+    // Always an array, never absent: status-cli reads this on every issue it renders,
     // and a missing key would push that check onto every reader instead of settling it here.
     tasks: hasProp(newIssue, "tasks") ? newIssue.tasks : [],
     validation: normalizeValidation(hasProp(newIssue, "validation") ? newIssue.validation : null, null),

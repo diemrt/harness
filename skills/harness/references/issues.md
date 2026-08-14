@@ -244,8 +244,8 @@ lasciare a chi clona un puntatore verso il nulla.
 La scrittura avviene in quest'ordine — archivio, poi `issues.json` — così un errore a metà non
 lascia mai il tracker senza la copia.
 
-**L'archivio non viene mai riletto.** Non è un secondo tracker: `--get`, `--get-all` e il board
-continuano a vedere **solo** `issues.json`. Un `--get` su una issue archiviata risponde
+**L'archivio non viene mai riletto.** Non è un secondo tracker: `--get`, `--get-all` e il
+riepilogo continuano a vedere **solo** `issues.json`. Un `--get` su una issue archiviata risponde
 `NOT_FOUND`. È storia congelata, e il blocco che la sostituisce ne porta il path.
 
 **La issue blocco** viene inserita con `status: "done"`, `validation.state: "pass"`,
@@ -363,7 +363,7 @@ non testo libero, e un limite spingerebbe a cancellare un arco vero per far pass
 Il grafo è **aciclico per costruzione**: la CLI rifiuta con `INVALID_DEPENDENCY` un id
 inesistente, la self-reference, un duplicato nell'array e qualsiasi payload che chiuderebbe un
 ciclo (diretto o indiretto). È l'unico punto in cui il DAG viene difeso, ed è ciò che permette a
-ogni lettore — board compreso — di darlo per acquisito. Per lo stesso motivo `--delete` di una
+ogni lettore di darlo per acquisito. Per lo stesso motivo `--delete` di una
 issue da cui altre dipendono viene rifiutata, elencando gli id che la puntano: sfilare l'id dai
 loro record muterebbe issue che il chiamante non ha nominato. Chi cancella scollega prima.
 
@@ -473,8 +473,8 @@ limiti valgono su `--insert` e sui soli campi **presenti** in `--update` — il 
 rivalida i campi omessi, quindi una issue scritta prima dei limiti resta aggiornabile.
 
 I due limiti sui task valgono identici per `tasks` e per `validation.tasks`. `short_title` si
-misura in **caratteri, non in parole**: il vincolo vero è che entri in una riga del riepilogo e in
-una riga del board, ed è ciò che il rendering misura davvero — contare parole è ambiguo fra lingue,
+misura in **caratteri, non in parole**: il vincolo vero è che entri in una riga del riepilogo,
+ed è ciò che il rendering misura davvero — contare parole è ambiguo fra lingue,
 trattini e sigle. Il tetto di `full_description` è **generoso ma non assente**: abbastanza alto da
 non mordere mai un indice, abbastanza basso da fermare un manuale. Vale anche qui la regola del
 `LIMIT_EXCEEDED`: non dice «comprimi», dice «quel contenuto non è un task», e quasi sempre è un

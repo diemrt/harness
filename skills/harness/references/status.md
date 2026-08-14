@@ -2,7 +2,7 @@
 
 `status-cli.mjs` stampa in una schermata sola dove sta il lavoro: conteggi, cosa è in corso,
 cosa si può prendere adesso. È l'equivalente di `/context` per il tracker — si guarda prima di
-decidere se vale la pena aprire il board.
+decidere cosa fare, e al clock-in è l'unico passo di visibilità.
 
 Non scrive niente. Nessun flag lo fa scrivere.
 
@@ -14,9 +14,10 @@ node "$SCRIPTS/status-cli.mjs" [--project-dir <path>] [--help]
 
 Il riepilogo **rende**; a calcolare è `tracker-graph.mjs`, che non ha una riga di comando e non si
 invoca da solo. Ci vivono le risposte sul grafo — quali issue sono lavorabili, quali dipendenze non
-risolvono, se c'è un ciclo, e le catene su cui è scritta la regola 1-WIP — e ci vivono perché i
-consumatori sono due: questo riepilogo e l'export markdown. Due copie di quella regola
-divergerebbero senza che niente lo dica, ed è l'unico motivo per cui il modulo esiste.
+risolvono, se c'è un ciclo, e le catene su cui è scritta la regola 1-WIP. Il modulo nacque per
+non tenere due copie della regola in due consumatori; oggi il consumatore che rende è uno solo,
+e ciò che il modulo continua a dare è una regola provabile su oggetti invece che su una
+schermata.
 
 Nessuna funzione lì dentro legge o scrive un file: prendono issue e restituiscono dati. È ciò che
 permette di provare la regola con oggetti in memoria invece che leggendo una schermata.
@@ -32,8 +33,8 @@ a un'altra domanda.
 stderr per leggere il motivo di un fallimento non trova nulla e crede che il comando sia
 rimasto muto.
 
-**L'output è testo, mai JSON.** È una rottura dichiarata rispetto a `issue-manager.mjs` e
-`board-server.mjs`, che stampano una riga JSON perché un agente la parsa: questo comando parla
+**L'output è testo, mai JSON.** È una rottura dichiarata rispetto a `issue-manager.mjs`, che
+stampa una riga JSON perché un agente la parsa: questo comando parla
 a un umano che legge un blocco di codice, non ha consumatori automatici e non deve acquisirne.
 Non passarlo a `JSON.parse`.
 
@@ -259,7 +260,7 @@ una per ciascuno degli altri stati e 8 in backlog, di cui una con una dipendenza
  IN CORSO
  ───────────────────────────────────────────────────────────────────────────────
   + 4f2a1b8c  in_progress  $$   4/7    vista albero delle catene
-  ~ 9c31e07d  in_review    $    3/3    filtri per tier nel board, con scor...
+  ~ 9c31e07d  in_review    $    3/3    filtri per tier nel tracker, con sc...
   ! a47813e7  blocked      $$$  2/5    corsie lunghe contro archi corti
 
  LAVORABILI · 3 di 7
@@ -286,7 +287,7 @@ locale come `YYYY-MM-DD HH:mm`; se il campo manca o non è interpretabile, l'int
 ferma al conteggio invece di stampare un valore grezzo.
 
 Il nome è il campo `project` di `issues.json` quando c'è, altrimenti il basename della
-directory del progetto — la stessa regola che il board applica già.
+directory del progetto.
 
 ### Icone
 

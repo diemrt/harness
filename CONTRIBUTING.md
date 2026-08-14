@@ -13,7 +13,7 @@ repository are in [CLAUDE.md](CLAUDE.md).
 | `skills/harness/` | `SKILL.md` and `references/`: the workflow, and the authoritative description of it |
 | `agents/harness-verifier.md` | the independent verifier subagent |
 | `commands/` | the `/harness:*` slash commands |
-| `scripts/` | the executables: issue tracker CLI, board server, configuration CLI, external worker runner, installation check |
+| `scripts/` | the executables: issue tracker CLI, status CLI, configuration CLI, external worker runner, installation check |
 | `test/` | the `node --test` suite |
 | `proposals/` | written and set aside; not part of the plugin |
 
