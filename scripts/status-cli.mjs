@@ -188,12 +188,34 @@ function tierIcon(tier) {
   return TIER_ICON[tier] ?? "-";
 }
 
-// How far the execution tasks of an issue have got. A dash where there are none, exactly like an
-// undeclared tier: "none" is a normal state here, not a hole to fill. A backlog issue has none by
-// design — the steps are materialized by whoever takes it — which is why this column belongs to
-// the in-flight table and to no other.
+// The checklist that can still move, which is not the same array at every status.
+//
+// Under `in_progress` it is the worker's `tasks`. Under `in_review` the worker has finished —
+// finishing is what put the issue there — so its execution tasks are ticked by construction, and
+// the only checklist still advancing is the verifier's `validation.tasks`. Reading the execution
+// tasks during review is why the column showed 6/6 the instant an issue entered verification and
+// never moved again: not a wrong count, a count of the wrong thing.
+//
+// It stayed invisible for as long as `validation.tasks` were never ticked at all (bfb0a23f) —
+// switching the source then would have traded a frozen N/N for a frozen 0/N, and nothing would have
+// looked any better.
+//
+// `blocked` keeps the execution tasks: a failed issue goes back to the worker, and it is the
+// worker's progress that matters again, even though the fail left judgement tasks partly ticked.
+function progressTasks(issue) {
+  if (issue.status === "in_review") {
+    return Array.isArray(issue.validation?.tasks) ? issue.validation.tasks : [];
+  }
+  return Array.isArray(issue.tasks) ? issue.tasks : [];
+}
+
+// How far the issue has got, measured on whoever is holding it now. A dash where there are none,
+// exactly like an undeclared tier: "none" is a normal state here, not a hole to fill. A backlog
+// issue has none by design — the steps are materialized by whoever takes it — which is why this
+// column belongs to the in-flight table and to no other. An issue under light verification carries
+// no judgement checklist either, and shows that same dash for as long as it is in review.
 export function taskProgress(issue) {
-  const tasks = Array.isArray(issue.tasks) ? issue.tasks : [];
+  const tasks = progressTasks(issue);
   if (tasks.length === 0) {
     return "-";
   }

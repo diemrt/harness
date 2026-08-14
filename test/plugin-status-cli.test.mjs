@@ -698,6 +698,72 @@ test("the count column does not push any row off the screen", () => {
   }
 });
 
+// Under in_review the execution tasks are ticked by construction — finishing them is what put the
+// issue there — so the count that moves is the verifier's. Every fixture below makes the two arrays
+// DISAGREE on purpose: with 5/5 against 2/4 only the wrong source can print "5/5", where a fixture
+// whose arrays matched would pass on either and defend nothing.
+
+const judgement = (count, checked, state = "unknown") => ({
+  criteria: [],
+  state,
+  tasks: withTasks(count, checked),
+});
+
+test("in review the count follows the verifier's checklist, not the worker's", () => {
+  assert.equal(
+    taskProgress({ status: "in_review", tasks: withTasks(5, 5), validation: judgement(4, 2) }),
+    "2/4"
+  );
+});
+
+test("every status other than in_review counts the execution tasks", () => {
+  // blocked is the one worth pinning: a failed issue goes back to the worker, so it is the worker's
+  // progress that matters again — even though the fail left validation.tasks partly ticked.
+  const failed = judgement(4, 3, "fail");
+  assert.equal(
+    taskProgress({ status: "blocked", tasks: withTasks(5, 1), validation: failed }),
+    "1/5"
+  );
+  assert.equal(
+    taskProgress({ status: "in_progress", tasks: withTasks(5, 1), validation: judgement(4, 3) }),
+    "1/5"
+  );
+});
+
+test("an issue in review with no judgement checklist shows the dash, not its execution tasks", () => {
+  // A light-verification issue is born validation: null, so there is nothing for a verifier to tick.
+  // The dash already means "there are none" everywhere else in this table, and it means the same
+  // thing here — which is not what "6/6" would say.
+  assert.equal(
+    taskProgress({ status: "in_review", tasks: withTasks(3, 3), validation: null }),
+    "-"
+  );
+  assert.equal(
+    taskProgress({ status: "in_review", tasks: withTasks(3, 3), validation: judgement(0, 0) }),
+    "-"
+  );
+});
+
+test("an in-review row shows how far the verifier has got", () => {
+  const rendered = renderSnapshot(
+    buildSnapshot([
+      issue("eeeeeeee-0000-0000-0000-000000000000", {
+        status: "in_review",
+        title: "Waiting on a verifier",
+        tasks: withTasks(6, 6),
+        validation: judgement(5, 2),
+      }),
+    ]),
+    { project: "P", lastUpdated: null }
+  );
+  const row = rendered.split("\n").find((line) => line.includes("Waiting on a verifier"));
+  assert.match(row, /2\/5/, `the row must carry the verifier's progress: ${JSON.stringify(row)}`);
+  assert.ok(
+    !/6\/6/.test(row),
+    `the row still shows the worker's finished tasks: ${JSON.stringify(row)}`
+  );
+});
+
 test("the workable rows carry no count: a backlog issue has no tasks yet, by design", () => {
   const rendered = renderSnapshot(
     buildSnapshot([issue("dddddddd-0000-0000-0000-000000000000", { status: "backlog", tasks: [] })]),
@@ -787,15 +853,41 @@ test("the task count shows when exactly one issue is in flight", () => {
   assert.equal(line, `1 in corso [2/9] | 3 backlog | 9 chiuse | ${TAIL}`);
 });
 
-test("the task count shows for an issue waiting on the verifier too", () => {
+test("for an issue waiting on the verifier the count is the verifier's", () => {
+  // This test used to pin the defect: a fixture with execution tasks only, asserting [4/4]. It read
+  // as coverage of the in_review case and was in fact a photograph of it, because 4/4 is what that
+  // issue would show on the day it entered review and on every day after.
   const line = renderOneline(
     inFlightSnapshot(
-      [issue("bbbbbbbb-0000-0000-0000-000000000000", { status: "in_review", tasks: withTasks(4, 4) })],
+      [
+        issue("bbbbbbbb-0000-0000-0000-000000000000", {
+          status: "in_review",
+          tasks: withTasks(4, 4),
+          validation: judgement(5, 2),
+        }),
+      ],
       { in_review: 1, done: 9 }
     ),
     { now: AT }
   );
-  assert.equal(line, `1 in verifica [4/4] | 9 chiuse | ${TAIL}`);
+  assert.equal(line, `1 in verifica [2/5] | 9 chiuse | ${TAIL}`);
+});
+
+test("an issue in review under light verification carries no count at all", () => {
+  const line = renderOneline(
+    inFlightSnapshot(
+      [
+        issue("bbbbbbbb-0000-0000-0000-000000000000", {
+          status: "in_review",
+          tasks: withTasks(4, 4),
+          validation: null,
+        }),
+      ],
+      { in_review: 1, done: 9 }
+    ),
+    { now: AT }
+  );
+  assert.equal(line, `1 in verifica | 9 chiuse | ${TAIL}`);
 });
 
 test("with two issues in flight the count disappears: it would answer for which one?", () => {

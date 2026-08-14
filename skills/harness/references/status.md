@@ -74,10 +74,20 @@ era stata data, e «niente, alle 16:34:50» la spende lo stesso.
 
 ### Il conteggio dei task, e quando sparisce
 
-`[2/9]` sono i task di esecuzione spuntati sul totale, e compaiono **solo quando c'è esattamente
-una issue in volo** fra `in_progress` e `in_review`. Con due, quel numero sarebbe il progresso di
-quale? Un numero che ha bisogno di una domanda per essere letto è peggio di nessun numero, e nella
-seconda riga dell'esempio infatti non c'è.
+`[2/9]` sono i task spuntati sul totale, e compaiono **solo quando c'è esattamente una issue in
+volo** fra `in_progress` e `in_review`. Con due, quel numero sarebbe il progresso di quale? Un
+numero che ha bisogno di una domanda per essere letto è peggio di nessun numero, e nella seconda
+riga dell'esempio infatti non c'è.
+
+**Quali task, dipende dallo stato.** Sotto `in_progress` sono i `tasks` di esecuzione, del worker.
+Sotto `in_review` sono i `validation.tasks`, del verificatore: il worker ha finito — averli finiti è
+ciò che ha portato la issue in verifica — quindi i suoi task sono spuntati per costruzione, e
+l'unica checklist che si sta ancora muovendo è quella del giudizio. Contare i task di esecuzione lì
+stampava `[6/6]` dall'istante in cui la issue entrava in verifica, e non era un conteggio sbagliato:
+era il conteggio della cosa sbagliata.
+
+Una issue `in_review` a **verifica leggera** non ha `validation.tasks`, quindi non porta parentesi:
+non c'è niente da spuntare, ed è diverso da «è tutto spuntato».
 
 Le parentesi quadre fanno da icona al posto di un glifo: in questo repository significano già
 checklist — `- [x]` nell'export, `[x]` negli elenchi di task — quindi il numero si legge come task
@@ -317,15 +327,20 @@ in quella schermata non compare.
 mette per prima la issue toccata più di recente (`updated_at` decrescente). **Non si tronca
 mai:** dodici righe qui sono un problema di WIP da vedere, non da riassumere.
 
-Ogni riga porta il **conteggio dei task di esecuzione**, `spuntati/totali`, fra il tier e il
-titolo. È l'unico dato che mancava a chi riprende il lavoro dopo un'interruzione, e compare nel
-punto e nel momento in cui il riepilogo gira davvero: a un confine di sessione, che è dove ogni
-ripresa comincia.
+Ogni riga porta il **conteggio dei task**, `spuntati/totali`, fra il tier e il titolo. È l'unico
+dato che mancava a chi riprende il lavoro dopo un'interruzione, e compare nel punto e nel momento in
+cui il riepilogo gira davvero: a un confine di sessione, che è dove ogni ripresa comincia.
 
-Un `-` al posto del conteggio dice che la issue non ha task. Su una issue `blocked` scritta prima
-del campo è la normalità; su una `in_progress` non può succedere, perché la CLI rifiuta quel
-passaggio di stato senza almeno un task. Un conteggio a tre cifre allunga la riga invece di essere
-troncato: un numero tagliato mente, una riga lunga no.
+Come in `--oneline`, il conteggio misura **chi ha in mano la issue adesso**: i `tasks` di
+esecuzione sotto `in_progress`, i `validation.tasks` del verificatore sotto `in_review`. Una issue
+`blocked` torna al worker, quindi torna ai task di esecuzione — anche se il `fail` ha lasciato
+qualche task di giudizio spuntato.
+
+Un `-` al posto del conteggio dice che la issue non ha task da mostrare in quello stato. Su una
+issue `blocked` scritta prima del campo è la normalità; su una `in_progress` non può succedere,
+perché la CLI rifiuta quel passaggio di stato senza almeno un task; su una `in_review` significa
+verifica leggera, cioè nessuna checklist di giudizio. Un conteggio a tre cifre allunga la riga
+invece di essere troncato: un numero tagliato mente, una riga lunga no.
 
 Il conteggio **non** compare fra le lavorabili, e non è una dimenticanza: una issue in `backlog`
 non ha ancora task, perché i passi li materializza chi la prende.
