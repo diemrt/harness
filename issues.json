@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-14T09:23:13Z",
+  "last_updated": "2026-08-14T09:38:22Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1509,50 +1509,89 @@
     {
       "id": "6342b5d0-711a-4c2b-a281-20df5fc9db88",
       "title": "In verifica il conteggio dei task legge la checklist sbagliata",
-      "description": "Il numero di task accanto a una issue in_review e' N/N dall'istante in cui ci entra. status-cli.mjs legge issue.tasks a ogni stato, ma sotto in_review i task di esecuzione sono spuntati per costruzione: averli finiti e' cio' che ha portato la issue in verifica. La checklist che si sta ancora muovendo e' un altro array, validation.tasks, ed e' del verificatore.\n\nNon e' un conteggio sbagliato: e' il conteggio della cosa sbagliata, e mostra avanzamento dove non ce n'e'. Costoso e invisibile insieme - N/N si legge come 'quasi fatto', e nessun test lo contraddice perche' taskProgress e' provato solo su in_progress e su blocked.\n\nEra invisibile per un secondo motivo, ora caduto: finche' i validation.tasks non venivano mai spuntati (bfb0a23f) cambiare sorgente avrebbe scambiato un N/N congelato con uno 0/N congelato. Ora che il verificatore li spunta, la sorgente giusta porta informazione.\n\nblocked resta sui task di esecuzione: una issue fallita torna al worker, ed e' di nuovo il suo avanzamento a contare.\n\nSuperficie: scripts/status-cli.mjs (taskProgress) e test/plugin-status-cli.test.mjs. Riguarda entrambe le rese - la tabella IN CORSO e --oneline, che e' quella che monitor.ps1 disegna.",
-      "status": "backlog",
+      "description": "Il numero di task accanto a una issue in_review e' N/N dall'istante in cui ci entra. status-cli.mjs legge issue.tasks a ogni stato, ma sotto in_review i task di esecuzione sono spuntati per costruzione: averli finiti e' cio' che ha portato la issue in verifica. La checklist che si sta ancora muovendo e' un altro array, validation.tasks, ed e' del verificatore.\n\nNon e' un conteggio sbagliato: e' il conteggio della cosa sbagliata, e mostra avanzamento dove non ce n'e'. Costoso e invisibile insieme - N/N si legge come 'quasi fatto', e nessun test lo contraddice perche' taskProgress e' provato solo su in_progress e su blocked.\n\nEra nascosto anche da un secondo motivo, ora caduto: finche' i validation.tasks non venivano mai spuntati (bfb0a23f) cambiare sorgente avrebbe scambiato un N/N congelato con uno 0/N congelato.\n\nblocked resta sui task di esecuzione: una issue fallita torna al worker.\n\nSuperficie: scripts/status-cli.mjs (taskProgress), test/plugin-status-cli.test.mjs e references/status.md, che descrive il conteggio come 'task di esecuzione' in entrambe le sezioni in cui lo spiega. Riguarda entrambe le rese - la tabella IN CORSO e --oneline, che monitor.ps1 disegna.",
+      "status": "done",
       "tier": "standard",
       "depends_on": [],
-      "covers": [],
-      "tasks": [],
+      "covers": [
+        "b09ed5a"
+      ],
+      "tasks": [
+        {
+          "id": 1,
+          "short_title": "RED su taskProgress in in_review",
+          "full_description": "Test su taskProgress: sotto in_review il conteggio viene da validation.tasks. Il fixture porta conteggi DIVERSI fra i due array (5/5 contro 2/4), altrimenti il test passa identico sulla sorgente vecchia. Verificato rosso prima di toccare status-cli.mjs.",
+          "checked": true
+        },
+        {
+          "id": 2,
+          "short_title": "RED sulle due rese",
+          "full_description": "Test sulla riga IN CORSO di una issue in_review e su --oneline con quella come sola issue in volo. Stessa asimmetria nei fixture. Entrambi verificati rossi: sono le due superfici che si guardano davvero, e --oneline e' quella che monitor.ps1 disegna.",
+          "checked": true
+        },
+        {
+          "id": 3,
+          "short_title": "RED sul caso senza checklist di giudizio",
+          "full_description": "Una issue in_review a verifica leggera (validation null) e una con validation.tasks vuoto mostrano il trattino, non i task di esecuzione. E' il caso che distingue 'ha finito' da 'non c'e' niente da spuntare'.",
+          "checked": true
+        },
+        {
+          "id": 4,
+          "short_title": "GREEN: la sorgente dipende dallo stato",
+          "full_description": "Il minimo che fa passare i test: sotto in_review il conteggio viene da validation.tasks, altrove da issue.tasks. blocked resta sui task di esecuzione, e il perche' e' scritto dove sta la scelta - una issue fallita torna al worker.",
+          "checked": true
+        },
+        {
+          "id": 5,
+          "short_title": "Suite verde",
+          "full_description": "npm test verde, gate di .harness/config.json. Nessun test esistente rotto se non quello che fotografava il difetto: asseriva [4/4] su una issue in_review con soli task di esecuzione, cioe' il numero che questa issue esiste per correggere.",
+          "checked": true
+        },
+        {
+          "id": 6,
+          "short_title": "Commit e consegna a in_review",
+          "full_description": "Commit sul ramo, poi in_review con validation.state unknown. Commit: b09ed5a. Il commit tocca uno script, quindi apre il gate documentale: coperto da questa stessa issue via covers, perche' la documentazione che serviva e' dentro il commit.",
+          "checked": true
+        },
+        {
+          "id": 7,
+          "short_title": "references/status.md smette di dire il falso",
+          "full_description": "Emerso lavorando: status.md descriveva il conteggio come 'i task di esecuzione' sia nella sezione di --oneline sia in quella della tabella. La modifica lo rendeva falso in entrambi i punti, quindi il documento rientra in questa issue invece di diventarne un'altra - e' lo stesso lavoro alla grana della prosa.",
+          "checked": true
+        }
+      ],
       "validation": {
-        "criteria": [
-          "taskProgress legge validation.tasks quando lo status e' in_review, e issue.tasks in tutti gli altri stati, blocked compreso",
-          "una issue in_review senza validation.tasks (validation null, o array vuoto) mostra il trattino, non i task di esecuzione",
-          "un test copre la riga IN CORSO di una issue in_review e fallirebbe sulla sorgente vecchia: i due array hanno conteggi diversi nel fixture",
-          "un test copre --oneline con una sola issue in volo in in_review: il numero fra parentesi quadre e' quello dei validation.tasks",
-          "npm test e' verde"
-        ],
+        "criteria": "Verificato tutto: (1) taskProgress in scripts/status-cli.mjs legge validation.tasks sotto in_review e issue.tasks altrove (blocked incluso) - progressTasks() a scripts/status-cli.mjs L188-208 nel diff di b09ed5a. (2) issue in_review senza validation.tasks (null o []) mostra '-': test 'an issue in review with no judgement checklist shows the dash, not its execution tasks' in test/plugin-status-cli.test.mjs, passa su npm test. (3-4) Copiato scripts/status-cli.mjs alla revisione precedente (git show b09ed5a^:scripts/status-cli.mjs) in una directory temp isolata e rieseguito test/plugin-status-cli.test.mjs corrente contro quella sorgente vecchia: i 5 test nuovi/riscritti falliscono tutti (es. 'in review the count follows the verifier's checklist' atteso 2/4 ottenuto 5/5; 'for an issue waiting on the verifier the count is the verifier's' atteso [2/5] ottenuto [4/4]; 'an in-review row shows how far the verifier has got' atteso 2/5 ottenuto 6/6) - confermano fixture con conteggi diversi fra tasks e validation.tasks, quindi difendono davvero la modifica e non passerebbero sulla sorgente vecchia. Il test preesistente 'the task count shows for an issue waiting on the verifier too' (asseriva [4/4], fotografava il difetto) e' stato riscritto in due test piu' forti, non cancellato: 'for an issue waiting on the verifier the count is the verifier's' (validation.tasks reale, fixture in disaccordo) e 'an issue in review under light verification carries no count at all' (validation: null). (5) npm test: 430/430 pass, nessun fallimento. blocked confermato sui task di esecuzione (progressTasks ritorna issue.tasks per ogni stato != in_review) con test dedicato 'every status other than in_review counts the execution tasks' che copre esplicitamente blocked. skills/harness/references/status.md aggiornato in entrambe le sezioni (--oneline e tabella IN CORSO) e non contraddice piu' il comportamento: descrive esplicitamente la dipendenza dallo stato e il caso di verifica leggera. git status --short mostra solo issues.json modificato in working tree, e il diff e' limitato al blocco della issue 6342b5d0 stessa (transizione backlog->in_review con tasks e covers, come da task 6 della issue) piu' last_updated: nessuna modifica ad altre issue. Nessun file modificato dal verificatore oltre alla chiusura di questa issue; le prove sulla sorgente vecchia sono state condotte in una directory temporanea isolata, mai nel repository.",
         "tasks": [
           {
             "id": 1,
             "short_title": "La sorgente del conteggio dipende dallo stato",
             "full_description": "Sotto in_review il conteggio viene da validation.tasks, altrove da issue.tasks. blocked resta sui task di esecuzione, e il perche' va scritto dove sta la scelta: una issue fallita torna al worker.",
-            "checked": false
+            "checked": true
           },
           {
             "id": 2,
             "short_title": "Il caso senza checklist di giudizio",
             "full_description": "Una issue a verifica leggera non ha validation.tasks. In review mostra il trattino, che nel resto della tabella significa gia' 'non ce ne sono' e non va reinterpretato qui.",
-            "checked": false
+            "checked": true
           },
           {
             "id": 3,
             "short_title": "I test coprono entrambe le rese",
             "full_description": "Tabella IN CORSO e --oneline. I fixture devono avere conteggi diversi fra tasks e validation.tasks, altrimenti il test passa identico sulla sorgente vecchia e non difende niente - lo stesso errore da cui e' nata bfb0a23f.",
-            "checked": false
+            "checked": true
           },
           {
             "id": 4,
             "short_title": "Suite verde",
             "full_description": "npm test verde: e' il gate dichiarato in .harness/config.json.",
-            "checked": false
+            "checked": true
           }
         ],
-        "state": "unknown"
+        "state": "pass"
       },
       "created_at": "2026-08-14T09:23:13Z",
-      "updated_at": "2026-08-14T09:23:13Z"
+      "updated_at": "2026-08-14T09:38:22Z"
     }
   ]
 }
