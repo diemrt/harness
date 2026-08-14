@@ -2,8 +2,8 @@
 
 <h1><code>harness</code></h1>
 
-**A controlled development harness for AI agents — an issue tracker, a live issue board, and
-a set of agent operating rules — installed as a Claude Code plugin, leaving nothing in your
+**A controlled development harness for AI agents — an issue tracker, independent verification,
+and a set of agent operating rules — installed as a Claude Code plugin, leaving nothing in your
 project but `issues.json`.**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/diemrt/harness/ci.yml?branch=main&label=CI)](https://github.com/diemrt/harness/actions/workflows/ci.yml)
@@ -29,8 +29,8 @@ verified by an agent **other** than the one that did it, and nothing reaches the
 before that verification passes.
 
 Earlier versions shipped those rules as files copied into each repository, then as an npm
-package that kept the copies in sync. The plugin removes the copies entirely — rules, scripts
-and board live in the plugin, your project keeps only its own data.
+package that kept the copies in sync. The plugin removes the copies entirely — rules and
+scripts live in the plugin, your project keeps only its own data.
 
 ## Install
 
@@ -51,8 +51,8 @@ writing anything.
 
 ## What it does
 
-- **Clock in** — reads the project's configuration, prepares the environment, starts the live
-  issue board, and shows what is in flight.
+- **Clock in** — reads the project's configuration, prepares the environment, and prints one
+  screen of tracker status: what is in flight, and what can be taken now.
 - **One issue in progress per dependency chain**, each worked by a dedicated subagent
   (internal, or an external CLI if you opt in).
 - **Independent verification** — the worker leaves the issue in review; a separate
@@ -88,7 +88,6 @@ source of truth: the workflow lives in the `harness` skill, and each command poi
 
 | Command | What it does | Without arguments |
 |---|---|---|
-| `/harness:board` | Starts the live issue board and prints its URL once; `stop` shuts it down | Starts the board for the current project |
 | `/harness:compact` | Proposes themed blocks to compact `done` issues, waits for confirmation, then archives them | Proposes blocks over every `done` issue in the tracker |
 | `/harness:docs-gate` | Lists the commits that touched code without any issue declaring them in `covers` | Uses the window autocalibrated on the current project |
 | `/harness:issue` | Lists issues by status, creates one, updates one | Shows the tracker: `in_progress`, `in_review`, `backlog` |

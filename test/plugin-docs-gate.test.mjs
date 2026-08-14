@@ -159,7 +159,7 @@ test("no line overflows 80 columns, with the window label the script actually bu
   // and nothing noticed. Both the project name and the window here are the real shapes.
   const report = buildGateReport({
     commits: [
-      commit("aaaaaaaabbbb", ["a.mjs"], "fix: canonicalise the board's project dir before watching it"),
+      commit("aaaaaaaabbbb", ["a.mjs"], "fix: canonicalise the tracker project dir before reading it"),
       commit("ccccccccdddd", ["b.mjs"], "feat: alert lines and empty states in the snapshot render"),
     ],
     covered: new Set(),

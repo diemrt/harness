@@ -4,8 +4,8 @@
 // Usage:
 //   node status-cli.mjs [--project-dir <path>] [--help]
 //
-// STDOUT IS TEXT, NOT JSON. This is a deliberate break from issue-manager.mjs and
-// board-server.mjs, which print one line of JSON because an agent parses it. This script talks to
+// STDOUT IS TEXT, NOT JSON. This is a deliberate break from issue-manager.mjs, which prints one
+// line of JSON because an agent parses it. This script talks to
 // a human reading a code block in the session: it has no automated consumers and must not acquire
 // any. Nothing is ever written to stderr.
 //
@@ -26,8 +26,8 @@ import {
   shortId,
 } from "./tracker-graph.mjs";
 
-// Re-exported, not redefined: shortId moved to the graph module when the export needed it too, and
-// the importers of this file should not have to care where it lives now.
+// Re-exported, not redefined: shortId lives in the graph module, and whoever imports it from here
+// should not have to care that it moved.
 export { shortId };
 
 export const STATUS_ICON = {

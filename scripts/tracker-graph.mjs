@@ -1,6 +1,6 @@
-// Pure graph computation over the tracker. Extracted from status-cli.mjs when a second consumer
-// appeared: the markdown export needs the same readiness, cycle and chain answers the summary
-// needs, and two copies of the 1-WIP rule would drift apart without anything saying so.
+// Pure graph computation over the tracker. Extracted from status-cli.mjs so that the readiness,
+// cycle and chain answers the 1-WIP rule is written on live in one place: two copies of that rule
+// would drift apart without anything saying so.
 //
 // Nothing here reads a file, writes a file, or renders anything. Every function takes issues and
 // returns data — which is what lets the rule be proved with objects in memory instead of by

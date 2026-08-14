@@ -436,7 +436,7 @@ test("every tier gets its icon, and an undeclared tier gets a dash", () => {
 });
 
 test("a long title is cut to the limit with three ASCII dots", () => {
-  const long = "filtri per tier nel board, con scorciatoie e tema a tre stati";
+  const long = "filtri per tier nel tracker, con scorciatoie e tema a tre stati";
   const out = render([issue("aaaaaaaa", { status: "in_progress", title: long })]);
   const row = lines(out).find((l) => l.includes("filtri per tier"));
   const title = row.slice(row.indexOf("filtri"));

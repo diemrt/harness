@@ -1,6 +1,6 @@
 ---
 name: harness
-description: Usa quando lavori allo sviluppo di un progetto con il workflow harness — issue tracciate su issues.json, una sola issue in corso per catena di dipendenza, verifica indipendente obbligatoria prima di pubblicare. Si attiva su "clock in", "clock out", "lavora la issue", "apri una issue", "board delle issue", o quando il progetto contiene un issues.json.
+description: Usa quando lavori allo sviluppo di un progetto con il workflow harness — issue tracciate su issues.json, una sola issue in corso per catena di dipendenza, verifica indipendente obbligatoria prima di pubblicare. Si attiva su "clock in", "clock out", "lavora la issue", "apri una issue", "stato del tracker", o quando il progetto contiene un issues.json.
 ---
 
 # Harness
@@ -11,8 +11,8 @@ ogni issue viene verificata da un agente **diverso** da chi l'ha svolta, e nient
 ramo condiviso prima di quella verifica.
 
 **Cosa harness scrive nel progetto:** `issues.json` alla radice (i dati del tracker) e
-`.harness/` (configurazione, archivi di `--compact`, log dei worker). Nient'altro: script,
-regole e board vivono in questo plugin. Cosa di tutto questo entri in git lo decide il
+`.harness/` (configurazione, archivi di `--compact`, log dei worker). Nient'altro: script e
+regole vivono in questo plugin. Cosa di tutto questo entri in git lo decide il
 progetto — harness non scrive nessun `.gitignore`
 ([references/config.md](references/config.md)).
 
@@ -71,8 +71,8 @@ possono procedere in parallelo. Dentro una stessa catena si va in ordine, una al
 `depends_on` ([references/issues.md](references/issues.md)), e la catena è la **componente
 connessa** di quel grafo: due issue stanno nella stessa catena se un cammino di dipendenze le
 collega, in un verso o nell'altro. Prima la ricostruiva l'orchestratore a giudizio e nessuno
-poteva controllarla; ora si calcola dal tracker, e il board la disegna. La regola non cambia:
-cambia che ora è verificabile.
+poteva controllarla; ora si calcola dal tracker, ed è da lì che il riepilogo dice cosa è
+lavorabile. La regola non cambia: cambia che ora è verificabile.
 
 La CLI non fa da guard: portare `in_progress` una issue con dipendenze aperte è tecnicamente
 possibile ([references/issues.md](references/issues.md)). È la valvola di sfogo per il caso in
@@ -416,8 +416,7 @@ e propone solo ciò che passa la bussola qui sopra.
 
 Per ogni issue lavorata: lavoro concluso → `in_review` → verifica indipendente → `pass` →
 pubblicazione. Allinea i `tasks` di ogni issue toccata prima di chiudere: è uno dei due momenti
-in cui l'allineamento è un atto dichiarato, non un rito implicito. Se durante la sessione hai
-avviato il board, fermalo adesso col `pid` della riga di avvio.
+in cui l'allineamento è un atto dichiarato, non un rito implicito.
 
 Chiudi ristampando il riepilogo (`node "$SCRIPTS/status-cli.mjs"`, verbatim in un blocco di
 codice): è il confronto con quello del clock-in, e dice in una schermata cosa si è mosso.
@@ -464,7 +463,6 @@ copia diversa da quella che si sta leggendo — e succede — il confronto sta i
   si legge l'output, canali, codici di uscita.
 - [references/sweep.md](references/sweep.md) — setaccio dei documenti: cosa legge, cosa promuove,
   cosa fa delle occasioni che non promuove.
-- [references/board.md](references/board.md) — board delle issue con aggiornamento live.
 - [references/install-check.md](references/install-check.md) — confronto fra la copia di harness
   installata e il repository da cui viene. Non è un passo del workflow: si esegue al rilascio, o
   quando si sospetta di star eseguendo una copia diversa da quella che si sta leggendo.

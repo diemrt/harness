@@ -96,7 +96,7 @@ acquisirne.
  ───────────────────────────────────────────────────────────────────────────────
   4f2a1b8c  feat: alert lines and empty states             3 file
   9c31e07d  feat: header, proportional bar and legend      5 file
-  a47813e7  fix: canonicalise the board's project dir      2 file
+  a47813e7  fix: canonicalise the tracker project dir      2 file
  ───────────────────────────────────────────────────────────────────────────────
  coperto = una issue lo dichiara in covers, in qualunque stato
 ```

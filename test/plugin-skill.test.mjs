@@ -181,35 +181,28 @@ test("a criterion must be checkable with the verifier's own access", () => {
   );
 });
 
-test("the board is a tool you ask for, not a clock-in step", () => {
+test("the board left the plugin, and the summary is the visibility step that stayed", () => {
   const content = readSkill();
-  const board = readFileSync(path.join(referencesDir, "board.md"), "utf8");
 
-  // Slice out the clock-in chapter and assert the board is not in it. Grepping the whole
-  // skill would match the reference index at the bottom, which must keep linking board.md.
+  // The board was the plugin's only networked component and its only long-running process. It
+  // was removed whole: what guards the removal is not the deleted file but the absence of any
+  // live reference to it — an orphan link in the skill would only surface when an agent follows it.
+  assert.ok(
+    !existsSync(path.join(referencesDir, "board.md")),
+    "references/board.md is back: the board was removed whole, reference included"
+  );
+  assert.ok(
+    !/board/i.test(content),
+    "the skill names the board again: no chapter, no clock-in step, no entry in the reference index"
+  );
+
   const start = content.indexOf("## Clock in");
   const end = content.indexOf("## Regola 1-WIP");
   assert.ok(start !== -1 && end > start, "the Clock in chapter moved: fix this test, not the skill");
-  const clockIn = content.slice(start, end);
-
-  assert.ok(
-    !/board/i.test(clockIn),
-    "clock-in still starts the board: the only consumer that ran it forbade it in writing"
-  );
   assert.match(
-    clockIn,
+    content.slice(start, end),
     /status-cli\.mjs/,
     "the tracker summary must stay the clock-in step that survives"
-  );
-
-  assert.ok(
-    !board.includes("al clock-in, automaticamente"),
-    "board.md still declares an automatic start"
-  );
-  assert.match(
-    board,
-    /^## Perché non parte da solo$/m,
-    "board.md must record why the default changed, or it will be changed back"
   );
 });
 
