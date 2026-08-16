@@ -10,6 +10,7 @@ import {
   readFileSync,
   readdirSync,
   mkdtempSync,
+  realpathSync,
   writeFileSync,
   rmSync,
 } from "node:fs";
@@ -1477,7 +1478,7 @@ test("--init in a directory without issues.json creates it and reports created:t
 
     const data = assertOk(run(dir, ["--init"]));
     assert.equal(data.created, true);
-    assert.equal(data.path, issuesPath);
+    assert.equal(data.path, path.join(realpathSync(dir), "issues.json"));
     assert.equal(existsSync(issuesPath), true, "--init must create the file");
   } finally {
     cleanup(dir);

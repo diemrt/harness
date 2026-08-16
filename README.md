@@ -49,6 +49,20 @@ Then, in any project, ask Claude to *clock in*. The first time, harness inspects
 proposes a setup command and a verification command, and asks you to confirm them before
 writing anything.
 
+### Codex CLI and other agent hosts
+
+The marketplace package and `/harness:*` commands above are Claude Code integration points, not
+requirements of the workflow. When Codex CLI or another host is given the harness skill by its
+environment—or is instructed by a repository's `AGENTS.md` to read it—it can run the same plain
+Node.js scripts and apply the same tracker and verification contract. This is interoperability,
+not a claim that the Claude marketplace plugin can be installed natively by that host.
+
+Hosts without slash commands discover the available operations in the portable index in
+[`skills/harness/SKILL.md`](skills/harness/SKILL.md): `status`, `issue`, `verify`, `compact`,
+`docs-gate`, and `sweep`. Natural requests such as “clock in”, “create an issue”, or “verify the
+issue” map to those operations; the host invokes the listed script or follows the linked
+reference instead of attempting the Claude-only `/harness:*` spelling.
+
 ## What it does
 
 - **Clock in** — reads the project's configuration, prepares the environment, and prints one

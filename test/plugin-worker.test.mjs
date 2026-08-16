@@ -348,7 +348,10 @@ test("--run writes a log under .harness/runs/<issueId>-<timestamp>.log with the 
     writeConfig(dir, { enabled: true, command: nodeCommand(cliPath) });
     const data = assertOk(run(dir, ["--run", "--issue-id", "log-issue", "--prompt-file", promptFile]));
 
-    assert.equal(data.logPath, path.join(dir, ".harness", "runs", path.basename(data.logPath)));
+    assert.equal(
+      data.logPath,
+      path.join(realpathSync(dir), ".harness", "runs", path.basename(data.logPath))
+    );
     assert.match(path.basename(data.logPath), /^log-issue-\d+\.log$/);
     assert.equal(existsSync(data.logPath), true);
 

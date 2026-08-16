@@ -245,10 +245,11 @@ function fail(message, code = "ERROR") {
   throw new IssueManagerError(message, code);
 }
 
-// Helper: emit the success envelope on stdout and terminate
+// Helper: emit the success envelope on stdout and let Node terminate after the stream drains.
+// process.exit() can truncate large evidence payloads while stdout is still being flushed.
 function writeOk(data) {
   process.stdout.write(JSON.stringify({ ok: true, data }) + "\n");
-  process.exit(0);
+  process.exitCode = 0;
 }
 
 // Helper: emit the failure envelope on stdout and terminate with a non-zero exit code.
@@ -256,7 +257,7 @@ function writeOk(data) {
 // tells them apart via `ok` or the exit code.
 function writeFail(message, code = "ERROR") {
   process.stdout.write(JSON.stringify({ ok: false, error: message, code }) + "\n");
-  process.exit(1);
+  process.exitCode = 1;
 }
 
 // Helper: id generator for new issues

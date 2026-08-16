@@ -22,6 +22,18 @@ contesto di cosa è stato prodotto.
 
 Tier del verificatore **>=** tier del worker, mai inferiore.
 
+`harness-verifier` è il nome dell'agent distribuito dal plugin Claude Code in
+`agents/harness-verifier.md`; il nome non è l'invariante. Se l'agent non è registrato sull'host
+— per esempio Codex CLI che legge la skill dal repository — l'orchestratore crea un
+subagent distinto, gli passa l'id della issue e il contesto prodotto, e gli impone le istruzioni
+di questa reference e di `agents/harness-verifier.md` (ignorando il frontmatter specifico
+dell'host). Il subagent deve avere una shell, accesso agli artefatti e un tier non inferiore a
+quello del worker. È il medesimo ruolo di verifica, istanziato con la primitiva dell'host.
+
+Se l'host non dispone di subagent o di un'altra forma che garantisca un agente distinto, la
+verifica non viene degradata a controllo inline: la issue resta `in_review` / `unknown` e si
+riporta il limite. L'orchestratore o il worker non possono sostituire il verificatore.
+
 ## Di cosa ha bisogno un verificatore per esistere
 
 **Di una shell che parta.** Verificare significa eseguire: il gate è un comando, e anche la

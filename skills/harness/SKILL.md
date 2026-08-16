@@ -36,6 +36,41 @@ vecchia resta sul disco. Un comando che punta lì **non fallisce**: gira, e gira
 sbagliata. È il modo silenzioso di verificare una cosa mentre se ne legge un'altra. Se la base
 directory non ti è stata annunciata, chiedila invece di ricostruirla.
 
+## Operazioni portabili per host senza slash command
+
+Gli slash command `/harness:*` sono scorciatoie di Claude Code, non il protocollo di harness.
+Codex CLI e gli altri host che non li registrano: **non usare slash command non disponibili**;
+devono invece riconoscere l'intento espresso dall'utente, leggere la reference indicata e usare
+direttamente gli script in
+`$SCRIPTS`. Questo indice è anche la lista delle operazioni disponibili:
+
+| Operazione | Intenti equivalenti | Primitiva o reference |
+|---|---|---|
+| `status` | «clock in», «stato del tracker», «cosa è lavorabile» | `status-cli.mjs`; [references/status.md](references/status.md) |
+| `issue` | «apri/crea/aggiorna una issue», «mostra la issue» | `issue-manager.mjs`; [references/issues.md](references/issues.md) |
+| `verify` | «verifica la issue», «manda in verifica» | agent distinto; [references/verification.md](references/verification.md) |
+| `compact` | «compatta/archivia le issue concluse» | `issue-manager.mjs --compact`; [references/issues.md](references/issues.md) |
+| `docs-gate` | «controlla la copertura documentale» | `docs-gate.mjs`; [references/docs-gate.md](references/docs-gate.md) |
+| `sweep` | «setaccia i documenti», «trova lavoro non tracciato» | [references/sweep.md](references/sweep.md) |
+
+La tabella serve a scoprire l'operazione, non sostituisce la reference: prima di comporre un
+payload o interpretare un output si legge soltanto quella pertinente. Se viene aggiunto un file
+in `commands/`, anche questo indice va aggiornato.
+
+### Codex CLI
+
+Quando Codex riceve questa skill dal proprio ambiente, usa la base directory annunciata dalla
+skill e calcola `$SCRIPTS` con la regola sopra. Quando invece sta sviluppando il repository
+clonato e legge `skills/harness/SKILL.md` come documento, la radice del repository è la radice
+del plugin e gli script sono `scripts/`; non serve copiare nulla nel progetto consumer.
+
+Codex traduce le operazioni della tabella nelle proprie primitive: shell per gli script,
+lettura/modifica dei file per gli artefatti e subagent per worker o verificatore. Lavorando
+inline mantiene `HARNESS_ROLE=worker` su **ogni** mutazione del tracker. Se usa un subagent,
+applica il `tier` della issue al momento del dispatch; per la verifica segue inoltre il contratto
+portabile in [references/verification.md](references/verification.md). I nomi dei tool cambiano
+fra host, gli invarianti no.
+
 ## Clock in (inizio sessione)
 
 1. **Contesto di progetto** — leggi quello che il progetto ha già (`CLAUDE.md`, `AGENTS.md`,

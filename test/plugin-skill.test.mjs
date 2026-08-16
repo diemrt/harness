@@ -56,6 +56,45 @@ test("every reference file is reachable from SKILL.md", () => {
   }
 });
 
+test("the skill exposes every shipped operation to hosts without slash commands", () => {
+  const content = readSkill();
+  const commandsDir = path.join(rootDir, "commands");
+  const section = content.match(
+    /^## Operazioni portabili per host senza slash command$([\s\S]*?)(?=^## )/m
+  )?.[1];
+
+  assert.ok(section, "the skill needs a discoverable operation index for Codex and other hosts");
+  for (const file of readdirSync(commandsDir).filter((name) => name.endsWith(".md"))) {
+    const operation = path.basename(file, ".md");
+    assert.match(
+      section,
+      new RegExp(`\\b${operation.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\\b`),
+      `commands/${file} ships an operation missing from the portable index`
+    );
+  }
+  assert.match(section, /Codex CLI/, "the portable index must tell Codex that it applies there");
+  assert.match(section, /non.*slash command/i, "the host must not invent unavailable slash commands");
+});
+
+test("Codex adaptation preserves worker and independent-verifier boundaries", () => {
+  const skill = readSkill();
+  const verification = readFileSync(path.join(referencesDir, "verification.md"), "utf8");
+
+  assert.match(skill, /^### Codex CLI$/m, "Codex needs an explicit host adapter");
+  assert.match(skill, /HARNESS_ROLE=worker/, "inline Codex work must retain the worker guard");
+  assert.match(skill, /tier/i, "Codex subagent dispatch must still apply the issue tier");
+  assert.match(
+    verification,
+    /agent[^\n]*non è registrato|agent[^\n]*non.*registrato/i,
+    "verification.md must cover hosts where the Claude agent definition is not registered"
+  );
+  assert.match(
+    verification,
+    /non dispone di subagent/i,
+    "verification.md must refuse self-validation when the host cannot create a separate agent"
+  );
+});
+
 test("cross-links between reference files resolve too", () => {
   for (const file of readdirSync(referencesDir).filter((f) => f.endsWith(".md"))) {
     const content = readFileSync(path.join(referencesDir, file), "utf8");
