@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-16T22:23:20Z",
+  "last_updated": "2026-08-16T22:44:57Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1612,6 +1612,61 @@
       },
       "created_at": "2026-08-16T22:17:47Z",
       "updated_at": "2026-08-16T22:23:20Z"
+    },
+    {
+      "id": "753d1860-31c1-4a88-8ae2-d9863f536af8",
+      "title": "Esporre i command harness nel menu $ di Codex",
+      "description": "Aggiungere un manifest Codex e sei skill entry-point dedicate a status, issue, verify, compact, docs-gate e sweep. Le entry devono comparire nel catalogo $ con namespace harness, delegare alla skill e alle reference autoritative esistenti e restare isolate dall'integrazione Claude Code. Documentare il reload richiesto dopo installazione o aggiornamento.",
+      "status": "done",
+      "tier": "standard",
+      "depends_on": [],
+      "covers": [],
+      "tasks": [
+        {
+          "id": 1,
+          "short_title": "Definire discovery e isolamento nei test",
+          "full_description": "Aggiungere test rossi per manifest, sei entry Codex, corrispondenza coi command e isolamento Claude.",
+          "checked": true
+        },
+        {
+          "id": 2,
+          "short_title": "Creare manifest e skill entry-point",
+          "full_description": "Generare e rifinire le sei skill Codex sottili, con metadata UI e delega alle fonti autoritative.",
+          "checked": true
+        },
+        {
+          "id": 3,
+          "short_title": "Documentare e verificare il reload",
+          "full_description": "Aggiornare README, eseguire validatori e suite, quindi preparare la verifica indipendente.",
+          "checked": true
+        }
+      ],
+      "validation": {
+        "criteria": "Independent verification passed. .codex-plugin/plugin.json parses with name=harness and skills=./skills/. The six entries status, issue, verify, compact, docs-gate, and sweep exist and match commands/*.md exactly; each loads skills/harness/SKILL.md plus only its relevant reference, derives the root from the announced entry base, and fails closed when it is absent. Their agents/openai.yaml files explicitly set policy.allow_implicit_invocation: false. README lists all six $harness entries and requires a new thread after install/update. git diff confirms .claude-plugin, commands/, and skills/harness/ are unchanged; git diff --check passed. python3 quick_validate.py passed for all six entries. npm run test passed: 406 tests, 406 pass, 0 fail (exit 0).",
+        "tasks": [
+          {
+            "id": 1,
+            "short_title": "Controllare il catalogo Codex",
+            "full_description": "Verificare manifest, namespace ed esistenza delle sei entry nel percorso dichiarato.",
+            "checked": true
+          },
+          {
+            "id": 2,
+            "short_title": "Controllare isolamento Claude",
+            "full_description": "Verificare che le entry Codex non alterino command e discovery Claude Code.",
+            "checked": true
+          },
+          {
+            "id": 3,
+            "short_title": "Validare skill e suite",
+            "full_description": "Eseguire validatori Codex, test strutturali e npm run test.",
+            "checked": true
+          }
+        ],
+        "state": "pass"
+      },
+      "created_at": "2026-08-16T22:31:01Z",
+      "updated_at": "2026-08-16T22:44:57Z"
     }
   ]
 }

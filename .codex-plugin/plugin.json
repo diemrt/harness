@@ -1,0 +1,25 @@
+{
+  "name": "harness",
+  "version": "0.7.1",
+  "description": "Controlled development harness for AI agents with tracked issues and independent verification.",
+  "author": {"name": "diemrt", "url": "https://github.com/diemrt"},
+  "homepage": "https://github.com/diemrt/harness#readme",
+  "repository": "https://github.com/diemrt/harness",
+  "license": "MIT",
+  "keywords": ["harness", "ai-agent", "issue-tracker", "workflow", "verification"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Harness",
+    "shortDescription": "Tracked AI development with independent verification",
+    "longDescription": "Run the harness workflow from Codex with explicit issue tracking, dependency-aware work, and independent verification.",
+    "developerName": "diemrt",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": [
+      "Clock in and show the harness tracker status.",
+      "Create a tracked issue for this work.",
+      "Verify the harness issue that is in review."
+    ],
+    "websiteURL": "https://github.com/diemrt/harness"
+  }
+}

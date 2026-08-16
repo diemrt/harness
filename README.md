@@ -51,17 +51,30 @@ writing anything.
 
 ### Codex CLI and other agent hosts
 
-The marketplace package and `/harness:*` commands above are Claude Code integration points, not
-requirements of the workflow. When Codex CLI or another host is given the harness skill by its
-environment—or is instructed by a repository's `AGENTS.md` to read it—it can run the same plain
-Node.js scripts and apply the same tracker and verification contract. This is interoperability,
-not a claim that the Claude marketplace plugin can be installed natively by that host.
+The repository also ships a Codex manifest. When harness is installed as a Codex plugin, the `$`
+menu exposes explicit entry points while the main `$harness:harness` skill remains available:
 
-Hosts without slash commands discover the available operations in the portable index in
-[`skills/harness/SKILL.md`](skills/harness/SKILL.md): `status`, `issue`, `verify`, `compact`,
-`docs-gate`, and `sweep`. Natural requests such as “clock in”, “create an issue”, or “verify the
-issue” map to those operations; the host invokes the listed script or follows the linked
-reference instead of attempting the Claude-only `/harness:*` spelling.
+| Codex skill | Operation |
+|---|---|
+| `$harness:status` | Clock in or print the tracker summary |
+| `$harness:issue` | List, create, inspect, or update issues |
+| `$harness:verify` | Dispatch independent verification |
+| `$harness:compact` | Propose and run issue compaction |
+| `$harness:docs-gate` | Check documentation coverage |
+| `$harness:sweep` | Find important documented work that is not tracked |
+
+These entry skills share the root `skills/` directory, following the same cross-host layout as
+Superpowers. They route into the same authoritative
+[`skills/harness/SKILL.md`](skills/harness/SKILL.md) and references used by Claude Code rather
+than copying the workflow. Claude's `/harness:*` commands remain under `commands/` and are not
+changed by the Codex manifest.
+
+After installing or updating the Codex plugin, start a **new thread** before checking the `$`
+menu. Plugin skills are loaded at thread startup, so the current thread keeps the previous
+catalog.
+
+An agent host without either integration can still read the portable operation index in the main
+skill and invoke the plain Node.js scripts directly.
 
 ## What it does
 

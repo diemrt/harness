@@ -1,0 +1,6 @@
+interface:
+  display_name: "Harness Compact"
+  short_description: "Compact completed harness issues safely"
+  default_prompt: "Use $compact to propose and compact completed harness issues."
+policy:
+  allow_implicit_invocation: false

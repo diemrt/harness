@@ -1,0 +1,6 @@
+interface:
+  display_name: "Harness Issue"
+  short_description: "Create, inspect, or update a harness issue"
+  default_prompt: "Use $issue to create, inspect, or update a tracked harness issue."
+policy:
+  allow_implicit_invocation: false

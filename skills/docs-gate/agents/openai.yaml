@@ -1,0 +1,6 @@
+interface:
+  display_name: "Harness Docs Gate"
+  short_description: "Check documentation coverage for commits"
+  default_prompt: "Use $docs-gate to check which code commits lack documentation coverage."
+policy:
+  allow_implicit_invocation: false
