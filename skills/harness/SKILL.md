@@ -38,9 +38,10 @@ directory non ti è stata annunciata, chiedila invece di ricostruirla.
 
 ## Operazioni portabili per host senza slash command
 
-Gli slash command `/harness:*` sono scorciatoie di Claude Code, non il protocollo di harness.
-Codex CLI e gli altri host che non li registrano: **non usare slash command non disponibili**;
-devono invece riconoscere l'intento espresso dall'utente, leggere la reference indicata e usare
+Ogni operazione ha la propria skill in `skills/<operazione>/`: Claude Code la registra come
+`/harness:<operazione>`, Codex come `$<operazione>`. Sono scorciatoie dell'host, non il protocollo
+di harness. Un host che non le registra **non deve inventare uno slash command che non esiste**;
+deve invece riconoscere l'intento espresso dall'utente, leggere la reference indicata e usare
 direttamente gli script in
 `$SCRIPTS`. Questo indice è anche la lista delle operazioni disponibili:
 
@@ -54,8 +55,8 @@ direttamente gli script in
 | `sweep` | «setaccia i documenti», «trova lavoro non tracciato» | [references/sweep.md](references/sweep.md) |
 
 La tabella serve a scoprire l'operazione, non sostituisce la reference: prima di comporre un
-payload o interpretare un output si legge soltanto quella pertinente. Se viene aggiunto un file
-in `commands/`, anche questo indice va aggiornato.
+payload o interpretare un output si legge soltanto quella pertinente. Se viene aggiunta una skill
+in `skills/`, anche questo indice va aggiornato.
 
 ### Codex CLI
 

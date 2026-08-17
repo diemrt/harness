@@ -58,18 +58,20 @@ test("every reference file is reachable from SKILL.md", () => {
 
 test("the skill exposes every shipped operation to hosts without slash commands", () => {
   const content = readSkill();
-  const commandsDir = path.join(rootDir, "commands");
+  const operations = readdirSync(path.join(rootDir, "skills"), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .filter((name) => name !== "harness");
   const section = content.match(
     /^## Operazioni portabili per host senza slash command$([\s\S]*?)(?=^## )/m
   )?.[1];
 
   assert.ok(section, "the skill needs a discoverable operation index for Codex and other hosts");
-  for (const file of readdirSync(commandsDir).filter((name) => name.endsWith(".md"))) {
-    const operation = path.basename(file, ".md");
+  for (const operation of operations) {
     assert.match(
       section,
       new RegExp(`\\b${operation.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\\b`),
-      `commands/${file} ships an operation missing from the portable index`
+      `skills/${operation}/ ships an operation missing from the portable index`
     );
   }
   assert.match(section, /Codex CLI/, "the portable index must tell Codex that it applies there");

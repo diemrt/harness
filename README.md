@@ -63,11 +63,16 @@ menu exposes explicit entry points while the main `$harness:harness` skill remai
 | `$harness:docs-gate` | Check documentation coverage |
 | `$harness:sweep` | Find important documented work that is not tracked |
 
-These entry skills share the root `skills/` directory, following the same cross-host layout as
+These entry skills live in the root `skills/` directory, following the same cross-host layout as
 Superpowers. They route into the same authoritative
-[`skills/harness/SKILL.md`](skills/harness/SKILL.md) and references used by Claude Code rather
-than copying the workflow. Claude's `/harness:*` commands remain under `commands/` and are not
-changed by the Codex manifest.
+[`skills/harness/SKILL.md`](skills/harness/SKILL.md) and references rather than copying the
+workflow.
+
+**There is one definition per operation, not one per host.** The same `skills/<operation>/SKILL.md`
+is what Claude Code registers as `/harness:<operation>` and what Codex registers as
+`$<operation>` — custom commands and skills are the same thing to Claude Code, so a plugin that
+shipped both spellings would show every operation twice in the `/` menu. The plugin therefore has
+no `commands/` directory, and `skills/` is the only place an operation is declared.
 
 After installing or updating the Codex plugin, start a **new thread** before checking the `$`
 menu. Plugin skills are loaded at thread startup, so the current thread keeps the previous
@@ -110,8 +115,10 @@ behalf has taken that decision away from you, in a file you never asked for.
 
 ## Slash commands
 
-The repetitive actions also have explicit commands. They are shortcuts, not a second
-source of truth: the workflow lives in the `harness` skill, and each command points back at it.
+The repetitive actions also have explicit entry points. They are shortcuts, not a second
+source of truth: the workflow lives in the `harness` skill, and each of them points back at it.
+Each one is a single skill under `skills/`, which Claude Code registers as `/harness:<operation>`
+and Codex as `$<operation>`.
 
 | Command | What it does | Without arguments |
 |---|---|---|

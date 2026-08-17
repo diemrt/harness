@@ -29,8 +29,13 @@ import { parseArgs } from "node:util";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-// The four directories that ARE the plugin. Everything Claude Code loads from harness lives in one
-// of them, so a copy that matches here matches where it counts.
+// The directories that ARE the plugin. Everything Claude Code loads from harness lives in one of
+// them, so a copy that matches here matches where it counts.
+//
+// `commands/` is in the list even though the plugin no longer ships it, and that is the point: an
+// installed copy that still carries it is a copy from before the operations became skills, and it
+// registers every /harness:* command twice. Dropping the entry would make exactly that divergence
+// invisible to the check written to catch divergences.
 export const COMPONENT_DIRS = ["agents", "commands", "scripts", "skills"];
 
 const USAGE = [

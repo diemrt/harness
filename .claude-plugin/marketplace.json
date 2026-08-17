@@ -10,7 +10,7 @@
       "name": "harness",
       "source": "./",
       "description": "Controlled development harness for AI agents: issue tracker, live issue board, and agent operating rules — installed as a plugin, leaving nothing but issues.json in your project.",
-      "version": "0.7.2",
+      "version": "0.7.3",
       "category": "engineering",
       "keywords": [
         "harness",

@@ -1,11 +1,62 @@
 ---
 name: verify
-description: Use when the user explicitly invokes independent verification for a harness issue that is ready for review.
+description: Lancia la verifica indipendente di una issue delegandola all'agent harness-verifier. Senza argomenti sceglie fra le issue in in_review.
+argument-hint: "[issue-id]"
+allowed-tools: Bash, Task
 ---
 
-# Harness verify
+Fai verificare una issue da un agente **diverso** da chi l'ha svolta. Il perché e i ruoli
+sono in `${CLAUDE_PLUGIN_ROOT}/skills/harness/references/verification.md`; qui c'è solo come
+si lancia. Il workflow dentro cui questa operazione vive è in
+`${CLAUDE_PLUGIN_ROOT}/skills/harness/SKILL.md`.
 
-1. Start from the base directory announced for this entry skill; resolve the plugin root as `<entry-base>/../..`. If the entry base is not announced, stop and ask for it; never guess or reuse an installed path.
-2. Read `<plugin-root>/skills/harness/SKILL.md` completely.
-3. Read `<plugin-root>/skills/harness/references/verification.md` completely.
-4. Follow “Operazioni portabili per host senza slash command” in the main skill. Always dispatch a distinct verifier; never verify inline.
+**Dove sta lo script.** Claude Code sostituisce `${CLAUDE_PLUGIN_ROOT}` da sé. Su un host che non
+lo fa — Codex CLI, o chiunque stia leggendo questo file come documento — il valore si ricava dalla
+**base directory annunciata per questa skill**: la radice del plugin è `<base della skill>/../..`,
+quindi gli script stanno in `<base della skill>/../../scripts`. Se la base non ti è stata
+annunciata, fermati e chiedila: non indovinarla e non riusare un path assoluto visto altrove, che
+porta il numero di versione e continuerebbe a girare sulla copia sbagliata invece di fallire.
+
+## 1. Scegli la issue
+
+`$1` è l'id, se l'utente l'ha passato. Se `$ARGUMENTS` è vuoto:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --get-all --status in_review
+```
+
+- una sola issue → è quella;
+- più di una → elencale (`id` accorciato, `title`) e chiedi quale, non sceglierne una tu;
+- nessuna → dillo e fermati. La verifica si fa su lavoro concluso: una issue ancora
+  `in_progress` non è pronta, portala prima a `in_review`.
+
+## 2. Delega, non verificare
+
+**Non eseguire tu i controlli.** Nemmeno se il lavoro è piccolo, nemmeno se il gate è un
+comando solo, e soprattutto **non se sei tu ad aver svolto la issue**: chi ha fatto il lavoro
+trova quello che si aspetta di trovare, ed è esattamente il caso che questa operazione esiste
+per impedire. Il tuo compito è raccogliere il contesto e passare la mano.
+
+Avvia l'agent `harness-verifier` (subagent dedicato, mai in linea) passandogli:
+
+- l'**id** della issue;
+- **cosa è stato prodotto**: file toccati e comandi eseguiti — `git status --short` e
+  `git diff --stat` come punto di partenza, non il racconto di chi ha lavorato;
+- il fatto che il gate è il comando `verify` di `.harness/config.json`.
+
+Su un host che non registra l'agent `harness-verifier`, il contratto portabile del verificatore —
+e il divieto di ripiegare sull'auto-verifica quando non esiste un secondo agente — è in
+`${CLAUDE_PLUGIN_ROOT}/skills/harness/references/verification.md`.
+
+Il verificatore legge i `validation.criteria`, li confronta con gli artefatti reali, spunta i
+`validation.tasks` che ha verificato davvero, esegue il gate e **chiude lui la issue**:
+`done`/`pass` con l'evidenza, oppure `blocked`/`fail` con il motivo. Non chiuderla tu, né prima
+né dopo di lui.
+
+## 3. Riporta l'esito
+
+- `pass` → la issue è `done`. Solo adesso il suo lavoro può raggiungere il ramo condiviso.
+- `fail` → la issue è `blocked`. **Niente pubblicazione**, e i commit già fatti sul ramo di
+  lavoro restano dove sono: si corregge con altri commit. Riporta il motivo così com'è: non
+  discuterlo, non correggere al volo il difetto dentro questa operazione, non rilanciare la
+  verifica sperando in un esito diverso. Si riprende la issue, si corregge, si riverifica.
