@@ -121,9 +121,25 @@ for (const [label, fragment] of [
 }
 
 for (const [label, fragment] of [
+  ["local tag", "title: !custom value"],
+  ["numeric anchor", "title: &1 value"],
+  ["numeric alias", "title: *1"],
+]) {
+  test(`parseIssue rejects YAML ${label}`, () => {
+    assert.throws(
+      () => parseIssue(`---\nid: ${ID_ONE}\n${fragment}\n---\n`, "11111111.md"),
+      (error) => error instanceof StorageError && error.code === "INVALID_INPUT"
+    );
+  });
+}
+
+for (const [label, fragment] of [
   ["tag", "depends_on: [!!str bad]"],
   ["anchor", "depends_on: [&name]"],
   ["alias", "depends_on: [*name]"],
+  ["local tag", "depends_on: [!custom]"],
+  ["numeric anchor", "depends_on: [&1]"],
+  ["numeric alias", "depends_on: [*1]"],
 ]) {
   test(`parseIssue rejects YAML ${label} in a flow sequence`, () => {
     assert.throws(
@@ -132,6 +148,19 @@ for (const [label, fragment] of [
     );
   });
 }
+
+test("serializeIssue JSON-quotes indicator-leading strings", () => {
+  const serialized = serializeIssue(
+    completeIssue({
+      title: "!custom value",
+      tasks: [{ id: 1, short_title: "&1 value", full_description: "*1", checked: false }],
+    })
+  );
+
+  assert.match(serialized, /^title: "!custom value"$/m);
+  assert.match(serialized, /^    short_title: "&1 value"$/m);
+  assert.match(serialized, /^    full_description: "\*1"$/m);
+});
 
 test("frontmatter title wins over a divergent rendered H1", () => {
   const parsed = parseIssue(

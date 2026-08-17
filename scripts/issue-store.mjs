@@ -31,7 +31,7 @@ function shortId(id) {
 }
 
 function encodeString(value) {
-  const ambiguous = /[:#\n\t"\[\]{}]|^\s|\s$|^(?:true|false|null|-?\d+)$/i;
+  const ambiguous = /[:#\n\t"\[\]{}]|^[!&*]|^\s|\s$|^(?:true|false|null|-?\d+)$/i;
   return value === "" || ambiguous.test(value) ? JSON.stringify(value) : value;
 }
 
@@ -122,9 +122,7 @@ function validateLines(lines, sourcePath) {
     if (/^ *\t/.test(line)) fail(`Tabs cannot indent frontmatter in '${sourcePath}'.`);
     if (indent % 2 !== 0) fail(`Frontmatter indentation must use two spaces in '${sourcePath}'.`);
     const unquoted = withoutQuotedStrings(line);
-    if (
-      /(^|\s)!!|(^|\s)&[A-Za-z]|(^|\s)\*[A-Za-z]|(^|\s)%YAML|^\s*<<:/m.test(unquoted)
-    ) {
+    if (/(^|\s)%YAML|^\s*<<:/m.test(unquoted)) {
       fail(`Unsupported YAML construct in '${sourcePath}'.`);
     }
   }
@@ -177,7 +175,7 @@ function parseScalar(value, sourcePath, allowFlowSequence = false) {
     if (typeof parsed !== "string") fail(`Quoted scalar must be a string in '${sourcePath}'.`);
     return parsed;
   }
-  if (/^(?:!!|&[A-Za-z]|\*[A-Za-z]|%YAML|<<:)/.test(value)) {
+  if (/^(?:[!&*]|%YAML|<<:)/.test(value)) {
     fail(`Unsupported YAML construct in '${sourcePath}'.`);
   }
   if (value.includes('"') || /[:#\[\]{}]/.test(value)) {
