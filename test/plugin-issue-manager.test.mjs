@@ -324,6 +324,24 @@ test("--update without dependency changes ignores an unrelated malformed Markdow
   }
 });
 
+test("--update with unchanged dependencies ignores an unrelated malformed Markdown issue", () => {
+  const { dir } = setupTempProject();
+  try {
+    writeFileSync(path.join(dir, ".harness", "issues", "aaaaaaaa.md"), "not markdown\n", "utf8");
+    const data = assertOk(run(dir, [
+      "--update",
+      "--issue-id",
+      ID_ONE,
+      "--issue-data",
+      JSON.stringify({ status: "blocked", depends_on: [] }),
+    ]));
+    assert.equal(data.status, "blocked");
+    assert.deepEqual(data.depends_on, []);
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("--upgrade refuses Markdown storage without creating legacy JSON", () => {
   const { dir } = setupTempProject();
   try {

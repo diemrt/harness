@@ -1561,12 +1561,16 @@ function updateIssue(issueId, issueData, declaredUnchanged = false) {
     enforceTasksForProgress(updatedIssue.status, mergedTasks);
   }
 
-  // The graph checks need the tracker as stored, and only the edges of THIS issue are being
-  // replaced — an update that omits depends_on cannot introduce a cycle, so it is not re-validated.
+  // The graph checks need the tracker as stored, but an omitted or unchanged dependency array
+  // cannot introduce a cycle, so only an actual edge change reads the full issue store.
   const dependsOn = hasProp(updatedIssue, "depends_on")
     ? updatedIssue.depends_on
     : Array.isArray(existing.depends_on) ? existing.depends_on : [];
-  if (hasProp(updatedIssue, "depends_on")) {
+  const existingDependsOn = Array.isArray(existing.depends_on) ? existing.depends_on : [];
+  const dependenciesChanged =
+    dependsOn.length !== existingDependsOn.length ||
+    dependsOn.some((dependency, index) => dependency !== existingDependsOn[index]);
+  if (hasProp(updatedIssue, "depends_on") && dependenciesChanged) {
     validateDependencyGraph(dependsOn, readAllIssues(projectDir), issueId);
   }
 
