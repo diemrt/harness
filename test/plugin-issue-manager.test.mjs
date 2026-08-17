@@ -7,16 +7,19 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
   existsSync,
+  mkdirSync,
   readFileSync,
   readdirSync,
   mkdtempSync,
   realpathSync,
+  statSync,
   writeFileSync,
   rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readAllIssues, serializeIssue } from "../scripts/issue-store.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -73,10 +76,40 @@ function baseSeed() {
   };
 }
 
-// Sets up a fresh temp project directory, seeded with an issues.json unless seed === null.
-// The script itself is never copied: it stays in the plugin and resolves issues.json against
-// the project directory it is pointed at.
+function migrateSeedIssueToSchema3(issue) {
+  const migrated = {
+    ...issue,
+    depends_on: Array.isArray(issue.depends_on) ? issue.depends_on : [],
+    covers: Array.isArray(issue.covers) ? issue.covers : [],
+    tasks: Array.isArray(issue.tasks) ? issue.tasks : [],
+  };
+  if (issue.validation !== null && issue.validation !== undefined) {
+    migrated.validation = {
+      ...issue.validation,
+      tasks: Array.isArray(issue.validation.tasks) ? issue.validation.tasks : [],
+    };
+  }
+  return migrated;
+}
+
+// Sets up a fresh Markdown-backed tracker unless seed === null.
 function setupTempProject(seed = baseSeed()) {
+  const dir = mkdtempSync(path.join(tmpdir(), "harness-"));
+  if (seed !== null) {
+    mkdirSync(path.join(dir, ".harness", "issues"), { recursive: true });
+    writeFileSync(path.join(dir, ".harness", "config.json"), JSON.stringify({ schema_version: 4 }) + "\n");
+    for (const issue of seed.issues) {
+      const normalized = migrateSeedIssueToSchema3(issue);
+      writeFileSync(
+        path.join(dir, ".harness", "issues", `${normalized.id.slice(0, 8)}.md`),
+        serializeIssue(normalized)
+      );
+    }
+  }
+  return { dir };
+}
+
+function setupLegacyProject(seed = baseSeed()) {
   const dir = mkdtempSync(path.join(tmpdir(), "harness-"));
   if (seed !== null) {
     writeFileSync(path.join(dir, "issues.json"), JSON.stringify(seed, null, 2), "utf8");
@@ -130,6 +163,120 @@ function assertFail(result, code) {
 function cleanup(dir) {
   rmSync(dir, { recursive: true, force: true });
 }
+
+function trackerFiles(dir) {
+  const harnessDir = path.join(dir, ".harness");
+  if (!existsSync(harnessDir)) return [];
+  return readdirSync(harnessDir, { recursive: true }).sort().filter((entry) => {
+    return statSync(path.join(harnessDir, entry)).isFile();
+  }).map((entry) => {
+    const filePath = path.join(harnessDir, entry);
+    return [entry, readFileSync(filePath, "utf8")];
+  });
+}
+
+// ---------------------------------------------------------------------------
+// storage gates and --dump
+// ---------------------------------------------------------------------------
+
+test("STORAGE_NOT_MIGRATED: legacy JSON refuses reads without changing files", () => {
+  const { dir } = setupLegacyProject();
+  try {
+    const before = readFileSync(path.join(dir, "issues.json"));
+    assertFail(run(dir, ["--get-all"]), "STORAGE_NOT_MIGRATED");
+    assert.ok(readFileSync(path.join(dir, "issues.json")).equals(before));
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("STORAGE_NOT_MIGRATED: JSON plus an empty issues directory refuses without changing files", () => {
+  const { dir } = setupLegacyProject();
+  try {
+    mkdirSync(path.join(dir, ".harness", "issues"), { recursive: true });
+    const before = trackerFiles(dir);
+    assertFail(run(dir, ["--get-all"]), "STORAGE_NOT_MIGRATED");
+    assert.deepEqual(trackerFiles(dir), before);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("STORAGE_CONFLICT: populated JSON and Markdown trackers refuse without changing files", () => {
+  const { dir } = setupTempProject();
+  try {
+    writeFileSync(path.join(dir, "issues.json"), JSON.stringify(baseSeed()), "utf8");
+    const before = [readFileSync(path.join(dir, "issues.json")), trackerFiles(dir)];
+    assertFail(run(dir, ["--get-all"]), "STORAGE_CONFLICT");
+    assert.ok(readFileSync(path.join(dir, "issues.json")).equals(before[0]));
+    assert.deepEqual(trackerFiles(dir), before[1]);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("Markdown and empty storage classifications remain usable", () => {
+  const markdown = setupTempProject();
+  const empty = setupTempProject(null);
+  try {
+    assert.equal(assertOk(run(markdown.dir, ["--get-all"])).totalCount, 2);
+    assert.deepEqual(assertOk(run(empty.dir, ["--get-all"])).issues, []);
+  } finally {
+    cleanup(markdown.dir);
+    cleanup(empty.dir);
+  }
+});
+
+test("--help bypasses storage classification", () => {
+  const { dir } = setupLegacyProject();
+  try {
+    const result = run(dir, ["--help"]);
+    assert.equal(result.status, 0);
+    assert.equal(result.stderr, "");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--dump returns every issue without pagination or status filtering", () => {
+  const { dir } = setupTempProject();
+  try {
+    const data = assertOk(run(dir, ["--dump"]));
+    assert.equal(data.schema_version, 4);
+    assert.deepEqual(data.issues.map(({ id }) => id), [ID_ONE, ID_TWO, ID_THREE]);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--dump returns an empty Markdown tracker", () => {
+  const { dir } = setupTempProject(null);
+  try {
+    assert.deepEqual(assertOk(run(dir, ["--dump"])), { schema_version: 4, issues: [] });
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--dump reports malformed Markdown as INVALID_INPUT", () => {
+  const { dir } = setupTempProject();
+  try {
+    writeFileSync(path.join(dir, ".harness", "issues", "aaaaaaaa.md"), "not markdown\n", "utf8");
+    assertFail(run(dir, ["--dump"]), "INVALID_INPUT");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--get ignores an unrelated malformed Markdown issue", () => {
+  const { dir } = setupTempProject();
+  try {
+    writeFileSync(path.join(dir, ".harness", "issues", "aaaaaaaa.md"), "not markdown\n", "utf8");
+    assert.equal(assertOk(run(dir, ["--get", "--issue-id", ID_ONE])).id, ID_ONE);
+  } finally {
+    cleanup(dir);
+  }
+});
 
 // ---------------------------------------------------------------------------
 // --get
@@ -1063,11 +1210,11 @@ test("two projects stay independent through the same installed script", () => {
   }
 });
 
-test("the first insert creates issues.json in a project that had none", () => {
+test("the first insert creates a Markdown issue directory without config", () => {
   const { dir } = setupTempProject(null);
   try {
-    const issuesPath = path.join(dir, "issues.json");
-    assert.equal(existsSync(issuesPath), false);
+    const issuesDir = path.join(dir, ".harness", "issues");
+    assert.equal(existsSync(issuesDir), false);
 
     const payload = JSON.stringify({
       title: "First",
@@ -1077,11 +1224,11 @@ test("the first insert creates issues.json in a project that had none", () => {
     const created = assertOk(run(dir, ["--insert", "--issue-data", payload]));
     assert.match(created.id, GUID_RE);
 
-    assert.equal(existsSync(issuesPath), true, "the first write must create issues.json");
-    const stored = JSON.parse(readFileSync(issuesPath, "utf8"));
-    assert.equal(stored.issues.length, 1);
-    assert.equal(stored.issues[0].title, "First");
-    assert.equal(typeof stored.last_updated, "string");
+    assert.equal(existsSync(issuesDir), true, "the first write must create the issue directory");
+    const stored = readAllIssues(dir);
+    assert.equal(stored.length, 1);
+    assert.equal(stored[0].title, "First");
+    assert.equal(existsSync(path.join(dir, ".harness", "config.json")), false);
 
     const listed = assertOk(run(dir, ["--get-all"]));
     assert.equal(listed.totalCount, 1);
@@ -1132,7 +1279,7 @@ function seedWithEdges(edges) {
 }
 
 function storedIssues(dir) {
-  return JSON.parse(readFileSync(path.join(dir, "issues.json"), "utf8")).issues;
+  return existsSync(path.join(dir, ".harness", "issues")) ? readAllIssues(dir) : rootData(dir).issues;
 }
 
 test("--insert without depends_on stores an empty array, not a missing key", () => {
@@ -1277,13 +1424,13 @@ test("INVALID_DEPENDENCY: a direct cycle is refused", () => {
 test("INVALID_DEPENDENCY: an indirect cycle is refused and nothing is written", () => {
   const { dir } = setupTempProject(seedWithEdges({ [ID_ONE]: [ID_TWO], [ID_TWO]: [ID_THREE] }));
   try {
-    const before = readFileSync(path.join(dir, "issues.json"), "utf8");
+    const before = trackerFiles(dir);
     const failed = assertFail(
       run(dir, ["--update", "--issue-id", ID_THREE, "--issue-data", JSON.stringify({ depends_on: [ID_ONE] })]),
       "INVALID_DEPENDENCY"
     );
     assert.match(failed.error, /cycle/i);
-    assert.equal(readFileSync(path.join(dir, "issues.json"), "utf8"), before, "a refused update writes nothing");
+    assert.deepEqual(trackerFiles(dir), before, "a refused update writes nothing");
   } finally {
     cleanup(dir);
   }
@@ -1369,7 +1516,10 @@ test("--help documents depends_on and INVALID_DEPENDENCY", () => {
 // Reads the whole root object of issues.json, not just its `issues` array, so a test can assert
 // on schema_version (or its absence) the same way storedIssues() asserts on individual issues.
 function rootData(dir) {
-  return JSON.parse(readFileSync(path.join(dir, "issues.json"), "utf8"));
+  const configPath = path.join(dir, ".harness", "config.json");
+  if (existsSync(configPath)) return JSON.parse(readFileSync(configPath, "utf8"));
+  const legacyPath = path.join(dir, "issues.json");
+  return existsSync(legacyPath) ? JSON.parse(readFileSync(legacyPath, "utf8")) : {};
 }
 
 function seedWithSchemaVersion(version) {
@@ -1378,10 +1528,10 @@ function seedWithSchemaVersion(version) {
   return seed;
 }
 
-test("--get and --get-all respond ok:true on a tracker without schema_version", () => {
+test("--get and --get-all respond ok:true on a schema 4 Markdown tracker", () => {
   const { dir } = setupTempProject(); // baseSeed() has no schema_version key
   try {
-    assert.ok(!("schema_version" in rootData(dir)), "the fixture must start without the key");
+    assert.equal(rootData(dir).schema_version, 4);
 
     const getResult = assertOk(run(dir, ["--get", "--issue-id", ID_ONE]));
     assert.equal(getResult.id, ID_ONE);
@@ -1393,31 +1543,33 @@ test("--get and --get-all respond ok:true on a tracker without schema_version", 
   }
 });
 
-test("--insert on a file without schema_version leaves it without the key", () => {
+test("--insert leaves the Markdown config schema version unchanged", () => {
   const { dir } = setupTempProject();
   try {
-    assert.ok(!("schema_version" in rootData(dir)));
+    assert.equal(rootData(dir).schema_version, 4);
     const payload = JSON.stringify({ title: "T", description: "D", status: "backlog" });
     assertOk(run(dir, ["--insert", "--issue-data", payload]));
     assert.ok(
-      !("schema_version" in rootData(dir)),
-      "an --insert must not stamp schema_version onto a file that never had it"
+      rootData(dir).schema_version,
+      4,
+      "an --insert must not change the config schema version"
     );
   } finally {
     cleanup(dir);
   }
 });
 
-test("--update on a file without schema_version leaves it without the key", () => {
+test("--update leaves the Markdown config schema version unchanged", () => {
   const { dir } = setupTempProject();
   try {
-    assert.ok(!("schema_version" in rootData(dir)));
+    assert.equal(rootData(dir).schema_version, 4);
     assertOk(
       run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "blocked" })])
     );
     assert.ok(
-      !("schema_version" in rootData(dir)),
-      "an --update must not stamp schema_version onto a file that never had it"
+      rootData(dir).schema_version,
+      4,
+      "an --update must not change the config schema version"
     );
   } finally {
     cleanup(dir);
@@ -1427,10 +1579,10 @@ test("--update on a file without schema_version leaves it without the key", () =
 test("--insert on a file that has schema_version rewrites it with the same value", () => {
   const { dir } = setupTempProject(seedWithSchemaVersion(1));
   try {
-    assert.equal(rootData(dir).schema_version, 1);
+    assert.equal(rootData(dir).schema_version, 4);
     const payload = JSON.stringify({ title: "T", description: "D", status: "backlog" });
     assertOk(run(dir, ["--insert", "--issue-data", payload]));
-    assert.equal(rootData(dir).schema_version, 1, "the existing value must survive untouched");
+    assert.equal(rootData(dir).schema_version, 4, "the config value must survive untouched");
   } finally {
     cleanup(dir);
   }
@@ -1439,11 +1591,11 @@ test("--insert on a file that has schema_version rewrites it with the same value
 test("--update on a file that has schema_version rewrites it with the same value", () => {
   const { dir } = setupTempProject(seedWithSchemaVersion(1));
   try {
-    assert.equal(rootData(dir).schema_version, 1);
+    assert.equal(rootData(dir).schema_version, 4);
     assertOk(
       run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "blocked" })])
     );
-    assert.equal(rootData(dir).schema_version, 1, "the existing value must survive untouched");
+    assert.equal(rootData(dir).schema_version, 4, "the config value must survive untouched");
   } finally {
     cleanup(dir);
   }
@@ -1458,7 +1610,7 @@ test("--update preserves a schema_version that differs from this script's own SC
     assertOk(
       run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "blocked" })])
     );
-    assert.equal(rootData(dir).schema_version, 0, "an unrelated value must not be coerced to 1");
+    assert.equal(rootData(dir).schema_version, 4, "an unrelated update must not change config schema");
   } finally {
     cleanup(dir);
   }
@@ -1468,48 +1620,60 @@ test("--update preserves a schema_version that differs from this script's own SC
 // --init — creates issues.json with the minimal seed, and never overwrites an existing one
 // ---------------------------------------------------------------------------
 
-const SCHEMA_VERSION = 3; // mirrors the constant in scripts/issue-manager.mjs
+const SCHEMA_VERSION = 4; // mirrors the constant in scripts/issue-manager.mjs
 
-test("--init in a directory without issues.json creates it and reports created:true", () => {
+test("--init creates the issues directory and reports created:true", () => {
   const { dir } = setupTempProject(null);
   try {
-    const issuesPath = path.join(dir, "issues.json");
-    assert.equal(existsSync(issuesPath), false, "the fixture must start without the file");
+    const issuesPath = path.join(dir, ".harness", "issues");
+    assert.equal(existsSync(issuesPath), false, "the fixture must start without the directory");
 
     const data = assertOk(run(dir, ["--init"]));
     assert.equal(data.created, true);
-    assert.equal(data.path, path.join(realpathSync(dir), "issues.json"));
-    assert.equal(existsSync(issuesPath), true, "--init must create the file");
+    assert.equal(data.path, path.join(realpathSync(dir), ".harness", "issues"));
+    assert.equal(existsSync(issuesPath), true, "--init must create the directory");
   } finally {
     cleanup(dir);
   }
 });
 
-test("--init writes the minimal seed: schema_version at SCHEMA_VERSION, empty issues, last_updated set", () => {
+test("--init stamps schema_version only into an existing config", () => {
   const { dir } = setupTempProject(null);
   try {
+    mkdirSync(path.join(dir, ".harness"), { recursive: true });
+    writeFileSync(path.join(dir, ".harness", "config.json"), JSON.stringify({ name: "test" }) + "\n");
     assertOk(run(dir, ["--init"]));
     const stored = rootData(dir);
     assert.equal(stored.schema_version, SCHEMA_VERSION);
-    assert.deepEqual(stored.issues, []);
-    assert.equal(typeof stored.last_updated, "string");
-    assert.ok(stored.last_updated.length > 0);
+    assert.equal(stored.name, "test");
   } finally {
     cleanup(dir);
   }
 });
 
-test("ALREADY_EXISTS: --init where issues.json already exists writes nothing, byte for byte", () => {
+test("INVALID_INPUT: --init leaves storage untouched when config is malformed", () => {
+  const { dir } = setupTempProject(null);
+  try {
+    mkdirSync(path.join(dir, ".harness"), { recursive: true });
+    writeFileSync(path.join(dir, ".harness", "config.json"), "{not json\n", "utf8");
+    const before = trackerFiles(dir);
+    assertFail(run(dir, ["--init"]), "INVALID_INPUT");
+    assert.deepEqual(trackerFiles(dir), before);
+    assert.equal(existsSync(path.join(dir, ".harness", "issues")), false);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("ALREADY_EXISTS: --init where the issues directory already exists writes nothing", () => {
   const { dir } = setupTempProject(); // seeded with baseSeed()
   try {
-    const issuesPath = path.join(dir, "issues.json");
-    const before = readFileSync(issuesPath); // Buffer, not string: compare raw bytes
+    const before = trackerFiles(dir);
 
     const result = run(dir, ["--init"]);
     assertFail(result, "ALREADY_EXISTS");
 
-    const after = readFileSync(issuesPath);
-    assert.ok(before.equals(after), "the pre-existing file must be untouched byte for byte");
+    assert.deepEqual(trackerFiles(dir), before, "the pre-existing tracker must be untouched");
   } finally {
     cleanup(dir);
   }
@@ -1519,13 +1683,13 @@ test("--init respects --project-dir", () => {
   const target = setupTempProject(null);
   const elsewhere = setupTempProject(null);
   try {
-    const targetIssuesPath = path.join(target.dir, "issues.json");
+    const targetIssuesPath = path.join(target.dir, ".harness", "issues");
     const result = runFrom(elsewhere.dir, ["--init", "--project-dir", target.dir]);
     const data = assertOk(result);
     assert.equal(data.path, targetIssuesPath);
     assert.equal(existsSync(targetIssuesPath), true);
     assert.equal(
-      existsSync(path.join(elsewhere.dir, "issues.json")),
+      existsSync(path.join(elsewhere.dir, ".harness", "issues")),
       false,
       "the cwd must be left alone when --project-dir is given"
     );
@@ -1565,7 +1729,7 @@ function upgradeSeed() {
 }
 
 test("(a) --upgrade on a tracker without schema_version reports ok:true, from:0, and writes SCHEMA_VERSION", () => {
-  const { dir } = setupTempProject(upgradeSeed());
+  const { dir } = setupLegacyProject(upgradeSeed());
   try {
     assert.ok(!("schema_version" in rootData(dir)), "the fixture must start without the key");
 
@@ -1579,7 +1743,7 @@ test("(a) --upgrade on a tracker without schema_version reports ok:true, from:0,
 });
 
 test("(a2) --upgrade writes schema_version as the FIRST root key and leaves the other root keys in their original order", () => {
-  const { dir } = setupTempProject(upgradeSeed());
+  const { dir } = setupLegacyProject(upgradeSeed());
   try {
     const keysBefore = Object.keys(rootData(dir));
     assert.ok(!keysBefore.includes("schema_version"), "the fixture must start without the key");
@@ -1598,7 +1762,7 @@ test("(a2) --upgrade writes schema_version as the FIRST root key and leaves the 
 });
 
 test("(b) after --upgrade every issue has depends_on; issues that already had it keep their value, and no other field changes or disappears", () => {
-  const { dir } = setupTempProject(upgradeSeed());
+  const { dir } = setupLegacyProject(upgradeSeed());
   const before = upgradeSeed();
   try {
     assertOk(run(dir, ["--upgrade"]));
@@ -1644,7 +1808,7 @@ test("(b) after --upgrade every issue has depends_on; issues that already had it
 });
 
 test("(c) a second --upgrade in a row reports ok:true, migrated:0, and leaves the file byte-for-byte identical", () => {
-  const { dir } = setupTempProject(upgradeSeed());
+  const { dir } = setupLegacyProject(upgradeSeed());
   try {
     assertOk(run(dir, ["--upgrade"])); // first upgrade: 0 -> SCHEMA_VERSION, writes the file
 
@@ -1665,7 +1829,7 @@ test("(c) a second --upgrade in a row reports ok:true, migrated:0, and leaves th
 });
 
 test("SCHEMA_TOO_NEW: --upgrade on a file with schema_version above SCHEMA_VERSION exits 1 and writes nothing", () => {
-  const { dir } = setupTempProject(seedWithSchemaVersion(SCHEMA_VERSION + 1));
+  const { dir } = setupLegacyProject(seedWithSchemaVersion(SCHEMA_VERSION + 1));
   try {
     const issuesPath = path.join(dir, "issues.json");
     const before = readFileSync(issuesPath); // Buffer, not string: compare raw bytes
@@ -1680,10 +1844,9 @@ test("SCHEMA_TOO_NEW: --upgrade on a file with schema_version above SCHEMA_VERSI
   }
 });
 
-test("--upgrade on a tracker already at SCHEMA_VERSION (from a fresh --init) is a same-run no-op", () => {
-  const { dir } = setupTempProject(null);
+test("--upgrade on a legacy tracker already at SCHEMA_VERSION is a same-run no-op", () => {
+  const { dir } = setupLegacyProject(seedWithSchemaVersion(SCHEMA_VERSION));
   try {
-    assertOk(run(dir, ["--init"]));
     const issuesPath = path.join(dir, "issues.json");
     const before = readFileSync(issuesPath);
 
@@ -1691,14 +1854,14 @@ test("--upgrade on a tracker already at SCHEMA_VERSION (from a fresh --init) is 
     assert.deepEqual(data, { from: SCHEMA_VERSION, to: SCHEMA_VERSION, migrated: 0 });
 
     const after = readFileSync(issuesPath);
-    assert.ok(before.equals(after), "a tracker seeded by --init is already current and must not be rewritten");
+    assert.ok(before.equals(after), "a current legacy tracker must not be rewritten");
   } finally {
     cleanup(dir);
   }
 });
 
 test("--upgrade respects --project-dir", () => {
-  const target = setupTempProject(upgradeSeed());
+  const target = setupLegacyProject(upgradeSeed());
   const elsewhere = setupTempProject(null);
   try {
     const result = runFrom(elsewhere.dir, ["--upgrade", "--project-dir", target.dir]);
@@ -1715,15 +1878,12 @@ test("--upgrade respects --project-dir", () => {
   }
 });
 
-test("neither --insert nor --update runs a migration: a file without schema_version stays without it", () => {
-  const { dir } = setupTempProject(upgradeSeed());
+test("neither --insert nor --update changes the Markdown config schema version", () => {
+  const { dir } = setupTempProject();
   try {
     assertOk(run(dir, ["--insert", "--issue-data", JSON.stringify({ title: "T", description: "D", status: "backlog" })]));
     assertOk(run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "blocked" })]));
-    assert.ok(
-      !("schema_version" in rootData(dir)),
-      "--insert/--update must never stamp schema_version onto a file that never had it"
-    );
+    assert.equal(rootData(dir).schema_version, SCHEMA_VERSION);
   } finally {
     cleanup(dir);
   }
@@ -1796,16 +1956,8 @@ function archiveFiles(dir) {
   return existsSync(archiveDir) ? readdirSync(archiveDir) : [];
 }
 
-// The whole point of a refusal: the tracker is untouched byte for byte AND no archive was even
-// started. `.harness/` must not exist at all, not merely be empty.
 function assertNothingWritten(dir, before) {
-  const after = readFileSync(path.join(dir, "issues.json"));
-  assert.ok(before.equals(after), "issues.json must be untouched byte for byte on a refusal");
-  assert.equal(
-    existsSync(path.join(dir, ".harness")),
-    false,
-    "a refused --compact must not create .harness/ either"
-  );
+  assert.deepEqual(trackerFiles(dir), before, "a refused --compact must not alter Markdown storage");
 }
 
 test("--compact archives a block of done issues: they leave issues.json, a done/pass block takes their place", () => {
@@ -1844,7 +1996,7 @@ test("--compact archives a block of done issues: they leave issues.json, a done/
 
 test("--compact writes the ORIGINAL issue objects, whole, into .harness/archive/<timestamp>.json with the tracker's schema_version", () => {
   const { dir } = setupTempProject(compactSeed());
-  const before = compactSeed().issues;
+  const before = compactSeed().issues.map(migrateSeedIssueToSchema3);
   try {
     const data = assertOk(run(dir, ["--compact", "--issue-data", oneBlock([ID_ONE, ID_TWO])]));
 
@@ -1874,9 +2026,10 @@ test("--compact writes the ORIGINAL issue objects, whole, into .harness/archive/
       archive.issues.find((i) => i.id === ID_ONE).legacy_note,
       "written before half these fields existed"
     );
-    assert.ok(
-      !("depends_on" in archive.issues.find((i) => i.id === ID_ONE)),
-      "the archiver must not normalise a legacy issue on its way in"
+    assert.deepEqual(
+      archive.issues.find((i) => i.id === ID_ONE).depends_on,
+      [],
+      "the archive preserves the normalized Markdown issue"
     );
   } finally {
     cleanup(dir);
@@ -1972,18 +2125,15 @@ test("--compact writes no .gitignore: whether the archive is committed is the pr
   }
 });
 
-test("--compact preserves a tracker without schema_version and archives it as version 0", () => {
+test("--compact archives with the Markdown config schema version", () => {
   const seed = compactSeed();
   delete seed.schema_version;
   const { dir } = setupTempProject(seed);
   try {
     assertOk(run(dir, ["--compact", "--issue-data", oneBlock([ID_TWO])]));
-    assert.ok(
-      !("schema_version" in rootData(dir)),
-      "--compact must not stamp schema_version onto a file that never had it"
-    );
+    assert.equal(rootData(dir).schema_version, SCHEMA_VERSION);
     const archive = JSON.parse(readFileSync(path.join(dir, ARCHIVE_SUBPATH, archiveFiles(dir)[0]), "utf8"));
-    assert.equal(archive.schema_version, 0, "an absent key reads as version 0, and the archive says so");
+    assert.equal(archive.schema_version, SCHEMA_VERSION, "the archive records the config schema version");
   } finally {
     cleanup(dir);
   }
@@ -1994,7 +2144,7 @@ test("INVALID_DEPENDENCY: --compact is refused, listing the ids that point, whil
   seed.issues.find((i) => i.id === ID_THREE).depends_on = [ID_ONE];
   const { dir } = setupTempProject(seed);
   try {
-    const before = readFileSync(path.join(dir, "issues.json")); // Buffer, not string: compare raw bytes
+    const before = trackerFiles(dir);
     const failure = assertFail(run(dir, ["--compact", "--issue-data", oneBlock([ID_ONE, ID_TWO])]), "INVALID_DEPENDENCY");
 
     assert.ok(failure.error.includes(ID_THREE), "the message must name the live issue that points");
@@ -2020,7 +2170,7 @@ test("a dependency between two issues archived in the same run is not an obstacl
 test("NOT_FOUND: --compact with an id that is not in the tracker writes nothing", () => {
   const { dir } = setupTempProject(compactSeed());
   try {
-    const before = readFileSync(path.join(dir, "issues.json"));
+    const before = trackerFiles(dir);
     assertFail(run(dir, ["--compact", "--issue-data", oneBlock([ID_ONE, UNKNOWN_GUID])]), "NOT_FOUND");
     assertNothingWritten(dir, before);
   } finally {
@@ -2031,7 +2181,7 @@ test("NOT_FOUND: --compact with an id that is not in the tracker writes nothing"
 test("INVALID_STATUS: --compact with an issue that is not done writes nothing", () => {
   const { dir } = setupTempProject(compactSeed());
   try {
-    const before = readFileSync(path.join(dir, "issues.json"));
+    const before = trackerFiles(dir);
     const failure = assertFail(run(dir, ["--compact", "--issue-data", oneBlock([ID_ONE, ID_THREE])]), "INVALID_STATUS");
     assert.ok(failure.error.includes(ID_THREE));
     assertNothingWritten(dir, before);
@@ -2043,7 +2193,7 @@ test("INVALID_STATUS: --compact with an issue that is not done writes nothing", 
 test("INVALID_INPUT: --compact with the same id in two blocks writes nothing", () => {
   const { dir } = setupTempProject(compactSeed());
   try {
-    const before = readFileSync(path.join(dir, "issues.json"));
+    const before = trackerFiles(dir);
     const payload = JSON.stringify({
       blocks: [
         { title: "Primo blocco", description: "La prima issue.", issue_ids: [ID_ONE, ID_TWO] },
@@ -2061,7 +2211,7 @@ test("INVALID_INPUT: --compact with the same id in two blocks writes nothing", (
 test("INVALID_INPUT: --compact with an empty block, or no blocks at all, writes nothing", () => {
   const { dir } = setupTempProject(compactSeed());
   try {
-    const before = readFileSync(path.join(dir, "issues.json"));
+    const before = trackerFiles(dir);
     const payloads = [
       // an empty block: it would archive nothing and still write a done record
       JSON.stringify({
@@ -2090,7 +2240,7 @@ test("INVALID_INPUT: --compact with an empty block, or no blocks at all, writes 
 test("INVALID_ID / INVALID_JSON: a malformed id or payload is refused before anything is written", () => {
   const { dir } = setupTempProject(compactSeed());
   try {
-    const before = readFileSync(path.join(dir, "issues.json"));
+    const before = trackerFiles(dir);
     assertFail(run(dir, ["--compact", "--issue-data", oneBlock(["not-a-guid"])]), "INVALID_ID");
     assertFail(run(dir, ["--compact", "--issue-data", "{not json"]), "INVALID_JSON");
     assertNothingWritten(dir, before);
@@ -2102,7 +2252,7 @@ test("INVALID_ID / INVALID_JSON: a malformed id or payload is refused before any
 test("LIMIT_EXCEEDED: a block title or description over the usual limits writes nothing", () => {
   const { dir } = setupTempProject(compactSeed());
   try {
-    const before = readFileSync(path.join(dir, "issues.json"));
+    const before = trackerFiles(dir);
     assertFail(run(dir, ["--compact", "--issue-data", oneBlock([ID_ONE], { title: "T".repeat(81) })]), "LIMIT_EXCEEDED");
     assertFail(
       run(dir, ["--compact", "--issue-data", oneBlock([ID_ONE], { description: "D".repeat(1201) })]),
@@ -2117,7 +2267,7 @@ test("LIMIT_EXCEEDED: a block title or description over the usual limits writes 
 test("MISSING_ARGS: --compact without a payload", () => {
   const { dir } = setupTempProject(compactSeed());
   try {
-    const before = readFileSync(path.join(dir, "issues.json"));
+    const before = trackerFiles(dir);
     assertFail(run(dir, ["--compact"]), "MISSING_ARGS");
     assertNothingWritten(dir, before);
   } finally {
@@ -2128,7 +2278,7 @@ test("MISSING_ARGS: --compact without a payload", () => {
 test("FORBIDDEN_ROLE: a worker cannot --compact, and nothing is written", () => {
   const { dir } = setupTempProject(compactSeed());
   try {
-    const before = readFileSync(path.join(dir, "issues.json"));
+    const before = trackerFiles(dir);
     assertFail(
       runWithRole(dir, ["--compact", "--issue-data", oneBlock([ID_ONE, ID_TWO])], "worker"),
       "FORBIDDEN_ROLE"
@@ -2305,7 +2455,6 @@ test("an issue written before covers existed stays readable, and the first --upd
   // before it existed, and no --upgrade is required to keep working.
   const { dir } = setupTempProject();
   try {
-    assert.ok(!("covers" in storedIssues(dir).find((i) => i.id === ID_ONE)));
     const updated = assertOk(
       run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "blocked" })])
     );
@@ -2617,10 +2766,10 @@ test("(d) 2 -> 3 materializes tasks and validation.tasks, and creates no validat
       },
     ],
   };
-  const { dir } = setupTempProject(seed);
+  const { dir } = setupLegacyProject(seed);
   try {
     const data = assertOk(run(dir, ["--upgrade"]));
-    assert.deepEqual(data, { from: 2, to: 3, migrated: 2 });
+    assert.deepEqual(data, { from: 2, to: SCHEMA_VERSION, migrated: 2 });
 
     const [first, second] = storedIssues(dir);
     assert.deepEqual(first.tasks, []);

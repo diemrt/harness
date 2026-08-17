@@ -110,9 +110,19 @@ import {
   renameSync,
 } from "node:fs";
 import path from "node:path";
+import {
+  StorageError,
+  classifyStorage,
+  deleteIssueFile,
+  readAllIssues,
+  readIssue,
+  writeIssue,
+} from "./issue-store.mjs";
 
 // Resolved in main() from --project-dir (or the cwd) before any command runs.
 let issuesFilePath = null;
+let projectDir = null;
+let storage = null;
 
 // Length caps on the free text of an issue. Deliberately not configurable: a limit a project can
 // raise is a limit nobody hits. Measured in JavaScript characters on the trimmed string, so
@@ -150,7 +160,7 @@ const TIERS = ["economy", "standard", "reasoning"];
 // see writeIssuesFile(). An absent key reads as version 0, and that is not an error: it is the
 // same choice already made for `tier` and `depends_on`, a new field never invalidates data
 // written before it existed.
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 // Ordered migrations for --upgrade. Each entry names the schema version it PRODUCES (`to`) and a
 // function that migrates one issue object, returning either the same reference (untouched) or a
@@ -282,12 +292,39 @@ function nowTimestamp() {
 // Helper: resolve the project directory whose issues.json this invocation operates on.
 // Defaults to the process cwd, which is the project an agent is working in; --project-dir
 // overrides it for callers that cannot control their cwd.
-function resolveIssuesFilePath(projectDir) {
-  const dir = path.resolve(projectDir ?? process.cwd());
+function resolveProjectDir(projectDirArg) {
+  const dir = path.resolve(projectDirArg ?? process.cwd());
   if (!existsSync(dir) || !statSync(dir).isDirectory()) {
     fail(`Project directory '${dir}' does not exist.`, "FILE_NOT_FOUND");
   }
-  return path.join(dir, "issues.json");
+  return dir;
+}
+
+function requireMarkdownStorage() {
+  if (storage.kind === "legacy") {
+    fail("Run --upgrade before using this tracker.", "STORAGE_NOT_MIGRATED");
+  }
+  if (storage.kind === "conflict") {
+    fail("Legacy JSON and Markdown issues are both populated.", "STORAGE_CONFLICT");
+  }
+  return storage;
+}
+
+function readSchemaVersion() {
+  const configPath = path.join(projectDir, HARNESS_DIR, "config.json");
+  if (!existsSync(configPath)) return SCHEMA_VERSION;
+  let config;
+  try {
+    config = JSON.parse(readFileSync(configPath, "utf8"));
+  } catch {
+    fail(`Config file '${configPath}' is not valid JSON.`, "INVALID_INPUT");
+  }
+  return typeof config.schema_version === "number" ? config.schema_version : SCHEMA_VERSION;
+}
+
+function dumpIssues() {
+  const issues = readAllIssues(projectDir).sort((a, b) => a.id.localeCompare(b.id));
+  writeOk({ schema_version: readSchemaVersion(), issues });
 }
 
 // Helper: enforce a length cap on a free-text field. Reports the measured length next to the
@@ -938,15 +975,29 @@ function writeIssuesFile(data) {
 // that erases a live tracker, and no confirmation flag is worth that risk — starting over is a
 // deliberate `rm` by the caller, not a flag on this command. Nothing is written on that path.
 function initTracker() {
-  if (existsSync(issuesFilePath)) {
+  if (storage.kind === "legacy" || storage.kind === "conflict" || existsSync(storage.issuesDir)) {
     fail(
-      `'${issuesFilePath}' already exists. Remove it yourself if you want to start over; --init never overwrites.`,
+      `'${storage.issuesDir}' or '${storage.jsonPath}' already exists. Remove it yourself if you want to start over; --init never overwrites.`,
       "ALREADY_EXISTS"
     );
   }
-  const data = { schema_version: SCHEMA_VERSION, last_updated: nowTimestamp(), issues: [] };
-  writeIssuesFile(data);
-  writeOk({ path: issuesFilePath, created: true });
+  const configPath = path.join(projectDir, HARNESS_DIR, "config.json");
+  let config = null;
+  if (existsSync(configPath)) {
+    try {
+      config = JSON.parse(readFileSync(configPath, "utf8"));
+    } catch {
+      fail(`Config file '${configPath}' is not valid JSON.`, "INVALID_INPUT");
+    }
+    if (config === null || typeof config !== "object" || Array.isArray(config)) {
+      fail(`Config file '${configPath}' must contain a JSON object.`, "INVALID_INPUT");
+    }
+  }
+  mkdirSync(storage.issuesDir, { recursive: true });
+  if (config !== null) {
+    writeFileSync(configPath, JSON.stringify({ ...config, schema_version: SCHEMA_VERSION }) + "\n", "utf8");
+  }
+  writeOk({ path: storage.issuesDir, created: true });
 }
 
 // Function to bring issues.json from its own schema_version up to SCHEMA_VERSION, running only
@@ -1156,8 +1207,7 @@ function compactTracker(compactData) {
   const payload = parseIssueData(compactData);
   validateCompactInput(payload);
 
-  const data = readIssuesFile();
-  const issues = Array.isArray(data.issues) ? data.issues : [];
+  const issues = readAllIssues(projectDir);
   const byId = new Map(issues.map((issue) => [issue.id, issue]));
 
   const archivedIds = new Set();
@@ -1197,7 +1247,6 @@ function compactTracker(compactData) {
   // ---- Nothing above this line writes. Everything below does. ----
 
   const now = nowTimestamp();
-  const projectDir = path.dirname(issuesFilePath);
   const archivePath = resolveArchivePath(projectDir, now);
   // Project-relative and with forward slashes: this string is what the block issue carries as
   // evidence, and issues.json is the one file the harness shares through the repository. An
@@ -1209,10 +1258,8 @@ function compactTracker(compactData) {
   // was actually written.
   const archivedIssues = payload.blocks.flatMap((block) => block.issue_ids.map((id) => byId.get(id)));
 
-  // The archive self-describes: whoever reopens it in six months must not have to guess which
-  // schema they are reading. An absent key reads as version 0, exactly as everywhere else.
   const archiveRecord = {
-    schema_version: hasProp(data, "schema_version") ? data.schema_version : 0,
+    schema_version: readSchemaVersion(),
     archived_at: now,
     issues: archivedIssues,
   };
@@ -1244,15 +1291,18 @@ function compactTracker(compactData) {
     updated_at: now,
   }));
 
-  data.issues = [...issues.filter((issue) => !archivedIds.has(issue.id)), ...blockIssues];
-
   // Write order is not arbitrary: the archive first, issues.json second. A failure while writing
   // the archive leaves the tracker exactly as it was and loses nothing; the reverse order would
   // put a window between "the issues are gone" and "the copy exists".
   // Recursive, so it creates .harness/ too when this is the first thing the project writes there.
   mkdirSync(path.dirname(archivePath), { recursive: true });
   writeFileSync(archivePath, JSON.stringify(archiveRecord, null, 2) + "\n", "utf8");
-  writeIssuesFile(data);
+  for (const id of archivedIds) {
+    deleteIssueFile(projectDir, id);
+  }
+  for (const issue of blockIssues) {
+    writeIssue(projectDir, issue);
+  }
 
   writeOk({
     archivePath,
@@ -1273,6 +1323,7 @@ function showHelp() {
     "node issue-manager.mjs --get --issue-id <id>",
     "node issue-manager.mjs --get-all [--order asc|desc] [--page 0] [--page-size 10]",
     "                        [--status backlog|in_progress|in_review|blocked|done, default: backlog]",
+    "node issue-manager.mjs --dump",
     "node issue-manager.mjs --insert (--issue-data '<json>' | --issue-data-file <path>)",
     "node issue-manager.mjs --update --issue-id <id> (--issue-data '<json>' | --issue-data-file <path>)",
     "                        [--decomposition-unchanged]",
@@ -1293,7 +1344,8 @@ function showHelp() {
     "",
     "Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_TIER, INVALID_DEPENDENCY,",
     "             INVALID_INPUT, INVALID_JSON, LIMIT_EXCEEDED, NOT_FOUND, FILE_NOT_FOUND,",
-    "             MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE, ALREADY_EXISTS, SCHEMA_TOO_NEW",
+    "             MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE, ALREADY_EXISTS, SCHEMA_TOO_NEW,",
+    "             STORAGE_NOT_MIGRATED, STORAGE_CONFLICT",
     "",
     "Role guard: when env var HARNESS_ROLE=worker, --insert/--update requests that set",
     "status=done, validation.state=pass, or check an entry of validation.tasks are rejected with",
@@ -1310,6 +1362,7 @@ function showHelp() {
     "                totalCount/issues are counted AFTER the --status filter, which defaults to",
     "                backlog when --status is omitted: a bare --get-all does not return the whole",
     "                tracker, only its backlog slice. Pass --status explicitly to see another state.",
+    "  --dump      : { schema_version: 4, issues: [...] } — every issue, ascending by id",
     "  --insert    : the created issue object (read .data.id for the new GUID)",
     "  --update    : the updated issue object",
     "  --delete    : { id, deleted }",
@@ -1387,9 +1440,7 @@ function showHelp() {
 // 2. Function to get issue details by ID
 function getIssue(issueId) {
   validateIssueId(issueId);
-  const data = readIssuesFile();
-  const issues = Array.isArray(data.issues) ? data.issues : [];
-  const issue = issues.find((i) => i.id === issueId);
+  const issue = readIssue(projectDir, issueId);
   if (!issue) {
     fail(`Issue with ID '${issueId}' not found.`, "NOT_FOUND");
   }
@@ -1404,8 +1455,7 @@ function getAllIssues({ order, page, pageSize, status }) {
     fail("'pageSize' must be greater than 0.", "INVALID_INPUT");
   }
 
-  const data = readIssuesFile();
-  let issues = Array.isArray(data.issues) ? [...data.issues] : [];
+  let issues = readAllIssues(projectDir);
 
   // Filter by status if provided
   if (status) {
@@ -1443,8 +1493,7 @@ function insertIssue(issueData) {
   validateIssueInput(newIssue, false);
   enforceRolePolicy(newIssue);
 
-  const data = readIssuesFile();
-  const existingIssues = Array.isArray(data.issues) ? data.issues : [];
+  const existingIssues = readAllIssues(projectDir);
   const dependsOn = hasProp(newIssue, "depends_on") ? newIssue.depends_on : [];
   validateDependencyGraph(dependsOn, existingIssues, null);
   enforceTasksForProgress(newIssue.status, hasProp(newIssue, "tasks") ? newIssue.tasks : []);
@@ -1473,8 +1522,7 @@ function insertIssue(issueData) {
     updated_at: now,
   };
 
-  data.issues = Array.isArray(data.issues) ? [...data.issues, storedIssue] : [storedIssue];
-  writeIssuesFile(data);
+  writeIssue(projectDir, storedIssue);
   writeOk(storedIssue);
 }
 
@@ -1487,8 +1535,7 @@ function updateIssue(issueId, issueData, declaredUnchanged = false) {
   validateIssueInput(updatedIssue, true);
   enforceRolePolicy(updatedIssue);
 
-  const data = readIssuesFile();
-  const issues = Array.isArray(data.issues) ? [...data.issues] : [];
+  const issues = readAllIssues(projectDir);
 
   const issueIndex = issues.findIndex((i) => i.id === issueId);
   if (issueIndex === -1) {
@@ -1556,18 +1603,14 @@ function updateIssue(issueId, issueData, declaredUnchanged = false) {
     updated_at: nowTimestamp(),
   };
 
-  issues[issueIndex] = storedIssue;
-  data.issues = issues;
-
-  writeIssuesFile(data);
+  writeIssue(projectDir, storedIssue);
   writeOk(storedIssue);
 }
 
 // 6. Function to delete an issue by ID
 function deleteIssue(issueId) {
   validateIssueId(issueId);
-  const data = readIssuesFile();
-  const issues = Array.isArray(data.issues) ? data.issues : [];
+  const issues = readAllIssues(projectDir);
 
   const exists = issues.some((i) => i.id === issueId);
   if (!exists) {
@@ -1588,10 +1631,7 @@ function deleteIssue(issueId) {
     );
   }
 
-  // Remove the issue from the list
-  data.issues = issues.filter((i) => i.id !== issueId);
-
-  writeIssuesFile(data);
+  deleteIssueFile(projectDir, issueId);
   writeOk({ id: issueId, deleted: true });
 }
 
@@ -1603,6 +1643,7 @@ function main() {
       help: { type: "boolean" },
       get: { type: "boolean" },
       "get-all": { type: "boolean" },
+      dump: { type: "boolean" },
       insert: { type: "boolean" },
       update: { type: "boolean" },
       delete: { type: "boolean" },
@@ -1632,7 +1673,9 @@ function main() {
     return;
   }
 
-  issuesFilePath = resolveIssuesFilePath(values["project-dir"]);
+  projectDir = resolveProjectDir(values["project-dir"]);
+  issuesFilePath = path.join(projectDir, "issues.json");
+  storage = classifyStorage(projectDir);
 
   const issueId = values["issue-id"];
   let issueData = values["issue-data"];
@@ -1654,6 +1697,10 @@ function main() {
   const pageSize = Number.parseInt(values["page-size"], 10);
   const status = values.status;
 
+  if (values.get || values["get-all"] || values.dump || values.insert || values.update || values.delete || values.compact) {
+    requireMarkdownStorage();
+  }
+
   // 8. Switch case to handle different tasks based on the provided argument
   if (values.get) {
     if (!issueId) {
@@ -1662,6 +1709,8 @@ function main() {
     getIssue(issueId);
   } else if (values["get-all"]) {
     getAllIssues({ order, page, pageSize, status });
+  } else if (values.dump) {
+    dumpIssues();
   } else if (values.insert) {
     if (!issueData) {
       fail("Please provide issue data in JSON format to insert (--issue-data or --issue-data-file).", "MISSING_ARGS");
@@ -1701,6 +1750,8 @@ try {
   main();
 } catch (err) {
   if (err instanceof IssueManagerError) {
+    writeFail(err.message, err.code);
+  } else if (err instanceof StorageError) {
     writeFail(err.message, err.code);
   } else {
     writeFail(`Unexpected error: ${err && err.message ? err.message : String(err)}`, "ERROR");
