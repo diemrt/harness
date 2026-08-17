@@ -39,7 +39,10 @@ Output: **una riga JSON**, lo stesso contratto di `issue-manager.mjs`. Niente su
 ## Cosa confronta, e cosa no
 
 Confronta la **forma**: l'elenco dei file sotto `agents/`, `commands/`, `scripts/` e `skills/`,
-più le voci alla radice presenti nell'installato e assenti dal repository. Un `.gitkeep` non
+più le voci alla radice presenti nell'installato e assenti dal repository. `commands/` è nella
+lista pur non essendo più spedita: una copia installata che la porta ancora è una copia di prima
+che le operazioni diventassero skill, e registra ogni `/harness:*` due volte. Toglierla dall'elenco
+renderebbe invisibile proprio la divergenza che questo controllo esiste per vedere. Un `.gitkeep` non
 conta come componente — è esattamente ciò che portava la copia rimasta congelata, ed è il modo
 in cui una directory vuota riesce a sembrare piena.
 

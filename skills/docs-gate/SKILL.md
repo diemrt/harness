@@ -1,4 +1,5 @@
 ---
+name: docs-gate
 description: Elenca i commit che hanno toccato codice senza che nessuna issue li dichiari in covers. Senza argomenti usa la finestra autocalibrata sul progetto corrente.
 argument-hint: "[--since <rev>] [--project-dir <path>]"
 allowed-tools: Bash
@@ -7,7 +8,15 @@ allowed-tools: Bash
 Controllo cumulativo del gate documentale sul progetto corrente. Il contratto completo — come si
 autocalibra la finestra, cosa conta come coperto, come si leggono le righe, canali e codici
 d'uscita — è in `${CLAUDE_PLUGIN_ROOT}/skills/harness/references/docs-gate.md`: leggilo quando
-l'output non ti torna, non prima.
+l'output non ti torna, non prima. Il workflow dentro cui questa operazione vive è in
+`${CLAUDE_PLUGIN_ROOT}/skills/harness/SKILL.md`.
+
+**Dove sta lo script.** Claude Code sostituisce `${CLAUDE_PLUGIN_ROOT}` da sé. Su un host che non
+lo fa — Codex CLI, o chiunque stia leggendo questo file come documento — il valore si ricava dalla
+**base directory annunciata per questa skill**: la radice del plugin è `<base della skill>/../..`,
+quindi gli script stanno in `<base della skill>/../../scripts`. Se la base non ti è stata
+annunciata, fermati e chiedila: non indovinarla e non riusare un path assoluto visto altrove, che
+porta il numero di versione e continuerebbe a girare sulla copia sbagliata invece di fallire.
 
 Argomenti: `$ARGUMENTS` (nessun argomento = finestra autocalibrata sul progetto corrente).
 
@@ -27,8 +36,9 @@ Argomenti: `$ARGUMENTS` (nessun argomento = finestra autocalibrata sul progetto 
 
 3. Se ci sono commit scoperti, **proponi le issue docs da aprire**, una per commit o una per
    gruppo coerente, e aspetta conferma. Ogni issue proposta dichiara in `covers` lo SHA che copre
-   — è quello che la rende coperta al giro dopo. Si aprono con `/harness:issue` o direttamente con
-   `--insert` (`skills/harness/references/issues.md`).
+   — è quello che la rende coperta al giro dopo. Si aprono con l'operazione `issue`
+   (`/harness:issue` in Claude Code, `$issue` in Codex) o direttamente con `--insert`
+   (`${CLAUDE_PLUGIN_ROOT}/skills/harness/references/issues.md`).
 
    Non aprirle da solo senza mostrarle: il gate è un promemoria, e cosa merita una issue lo decide
    la bussola in `SKILL.md`.

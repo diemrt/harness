@@ -1,4 +1,5 @@
 ---
+name: status
 description: Stampa un'istantanea del tracker — conteggi, cosa è in corso, cosa si può prendere adesso. Senza argomenti mostra il progetto corrente.
 argument-hint: "[--project-dir <path>]"
 allowed-tools: Bash
@@ -7,7 +8,15 @@ allowed-tools: Bash
 Istantanea del tracker del progetto corrente, in una schermata sola. Il contratto completo —
 come si legge ogni riga, icone, ordinamenti, casi vuoti, allerte, canali e codici d'uscita — è
 in `${CLAUDE_PLUGIN_ROOT}/skills/harness/references/status.md`: leggilo quando l'output non ti
-torna, non prima.
+torna, non prima. Il workflow dentro cui questa operazione vive è in
+`${CLAUDE_PLUGIN_ROOT}/skills/harness/SKILL.md`.
+
+**Dove sta lo script.** Claude Code sostituisce `${CLAUDE_PLUGIN_ROOT}` da sé. Su un host che non
+lo fa — Codex CLI, o chiunque stia leggendo questo file come documento — il valore si ricava dalla
+**base directory annunciata per questa skill**: la radice del plugin è `<base della skill>/../..`,
+quindi gli script stanno in `<base della skill>/../../scripts`. Se la base non ti è stata
+annunciata, fermati e chiedila: non indovinarla e non riusare un path assoluto visto altrove, che
+porta il numero di versione e continuerebbe a girare sulla copia sbagliata invece di fallire.
 
 Argomenti: `$ARGUMENTS` (nessun argomento = progetto corrente).
 

@@ -245,10 +245,11 @@ function fail(message, code = "ERROR") {
   throw new IssueManagerError(message, code);
 }
 
-// Helper: emit the success envelope on stdout and terminate
+// Helper: emit the success envelope on stdout and let Node terminate after the stream drains.
+// process.exit() can truncate large evidence payloads while stdout is still being flushed.
 function writeOk(data) {
   process.stdout.write(JSON.stringify({ ok: true, data }) + "\n");
-  process.exit(0);
+  process.exitCode = 0;
 }
 
 // Helper: emit the failure envelope on stdout and terminate with a non-zero exit code.
@@ -256,7 +257,7 @@ function writeOk(data) {
 // tells them apart via `ok` or the exit code.
 function writeFail(message, code = "ERROR") {
   process.stdout.write(JSON.stringify({ ok: false, error: message, code }) + "\n");
-  process.exit(1);
+  process.exitCode = 1;
 }
 
 // Helper: id generator for new issues
@@ -1617,7 +1618,8 @@ function main() {
       page: { type: "string", default: "0" },
       "page-size": { type: "string", default: "10" },
       // Deliberate default, not an oversight: every caller shipped in this repo that reads
-      // --get-all for actual workflow decisions (SKILL.md, commands/issue.md, commands/verify.md)
+      // --get-all for actual workflow decisions (skills/harness/SKILL.md, skills/issue/SKILL.md,
+      // skills/verify/SKILL.md)
       // already passes --status explicitly, so this default never silently changes their result.
       // It exists for the bare `--get-all` case, and showHelp()/references/issues.md both spell it
       // out so that case does not read as "the whole tracker" when it is really "the backlog".

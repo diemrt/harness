@@ -11,8 +11,8 @@ repository are in [CLAUDE.md](CLAUDE.md).
 | `.claude-plugin/plugin.json` | the plugin manifest |
 | `.claude-plugin/marketplace.json` | the marketplace entry — this repo is its own single-plugin marketplace |
 | `skills/harness/` | `SKILL.md` and `references/`: the workflow, and the authoritative description of it |
+| `skills/<operation>/` | one entry point per operation: `/harness:<operation>` in Claude Code, `$<operation>` in Codex |
 | `agents/harness-verifier.md` | the independent verifier subagent |
-| `commands/` | the `/harness:*` slash commands |
 | `scripts/` | the executables: issue tracker CLI, status CLI, configuration CLI, external worker runner, installation check |
 | `test/` | the `node --test` suite |
 | `proposals/` | written and set aside; not part of the plugin |
@@ -24,12 +24,12 @@ of anything: what you edit is what ships.
 
 1. Edit the plugin files.
 2. `npm test` (`node --test`). Beyond the behavioural tests of the scripts, the suite checks
-   the plugin's structure: skill frontmatter and reference links, command frontmatter and the
-   script paths the commands invoke, the verifier agent, and that the command names documented
-   in the README are exactly the ones shipped. A renamed file or a dangling link fails here
-   instead of failing silently at runtime, where a broken command simply never triggers.
+   the plugin's structure: skill frontmatter and reference links, the script paths each operation
+   invokes, the verifier agent, that no operation is defined twice, and that the operation names
+   documented in the README are exactly the ones shipped. A renamed file or a dangling link fails
+   here instead of failing silently at runtime, where a broken operation simply never triggers.
 3. Exercise the change in this repository, which runs on harness itself. Committing a new
-   skill, agent or command is not proof it works — invoke it in a real session here.
+   skill or agent is not proof it works — invoke it in a real session here.
 
 **A session opened here does not load this working tree.** It loads the installed copy, even
 though the cwd *is* the plugin root: measured on 2026-08-14, right after the marketplace was

@@ -1,4 +1,5 @@
 ---
+name: issue
 description: Operazioni sul tracker harness — elenca le issue per stato, creane una nuova, aggiornane una esistente. Senza argomenti mostra lo stato del tracker.
 argument-hint: "[list <stato> | show <id> | new <descrizione> | update <id> <modifica> | init | upgrade]"
 allowed-tools: Bash, Read, Write
@@ -7,7 +8,15 @@ allowed-tools: Bash, Read, Write
 Operazioni sul tracker del progetto corrente. Contratto completo della CLI — schema,
 paginazione, errori, `validation` — in
 `${CLAUDE_PLUGIN_ROOT}/skills/harness/references/issues.md`: leggilo prima di comporre un
-payload fuori dai casi sotto.
+payload fuori dai casi sotto. Il workflow dentro cui questa operazione vive è in
+`${CLAUDE_PLUGIN_ROOT}/skills/harness/SKILL.md`.
+
+**Dove sta lo script.** Claude Code sostituisce `${CLAUDE_PLUGIN_ROOT}` da sé. Su un host che non
+lo fa — Codex CLI, o chiunque stia leggendo questo file come documento — il valore si ricava dalla
+**base directory annunciata per questa skill**: la radice del plugin è `<base della skill>/../..`,
+quindi gli script stanno in `<base della skill>/../../scripts`. Se la base non ti è stata
+annunciata, fermati e chiedila: non indovinarla e non riusare un path assoluto visto altrove, che
+porta il numero di versione e continuerebbe a girare sulla copia sbagliata invece di fallire.
 
 Tutte le invocazioni passano dallo script del plugin. **Non aprire e non editare
 `issues.json` a mano**, nemmeno per un campo: si perde la consistenza dei dati.
@@ -56,7 +65,7 @@ Insieme ai criteri scrivi i `validation.tasks`. I `tasks` di esecuzione no: li m
 prende la issue, e la CLI li esige al passaggio a `in_progress`.
 
 Una issue docs che documenta commit già fatti li dichiara in `"covers":["<sha>"]`: è ciò che la
-rende visibile al gate (`/harness:docs-gate`).
+rende visibile all'operazione `docs-gate`.
 
 ## `update <id> <modifica>` → aggiornare
 
@@ -68,9 +77,10 @@ viene rifiutato; se i passi reggono, dichiaralo con `--decomposition-unchanged`.
 non chiede mai il flag.
 
 **Da qui non si chiude una issue.** Non portare mai lo stato a `done` né `validation.state` a
-`pass`: la chiusura spetta a un agente diverso da chi ha svolto il lavoro, con
-`/harness:verify`. Il worker arriva al massimo a `in_review` / `unknown`; oltre, con
-`HARNESS_ROLE=worker`, la CLI rifiuta `FORBIDDEN_ROLE` — spunta dei `validation.tasks` compresa.
+`pass`: la chiusura spetta a un agente diverso da chi ha svolto il lavoro, con l'operazione
+`verify` (`/harness:verify` in Claude Code, `$verify` in Codex). Il worker arriva al massimo a
+`in_review` / `unknown`; oltre, con `HARNESS_ROLE=worker`, la CLI rifiuta `FORBIDDEN_ROLE` —
+spunta dei `validation.tasks` compresa.
 
 ## `init` → crea il tracker
 

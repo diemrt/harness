@@ -1,0 +1,6 @@
+interface:
+  display_name: "Harness Sweep"
+  short_description: "Find important untracked work in docs"
+  default_prompt: "Use $sweep to scan project documents for important untracked work."
+policy:
+  allow_implicit_invocation: false

@@ -54,7 +54,7 @@ quel caso spacciata per regola.
 # leggere: backlog (default), o uno stato specifico
 # attenzione: la prima riga NON e' l'intero tracker, e' solo il backlog. --get-all senza
 # --status non toglie il filtro, lo fissa su backlog: per vedere tutto va interrogato ogni
-# stato (vedi "Stato del tracker" in commands/issue.md) o letto issues.json direttamente.
+# stato (vedi "Nessun argomento" in ../../issue/SKILL.md) o letto issues.json direttamente.
 node "$SCRIPTS/issue-manager.mjs" --get-all
 node "$SCRIPTS/issue-manager.mjs" --get-all --status in_progress
 
