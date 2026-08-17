@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-17T08:05:20Z",
+  "last_updated": "2026-08-17T08:16:08Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1671,7 +1671,7 @@
     {
       "id": "f690fbf2-3c6b-4aed-b47e-f2b1b3e8cbb8",
       "title": "I comandi diventano skill: una definizione sola per operazione",
-      "description": "La 0.7.2 ha aggiunto sei skill wrapper con gli stessi nomi dei sei file in commands/. Claude Code ha unificato command e skill: commands/X.md e skills/X/SKILL.md producono entrambi /harness:X, e la scansione di skills/ non e' disattivabile (nel manifest il campo skills somma ai default, commands li sostituisce). Ogni operazione harness compare quindi due volte nel menu.\n\nSi toglie la collisione dal lato commands/: la directory sparisce e ogni skills/<op>/SKILL.md diventa l'unica definizione, col contratto operativo del command (argument-hint, allowed-tools, $ARGUMENTS, CLAUDE_PLUGIN_ROOT) piu' la regola per risolvere la radice del plugin dalla base directory annunciata, per gli host che non sostituiscono quella variabile. Codex continua a esporre $<op> tramite agents/openai.yaml. E' il layout di Superpowers, che ha eliminato gli stessi stub, ed e' l'unico allineato ad Agent Plugins 1.0, dove skills/ e' l'unica posizione di discovery standard.\n\nRicadono nel tratto: test/plugin-commands.test.mjs, la parte di plugin-skill.test.mjs che indicizza commands/, i riferimenti in README (il paragrafo Codex afferma il falso), CONTRIBUTING e l'indice portabile in skills/harness/SKILL.md.",
+      "description": "La 0.7.2 ha aggiunto sei skill wrapper con gli stessi nomi dei sei file in commands/. Claude Code ha unificato command e skill: commands/X.md e skills/X/SKILL.md producono entrambi /harness:X, e la scansione di skills/ non e' disattivabile (nel manifest il campo skills somma ai default, commands li sostituisce). Ogni operazione harness compare quindi due volte nel menu.\n\nSi toglie la collisione dal lato commands/: la directory sparisce e ogni skills/<op>/SKILL.md diventa l'unica definizione, col contratto operativo del command (argument-hint, allowed-tools, $ARGUMENTS, CLAUDE_PLUGIN_ROOT) piu' la regola per risolvere la radice del plugin dalla base directory annunciata, per gli host che non sostituiscono quella variabile. Codex continua a esporre $<op> tramite agents/openai.yaml. E' il layout di Superpowers, ed e' l'unico allineato ad Agent Plugins 1.0, dove skills/ e' l'unica posizione di discovery standard.\n\nRicadono nel tratto i test, README, CONTRIBUTING e l'indice portabile in skills/harness/SKILL.md.\n\nPrimo giro di verifica fail: references/issues.md rimandava ancora a commands/issue.md, cancellato dallo stesso commit.",
       "status": "in_review",
       "tier": "reasoning",
       "depends_on": [],
@@ -1680,55 +1680,61 @@
         {
           "id": 1,
           "short_title": "Portare i sei command dentro le skill",
-          "full_description": "Per ognuna di status, issue, verify, compact, docs-gate, sweep: riscrivere skills/<op>/SKILL.md col frontmatter completo (name, description con il caso senza argomenti, argument-hint, allowed-tools) e col corpo del command corrispondente. Aggiungere in ogni skill la nota su come si risolve la radice del plugin dove CLAUDE_PLUGIN_ROOT non viene sostituita, riusando la regola di skills/harness/SKILL.md. I rimandi incrociati fra comandi (/harness:verify, /harness:issue) vanno riscritti come nomi di operazione, non come slash command di un host solo.",
+          "full_description": "Per ognuna di status, issue, verify, compact, docs-gate, sweep: riscrivere skills/<op>/SKILL.md col frontmatter completo (name, description con il caso senza argomenti, argument-hint, allowed-tools) e col corpo del command corrispondente. Aggiungere in ogni skill la nota su come si risolve la radice del plugin dove CLAUDE_PLUGIN_ROOT non viene sostituita, riusando la regola di skills/harness/SKILL.md. I rimandi incrociati fra comandi vanno riscritti come nomi di operazione, non come slash command di un host solo.",
           "checked": true
         },
         {
           "id": 2,
           "short_title": "Rimuovere commands/ e aggiornare l'indice portabile",
-          "full_description": "git rm dei sei file e della directory commands/. In skills/harness/SKILL.md correggere la chiusa dell'indice portabile che oggi dice 'Se viene aggiunto un file in commands/, anche questo indice va aggiornato': la sorgente delle operazioni diventa skills/<op>/.",
+          "full_description": "git rm dei sei file e della directory commands/. In skills/harness/SKILL.md correggere la chiusa dell'indice portabile che diceva 'Se viene aggiunto un file in commands/, anche questo indice va aggiornato': la sorgente delle operazioni diventa skills/<op>/.",
           "checked": true
         },
         {
           "id": 3,
           "short_title": "Riscrivere plugin-commands.test.mjs sulle skill",
-          "full_description": "La suite oggi legge commands/<name>.md e pretende l'assenza del campo name. Va riscritta su skills/<op>/SKILL.md conservando tutte le asserzioni di sostanza: descrizione, argument-hint, caso senza argomenti, invocazione degli script attraverso la radice del plugin, path esistenti, rimando alla reference, issue che non chiude, verify che delega a harness-verifier con il tool Task, compact che chiede conferma e proietta id e titolo, README allineato.",
+          "full_description": "La suite leggeva commands/<name>.md e pretendeva l'assenza del campo name. Riscritta su skills/<op>/SKILL.md conservando tutte le asserzioni di sostanza: descrizione, argument-hint, caso senza argomenti, invocazione degli script attraverso la radice del plugin, path esistenti, rimando alla reference, issue che non chiude, verify che delega a harness-verifier con il tool Task, compact che chiede conferma e proietta id e titolo, README allineato.",
           "checked": true
         },
         {
           "id": 4,
           "short_title": "Adeguare plugin-codex e plugin-skill",
-          "full_description": "plugin-codex.test.mjs ricava i nomi da readdirSync('commands'): va cambiato in una lista di operazioni derivata da skills/. Le asserzioni sulla base directory annunciata restano ma vanno riformulate sul testo nuovo delle skill. In plugin-skill.test.mjs il test dell'indice portabile enumera commands/: deve enumerare le directory di skills/ diverse da harness.",
+          "full_description": "plugin-codex.test.mjs ricavava i nomi da readdirSync('commands'): ora li ricava dalle directory di skills/ diverse da harness. Le asserzioni sulla base directory annunciata restano, riformulate sul testo nuovo delle skill. In plugin-skill.test.mjs il test dell'indice portabile enumerava commands/: ora enumera skills/.",
           "checked": true
         },
         {
           "id": 5,
           "short_title": "Guard di regressione contro la collisione",
-          "full_description": "Aggiungere un test che fallisca se esiste una directory commands/ con file .md che portano lo stesso nome di una skill: e' la collisione che ha prodotto i duplicati nel menu di Claude Code, e senza guard torna al primo file riaggiunto per comodita'. Il test deve spiegare nel messaggio perche' fallisce.",
+          "full_description": "Un test fallisce se esiste una directory commands/ con file .md che portano lo stesso nome di una skill: e' la collisione che ha prodotto i duplicati nel menu di Claude Code, e senza guard torna al primo file riaggiunto per comodita'. Il messaggio di errore spiega perche' fallisce.",
           "checked": true
         },
         {
           "id": 6,
           "short_title": "install-check: perche' commands resta fra i COMPONENT_DIRS",
-          "full_description": "In scripts/install-check.mjs la costante COMPONENT_DIRS elenca quattro directory 'che SONO il plugin'. commands/ resta nella lista di proposito: una copia installata che la porta ancora e' esattamente la divergenza da segnalare dopo questo rilascio. Aggiornare il commento perche' dica questo invece di descrivere un layout che non esiste piu'.",
+          "full_description": "In scripts/install-check.mjs la costante COMPONENT_DIRS elencava quattro directory 'che SONO il plugin'. commands/ resta nella lista di proposito: una copia installata che la porta ancora e' esattamente la divergenza da segnalare dopo questo rilascio. Commento aggiornato, e la stessa ragione scritta in references/install-check.md.",
           "checked": true
         },
         {
           "id": 7,
           "short_title": "README, CONTRIBUTING e AGENTS.md",
-          "full_description": "README: riscrivere il paragrafo 'Codex CLI and other agent hosts' togliendo la frase che dichiara i comandi Claude sotto commands/ e non toccati dal manifest Codex, e spiegare che le stesse skill servono i due host. CONTRIBUTING: la tabella del layout elenca commands/. Controllare anche AGENTS.md e ogni altra menzione residua.",
+          "full_description": "README: riscritto il paragrafo 'Codex CLI and other agent hosts' togliendo la frase che dichiarava i comandi Claude sotto commands/ e non toccati dal manifest Codex, e spiegato che le stesse skill servono i due host. CONTRIBUTING: aggiornata la tabella del layout e il passo 2 del development loop. AGENTS.md: nessuna occorrenza.",
           "checked": true
         },
         {
           "id": 8,
           "short_title": "Bump 0.7.3 nei tre manifest",
-          "full_description": "Portare la versione a 0.7.3 in .claude-plugin/plugin.json, .claude-plugin/marketplace.json e .codex-plugin/plugin.json, che oggi e' rimasto a 0.7.1 mentre gli altri due sono a 0.7.2.",
+          "full_description": "Versione 0.7.3 in .claude-plugin/plugin.json, .claude-plugin/marketplace.json e .codex-plugin/plugin.json, che era rimasto a 0.7.1 mentre gli altri due erano a 0.7.2. Un test confronta i tre.",
           "checked": true
         },
         {
           "id": 9,
           "short_title": "npm run test verde e commit sul ramo",
           "full_description": "Eseguire npm run test fino al verde e committare su fix/commands-skills-collision. Nessuna pubblicazione prima del pass del verificatore indipendente.",
+          "checked": true
+        },
+        {
+          "id": 10,
+          "short_title": "Puntatori rimasti verso i file cancellati",
+          "full_description": "Esito del primo giro di verifica: skills/harness/references/issues.md riga 57 rimandava a commands/issue.md, cancellato dallo stesso commit. Corretto li', piu' il commento di scripts/issue-manager.mjs che citava commands/issue.md e commands/verify.md, e la reference install-check.md. Aggiunto il test che rifiuta qualunque puntatore a commands/<nome>.md nel corpus che un agente legge: e' il difetto che una grep aveva mancato e che un test coglie.",
           "checked": true
         }
       ],
@@ -1747,43 +1753,43 @@
             "id": 1,
             "short_title": "commands/ non esiste piu'",
             "full_description": "Verificare che la directory commands/ sia assente dal working tree e che nessun file di documentazione o di skill la citi come luogo dei comandi. Le sole occorrenze ammesse sono le fixture sintetiche dei test di install-check e la storia in issues.json.",
-            "checked": false
+            "checked": true
           },
           {
             "id": 2,
             "short_title": "Sei SKILL.md complete e autosufficienti",
             "full_description": "Aprire skills/{status,issue,verify,compact,docs-gate,sweep}/SKILL.md e controllare che ognuna porti il contratto operativo che stava nel command corrispondente (invocazione dello script, gestione degli argomenti, casi d'errore, rimando alla reference) e non un semplice 'leggi la skill principale'. Frontmatter con name, description, argument-hint, allowed-tools.",
-            "checked": false
+            "checked": true
           },
           {
             "id": 3,
             "short_title": "Portabilita' della radice del plugin",
             "full_description": "Ogni SKILL.md deve dire come si ricava la radice del plugin quando l'host non sostituisce CLAUDE_PLUGIN_ROOT, coerentemente con la regola gia' scritta in skills/harness/SKILL.md. Verificare inoltre che agents/openai.yaml sia ancora presente in tutte e sei le skill.",
-            "checked": false
+            "checked": true
           },
           {
             "id": 4,
             "short_title": "Guard di regressione sulla collisione",
             "full_description": "Esiste un test che fallisce se una stessa operazione risulta definita sia come file in commands/ sia come skills/<op>/SKILL.md. Controllarlo rendendolo rosso temporaneamente, o leggendo l'asserzione, e verificare che sia agganciato a npm run test.",
-            "checked": false
+            "checked": true
           },
           {
             "id": 5,
             "short_title": "npm run test verde",
             "full_description": "Eseguire il comando di verifica dichiarato in .harness/config.json e riportarne l'output. Deve uscire 0 con la suite aggiornata: nessun test residuo che pretenda l'esistenza di commands/ come sorgente dei comandi.",
-            "checked": false
+            "checked": true
           },
           {
             "id": 6,
             "short_title": "Documenti e versione allineati",
             "full_description": "README e CONTRIBUTING descrivono il layout a sole skill; la frase del README che dichiara i comandi Claude sotto commands/ e' rimossa o riscritta. La versione 0.7.3 compare identica nei tre manifest.",
-            "checked": false
+            "checked": true
           }
         ],
         "state": "unknown"
       },
       "created_at": "2026-08-17T07:55:25Z",
-      "updated_at": "2026-08-17T08:05:20Z"
+      "updated_at": "2026-08-17T08:16:08Z"
     }
   ]
 }

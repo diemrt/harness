@@ -1618,7 +1618,8 @@ function main() {
       page: { type: "string", default: "0" },
       "page-size": { type: "string", default: "10" },
       // Deliberate default, not an oversight: every caller shipped in this repo that reads
-      // --get-all for actual workflow decisions (SKILL.md, commands/issue.md, commands/verify.md)
+      // --get-all for actual workflow decisions (skills/harness/SKILL.md, skills/issue/SKILL.md,
+      // skills/verify/SKILL.md)
       // already passes --status explicitly, so this default never silently changes their result.
       // It exists for the bare `--get-all` case, and showHelp()/references/issues.md both spell it
       // out so that case does not read as "the whole tracker" when it is really "the backlog".

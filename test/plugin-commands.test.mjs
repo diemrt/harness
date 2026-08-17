@@ -83,6 +83,38 @@ test("no operation is defined twice", () => {
   );
 });
 
+test("nothing an agent reads still points at a deleted command file", () => {
+  // The other half of the same defect. Removing commands/ leaves the pointers behind: a reference
+  // that says "see commands/issue.md" survives the deletion, resolves to nothing, and only fails
+  // when an agent follows it mid-workflow. The collision guard above cannot see this — the file it
+  // names is already gone. Bare `commands/` is allowed: install-check deliberately still watches
+  // that directory in an installed copy.
+  const corpus = [];
+  function collect(dir) {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) collect(full);
+      else if (/\.(md|mjs|json)$/.test(entry.name)) corpus.push(full);
+    }
+  }
+  collect(skillsDir);
+  collect(path.join(rootDir, "scripts"));
+  collect(path.join(rootDir, "agents"));
+  for (const file of ["README.md", "CONTRIBUTING.md", "AGENTS.md", "CLAUDE.md"]) {
+    const full = path.join(rootDir, file);
+    if (existsSync(full)) corpus.push(full);
+  }
+
+  for (const file of corpus) {
+    const match = readFileSync(file, "utf8").match(/commands\/[A-Za-z0-9_-]+\.md/);
+    assert.equal(
+      match,
+      null,
+      `${path.relative(rootDir, file)} points at ${match?.[0]}, which the plugin no longer ships`
+    );
+  }
+});
+
 test("every operation carries a name, a description and an argument hint", () => {
   for (const name of OPERATIONS) {
     const fields = parseFrontmatter(read(name), `skills/${name}/SKILL.md`);
