@@ -238,6 +238,20 @@ test("--help bypasses storage classification", () => {
   }
 });
 
+test("--help describes the Markdown init, upgrade, and compact contracts", () => {
+  const { dir } = setupTempProject();
+  try {
+    const result = run(dir, ["--help"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /creates \.harness\/issues/);
+    assert.match(result.stdout, /legacy issues\.json tracker/);
+    assert.match(result.stdout, /Markdown issues/);
+    assert.doesNotMatch(result.stdout, /--init\s+: \{ path, created: true \} — creates issues\.json/);
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("--dump returns every issue without pagination or status filtering", () => {
   const { dir } = setupTempProject();
   try {
@@ -273,6 +287,50 @@ test("--get ignores an unrelated malformed Markdown issue", () => {
   try {
     writeFileSync(path.join(dir, ".harness", "issues", "aaaaaaaa.md"), "not markdown\n", "utf8");
     assert.equal(assertOk(run(dir, ["--get", "--issue-id", ID_ONE])).id, ID_ONE);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--insert without dependencies ignores an unrelated malformed Markdown issue", () => {
+  const { dir } = setupTempProject();
+  try {
+    writeFileSync(path.join(dir, ".harness", "issues", "aaaaaaaa.md"), "not markdown\n", "utf8");
+    const data = assertOk(run(dir, [
+      "--insert",
+      "--issue-data",
+      JSON.stringify({ title: "Independent", description: "No graph read", status: "backlog" }),
+    ]));
+    assert.equal(data.title, "Independent");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--update without dependency changes ignores an unrelated malformed Markdown issue", () => {
+  const { dir } = setupTempProject();
+  try {
+    writeFileSync(path.join(dir, ".harness", "issues", "aaaaaaaa.md"), "not markdown\n", "utf8");
+    const data = assertOk(run(dir, [
+      "--update",
+      "--issue-id",
+      ID_ONE,
+      "--issue-data",
+      JSON.stringify({ status: "blocked" }),
+    ]));
+    assert.equal(data.status, "blocked");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--upgrade refuses Markdown storage without creating legacy JSON", () => {
+  const { dir } = setupTempProject();
+  try {
+    const before = trackerFiles(dir);
+    assertFail(run(dir, ["--upgrade"]), "INVALID_INPUT");
+    assert.equal(existsSync(path.join(dir, "issues.json")), false);
+    assert.deepEqual(trackerFiles(dir), before);
   } finally {
     cleanup(dir);
   }

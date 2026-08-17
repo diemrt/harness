@@ -1333,9 +1333,10 @@ function showHelp() {
     "node issue-manager.mjs --compact (--issue-data '<json>' | --issue-data-file <path>)",
     "",
     "Project resolution:",
-    "  --project-dir <path>  directory holding issues.json (default: the current directory).",
-    "  issues.json is never resolved next to this script: one installed copy serves every project.",
-    "  A project without issues.json reads as an empty tracker; the file is created on first write.",
+    "  --project-dir <path>  project directory (default: the current directory).",
+    "  Markdown issues live in .harness/issues; one installed copy serves every project.",
+    "  A project with neither Markdown issues nor legacy JSON reads as an empty tracker.",
+    "  The first insert creates .harness/issues; --init creates it explicitly.",
     "",
     "Output contract (stdout is always one line of JSON, except for this help text):",
     '  success : {"ok":true,"data":<payload>}                       exit code 0',
@@ -1366,10 +1367,11 @@ function showHelp() {
     "  --insert    : the created issue object (read .data.id for the new GUID)",
     "  --update    : the updated issue object",
     "  --delete    : { id, deleted }",
-    "  --init      : { path, created: true } — creates issues.json with the minimal seed",
-    "                { schema_version, last_updated, issues: [] }. Fails with ALREADY_EXISTS and",
-    "                writes nothing if the file is already there: remove it yourself to start over.",
-    "  --upgrade   : { from, to, migrated } — brings issues.json's schema_version (absent reads as",
+    "  --init      : { path, created: true } — creates .harness/issues. If .harness/config.json",
+    "                already exists, it stamps schema_version: 4 there; it never creates config.",
+    "                Fails with ALREADY_EXISTS if Markdown storage or legacy JSON already exists.",
+    "  --upgrade   : legacy issues.json tracker only; Markdown migration is not available yet. It",
+    "                brings issues.json's schema_version (absent reads as",
     "                0) up to SCHEMA_VERSION, running only the migrations in between. Adds new",
     "                fields with their default (0->1 materializes depends_on: [] where missing,",
     "                1->2 does the same with covers: [], 2->3 with tasks: [] and, on the issues",
@@ -1381,7 +1383,7 @@ function showHelp() {
     "                nothing: that is an old script in front of newer data. Neither --insert nor",
     "                --update ever runs a migration on your behalf.",
     "  --compact   : { archivePath, removed, blocks: [ { id, title, archivedCount } ] } — shrinks",
-    "                issues.json without losing history. Takes the groupings ALREADY DECIDED by the",
+    "                Markdown issues without losing history. Takes the groupings ALREADY DECIDED by the",
     "                caller, as { blocks: [ { title, description, issue_ids } ] }; it groups",
     "                nothing itself. Every id must exist and be 'done', no id in two blocks, no",
     "                empty block, title/description within the usual limits. Refused with",
@@ -1389,11 +1391,11 @@ function showHelp() {
     "                declares an archived id in depends_on: unlink first, this command never",
     "                rewrites an issue you did not name. On success the original issue objects are",
     "                written WHOLE to <project>/.harness/archive/<timestamp>.json together with the",
-    "                schema_version they were stored under, removed from issues.json, and replaced",
+    "                schema_version they were stored under, removed from Markdown storage, and replaced",
     "                by one issue per block (status done, validation.state pass, criteria carrying",
     "                the archive path and the id + title of every issue covered). The archive is",
-    "                never read back: --get and --get-all see issues.json only. Any",
-    "                refusal writes nothing at all — neither issues.json nor the archive.",
+    "                never read back: --get and --get-all see Markdown issues only. Any",
+    "                refusal writes nothing at all — neither Markdown storage nor the archive.",
     "",
     "Passing the payload:",
     "  --issue-data-file <path>  reads the JSON from a file — no shell quoting/escaping",
@@ -1493,9 +1495,10 @@ function insertIssue(issueData) {
   validateIssueInput(newIssue, false);
   enforceRolePolicy(newIssue);
 
-  const existingIssues = readAllIssues(projectDir);
   const dependsOn = hasProp(newIssue, "depends_on") ? newIssue.depends_on : [];
-  validateDependencyGraph(dependsOn, existingIssues, null);
+  if (dependsOn.length > 0) {
+    validateDependencyGraph(dependsOn, readAllIssues(projectDir), null);
+  }
   enforceTasksForProgress(newIssue.status, hasProp(newIssue, "tasks") ? newIssue.tasks : []);
 
   const now = nowTimestamp();
@@ -1535,14 +1538,10 @@ function updateIssue(issueId, issueData, declaredUnchanged = false) {
   validateIssueInput(updatedIssue, true);
   enforceRolePolicy(updatedIssue);
 
-  const issues = readAllIssues(projectDir);
-
-  const issueIndex = issues.findIndex((i) => i.id === issueId);
-  if (issueIndex === -1) {
+  const existing = readIssue(projectDir, issueId);
+  if (!existing) {
     fail(`Issue with ID '${issueId}' not found.`, "NOT_FOUND");
   }
-
-  const existing = issues[issueIndex];
 
   enforcePairedUpdate(updatedIssue, existing, declaredUnchanged);
 
@@ -1568,7 +1567,7 @@ function updateIssue(issueId, issueData, declaredUnchanged = false) {
     ? updatedIssue.depends_on
     : Array.isArray(existing.depends_on) ? existing.depends_on : [];
   if (hasProp(updatedIssue, "depends_on")) {
-    validateDependencyGraph(dependsOn, issues, issueId);
+    validateDependencyGraph(dependsOn, readAllIssues(projectDir), issueId);
   }
 
   // Rebuild the stored object: preserve id + created_at; set new updated_at
@@ -1732,6 +1731,12 @@ function main() {
   } else if (values.init) {
     initTracker();
   } else if (values.upgrade) {
+    if (storage.kind !== "legacy") {
+      fail(
+        "--upgrade is only available for a legacy issues.json tracker until Markdown migration support is implemented.",
+        "INVALID_INPUT"
+      );
+    }
     upgradeTracker();
   } else if (values.compact) {
     if (!issueData) {
