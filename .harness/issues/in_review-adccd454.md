@@ -1,10 +1,10 @@
 ---
 id: adccd454-a30a-498e-adad-f076b5137203
 title: Residui e buchi di presidio dopo il travaso a storage Markdown
-status: in_progress
+status: in_review
 tier: economy
 depends_on: []
-covers: [6769512f0a0053d7cf93cf970ab9b259fed05ce8]
+covers: [6769512f0a0053d7cf93cf970ab9b259fed05ce8, 877b5cdc6b3ad60dfb2084a9f817612f285287a8]
 tasks:
   -
     id: 1
@@ -72,7 +72,7 @@ validation:
       checked: true
   state: unknown
 created_at: "2026-08-18T08:55:05Z"
-updated_at: "2026-08-18T09:41:44Z"
+updated_at: "2026-08-18T09:42:07Z"
 ---
 
 # Residui e buchi di presidio dopo il travaso a storage Markdown
