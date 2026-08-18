@@ -24,9 +24,29 @@ import {
   writeIssue,
 } from "../scripts/issue-store.mjs";
 
+import { fileURLToPath } from "node:url";
+
+const scriptsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts");
+
 const ID_ONE = "11111111-1111-1111-1111-111111111111";
 const ID_TWO = "22222222-2222-2222-2222-222222222222";
 const COLLIDING_ID = "11111111-2222-2222-2222-222222222222";
+
+test("issue-manager is the only shipped script that imports the store", () => {
+  // The file layout is one Markdown file per issue, and every reader of that layout is a place
+  // that has to change the day it moves. Keeping the importers down to one is what lets the other
+  // scripts read the tracker through `issue-manager --dump` and stay out of the storage question
+  // entirely. Running issue-manager as a child process is not importing it: no module crosses.
+  const importers = readdirSync(scriptsDir)
+    .filter((file) => file.endsWith(".mjs"))
+    .filter((file) => /from\s+["'][^"']*issue-store\.mjs["']/.test(readFileSync(path.join(scriptsDir, file), "utf8")));
+
+  assert.deepEqual(
+    importers,
+    ["issue-manager.mjs"],
+    "a second importer of issue-store is a second reader of the storage layout"
+  );
+});
 
 function completeIssue(overrides = {}) {
   return {
