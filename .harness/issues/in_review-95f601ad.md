@@ -1,10 +1,10 @@
 ---
 id: 95f601ad-eb21-427c-86e8-402bcec7e663
 title: Lo stato della issue nel nome del file
-status: in_progress
+status: in_review
 tier: standard
 depends_on: [1d1fef48-e1ec-46f4-b387-4be1b6a7a854]
-covers: []
+covers: [016c0bc41a9b517faa6527f9d431fe16bf1fa864]
 tasks:
   -
     id: 1
@@ -30,12 +30,12 @@ tasks:
     id: 5
     short_title: Allineare i documenti
     full_description: README, references/issues.md e skills/issue/SKILL.md dove promettono un file chiamato col solo id.
-    checked: false
+    checked: true
   -
     id: 6
     short_title: Verificare e affidare review
     full_description: Suite completa, gate documentale, allineamento dei task e passaggio in review per il verificatore indipendente.
-    checked: false
+    checked: true
 validation:
   criteria:
     - Ogni file del tracker si chiama <stato>-<primi 8 caratteri dell id>.md, e la lettura rifiuta un nome fuori formato o con un prefisso che non combacia con lo status del frontmatter.
@@ -66,7 +66,7 @@ validation:
       checked: false
   state: unknown
 created_at: "2026-08-18T08:54:39Z"
-updated_at: "2026-08-18T09:03:10Z"
+updated_at: "2026-08-18T09:05:26Z"
 ---
 
 # Lo stato della issue nel nome del file
