@@ -18,8 +18,9 @@ quindi gli script stanno in `<base della skill>/../../scripts`. Se la base non t
 annunciata, fermati e chiedila: non indovinarla e non riusare un path assoluto visto altrove, che
 porta il numero di versione e continuerebbe a girare sulla copia sbagliata invece di fallire.
 
-Tutte le invocazioni passano dallo script del plugin. **Non aprire e non editare
-`issues.json` a mano**, nemmeno per un campo: si perde la consistenza dei dati.
+Tutte le invocazioni passano dallo script del plugin. **Non aprire e non editare i file del
+tracker a mano** — `.harness/issues/<primi 8 caratteri dell'id>.md` — nemmeno per un campo: si
+perde la consistenza dei dati.
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" <flag> [--project-dir <path>]
@@ -37,7 +38,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --get-all --status in_rev
 node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --get-all --status backlog
 ```
 
-Riassumi in tabella `id` (accorciato), `title`, `status`; un progetto senza `issues.json` si
+Riassumi in tabella `id` (accorciato), `title`, `status`; un progetto senza tracker si
 legge come tracker vuoto — dillo, non è un errore e non crea niente.
 
 ## `list [stato]` → un solo stato
@@ -84,17 +85,19 @@ spunta dei `validation.tasks` compresa.
 
 ## `init` → crea il tracker
 
-`--init`, `data: { path, created: true }`; file già esistente → `ALREADY_EXISTS`, nessuna
-scrittura.
+`--init` crea `.harness/issues/`, `data: { path, created: true }`; tracker già esistente →
+`ALREADY_EXISTS`, nessuna scrittura.
 
-## `upgrade` → aggiorna lo schema
+## `upgrade` → migra un tracker legacy
 
-`--upgrade` porta `issues.json` a `SCHEMA_VERSION`, aggiunge solo campi nuovi coi default (mai
-automatico da `new`/`update`). `data: { from, to, migrated }`; già aggiornato → `migrated: 0`,
-nessuna scrittura; più nuovo di questo script → `SCHEMA_TOO_NEW`, nessuna scrittura.
+`--upgrade` porta un `issues.json` legacy allo storage Markdown (mai automatico da
+`new`/`update`). `data: { from, to, migrated, issues, archivePath, resumed }`; già su storage
+Markdown → `migrated: 0`, nessuna scrittura.
 
 ## Errori
 
 Su stdout c'è sempre una sola riga JSON. Se `ok` è `false`, riporta `code` e `error` così
 come sono: `INVALID_ID`, `NOT_FOUND`, `INVALID_INPUT`, `INVALID_TIER`, `LIMIT_EXCEEDED`,
-`FORBIDDEN_ROLE` dicono già cosa è andato storto, non tirare a indovinare una correzione.
+`FORBIDDEN_ROLE`, `STORAGE_CONFLICT` dicono già cosa è andato storto, non tirare a indovinare
+una correzione. `STORAGE_NOT_MIGRATED` ha una risposta sola, ed è nel messaggio: il progetto ha
+ancora il tracker JSON, va lanciato `upgrade`.

@@ -42,12 +42,14 @@ Argomenti: `$ARGUMENTS` (nessun argomento = progetto corrente).
 
 ## Uscita diversa da zero
 
-Lo script esce 1 quando la directory di progetto non esiste, quando `issues.json` non è un JSON
-valido, o quando un flag non esiste. Riporta la riga che stampa così com'è e fermati: non
-ritentare con flag inventati.
+Lo script esce 1 quando la directory di progetto non esiste, quando `issue-manager --dump` non
+riesce a leggere il tracker, o quando un flag non esiste. Riporta la riga che stampa così com'è e
+fermati: non ritentare con flag inventati. Il motivo arriva verbatim da `issue-manager`, quindi
+un progetto ancora sul tracker `issues.json` legacy lo dice e nomina `--upgrade`: quello è il
+comando da proporre, non un'ipotesi tua.
 
 **Tutto esce su stdout, errori compresi: su stderr non finisce mai niente**, e l'output è testo,
 mai JSON. Chi guarda solo stderr non trova nulla e crede che il comando sia rimasto muto.
 
-Un tracker vuoto **non** è un errore: esce 0 e stampa `tracker vuoto`. Vale sia quando
-`issues.json` manca sia quando esiste senza issue dentro.
+Un tracker vuoto **non** è un errore: esce 0 e stampa `tracker vuoto`. Vale sia quando il tracker
+manca del tutto sia quando `.harness/issues/` esiste senza issue dentro.
