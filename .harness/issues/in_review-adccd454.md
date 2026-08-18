@@ -1,10 +1,10 @@
 ---
 id: adccd454-a30a-498e-adad-f076b5137203
 title: Residui e buchi di presidio dopo il travaso a storage Markdown
-status: in_progress
+status: in_review
 tier: economy
 depends_on: []
-covers: []
+covers: [6769512f0a0053d7cf93cf970ab9b259fed05ce8]
 tasks:
   -
     id: 1
@@ -35,7 +35,7 @@ tasks:
     id: 6
     short_title: Verificare e affidare review
     full_description: Suite completa, gate documentale, allineamento dei task e passaggio in review.
-    checked: false
+    checked: true
 validation:
   criteria:
     - writeIssuesFile e ogni altra funzione rimasta senza chiamanti dopo il travaso non esistono piu', e la suite resta verde.
@@ -67,7 +67,7 @@ validation:
       checked: false
   state: unknown
 created_at: "2026-08-18T08:55:05Z"
-updated_at: "2026-08-18T09:28:32Z"
+updated_at: "2026-08-18T09:28:58Z"
 ---
 
 # Residui e buchi di presidio dopo il travaso a storage Markdown
