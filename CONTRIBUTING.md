@@ -50,13 +50,14 @@ test` as the verification command, so that is the gate every issue must pass bef
 
 ## Releasing
 
-`plugin.json` and `marketplace.json` both carry the version and must agree. They are the only
-version numbers in the repository — `package.json` deliberately has none, since nothing is
-published from it. Consumers install from git, so the release is the tag.
+Three manifests carry the version and must agree: `.claude-plugin/plugin.json`,
+`.claude-plugin/marketplace.json` and `.codex-plugin/plugin.json`. They are the only version
+numbers in the repository — `package.json` deliberately has none, since nothing is published
+from it. Consumers install from git, so the release is the tag.
 
 ```sh
-# set the same version in both files, commit, then:
-git tag v0.6.0 && git push && git push --tags
+# set the same version in all three files, commit, then:
+git tag v1.0.0 && git push && git push --tags
 ```
 
 ### Check what is actually installed

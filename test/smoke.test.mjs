@@ -74,6 +74,13 @@ test("the marketplace entry points at this repository's plugin", () => {
   const entry = marketplace.plugins?.find((candidate) => candidate.name === plugin.name);
   assert.ok(entry, `marketplace.json must list a plugin named ${plugin.name}`);
   assert.equal(entry.version, plugin.version, "marketplace and plugin manifest must agree");
+  // The Codex manifest is the third copy of the same number, and the one nobody remembers when
+  // cutting a release: CONTRIBUTING.md names all three, so the check has to cover all three.
+  assert.equal(
+    readJson(".codex-plugin", "plugin.json").version,
+    plugin.version,
+    "the Codex manifest carries the same version as the Claude Code one"
+  );
   assert.ok(
     existsSync(path.resolve(rootDir, entry.source)),
     `marketplace source must resolve: ${entry.source}`
