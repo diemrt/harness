@@ -209,17 +209,15 @@ disco esiste una copia completa del tracker.
 - **mai automatico:** né `--insert` né `--update` eseguono una migrazione al posto tuo, e nessun
   comando legge un `issues.json` di nascosto. L'upgrade è un'azione esplicita.
 
-`data`: `{ from, to, migrated, issues, archivePath, resumed }`. `migrated` conta le **issue**
-cambiate da una migrazione di campo, non le modifiche fatte; `issues` quante ne ha il tracker
-dopo il travaso; `resumed` se questo run ha completato un upgrade interrotto da un altro.
-
 ```bash
 node "$SCRIPTS/issue-manager.mjs" --upgrade
 ```
 
-`data`: `{ from, to, migrated }`, con `migrated` il numero di issue **effettivamente toccate**
-dalle migrazioni applicate (un'issue toccata da più migrazioni nello stesso giro conta una
-volta sola).
+`data`: `{ from, to, migrated, issues, archivePath, resumed }`. `migrated` conta le **issue
+effettivamente toccate** da una migrazione di campo, non le modifiche fatte — un'issue toccata da
+più migrazioni nello stesso giro conta una volta sola; `issues` quante ne ha il tracker dopo il
+travaso; `archivePath` dove è finita la copia del file legacy; `resumed` se questo run ha
+completato un upgrade interrotto da un altro.
 
 ## `--compact`
 
@@ -356,11 +354,12 @@ eccezione: testo semplice). Su stderr non viene scritto nulla.
 |---|---|
 | `--get` | l'oggetto issue |
 | `--get-all` | `{ totalCount, page, pageSize, issues: [...] }` |
+| `--dump` | `{ schema_version, issues: [...] }` — tutto il tracker, per id crescente |
 | `--insert` | l'issue creata (con `id`) |
 | `--update` | l'issue aggiornata |
 | `--delete` | `{ id, deleted }` |
 | `--init` | `{ path, created: true }` |
-| `--upgrade` | `{ from, to, migrated }` |
+| `--upgrade` | `{ from, to, migrated, issues, archivePath, resumed }` |
 | `--compact` | `{ archivePath, removed, blocks: [ { id, title, archivedCount } ] }` |
 
 | Parametro | Uso |
