@@ -57,13 +57,16 @@ accetta ancora (vedi `--upgrade` sotto). Nessun comando migra al posto tuo, e ne
 ```bash
 # leggere: backlog (default), o uno stato specifico
 # attenzione: la prima riga NON e' l'intero tracker, e' solo il backlog. --get-all senza
-# --status non toglie il filtro, lo fissa su backlog: per vedere tutto va interrogato ogni
-# stato (vedi "Nessun argomento" in ../../issue/SKILL.md) o letto issues.json direttamente.
+# --status non toglie il filtro, lo fissa su backlog: per vedere tutto si usa --dump, che non
+# filtra e non pagina (vedi "Nessun argomento" in ../../issue/SKILL.md).
 node "$SCRIPTS/issue-manager.mjs" --get-all
 node "$SCRIPTS/issue-manager.mjs" --get-all --status in_progress
 
 # singola issue
 node "$SCRIPTS/issue-manager.mjs" --get --issue-id <id>
+
+# tutto il tracker, senza filtri e senza pagine
+node "$SCRIPTS/issue-manager.mjs" --dump
 
 # creare (payload da file: nessun escaping di quote da gestire)
 node "$SCRIPTS/issue-manager.mjs" --insert --issue-data-file ./new-issue.json
@@ -81,10 +84,10 @@ node "$SCRIPTS/issue-manager.mjs" --delete --issue-id <id>
 # operare su un altro progetto
 node "$SCRIPTS/issue-manager.mjs" --get-all --project-dir /path/to/project
 
-# creare issues.json di proposito, col seed minimo (rifiuta se il file esiste già)
+# creare .harness/issues di proposito (rifiuta se il tracker esiste già)
 node "$SCRIPTS/issue-manager.mjs" --init
 
-# portare issues.json allo schema corrente
+# portare un tracker issues.json legacy allo storage Markdown
 node "$SCRIPTS/issue-manager.mjs" --upgrade
 
 # archiviare le done gia' raggruppate a monte e sostituirle coi blocchi
@@ -129,47 +132,86 @@ sarebbe invisibile al secondo, che è il lettore più frequente.
 Prima ancora: **se il lavoro meriti una issue** lo decide la bussola in [SKILL.md](../SKILL.md).
 Questa pagina descrive come si scrive una issue, non se vada scritta.
 
-## `--init`
+## `--dump`
 
-Crea `issues.json` nella directory del progetto (default cwd, o `--project-dir`) col seed
-minimo:
+Restituisce **l'intero tracker**, senza filtro di stato e senza pagine, ordinato per id
+crescente:
 
 ```json
-{ "schema_version": 2, "last_updated": "<datetime>", "issues": [] }
+{ "schema_version": 4, "issues": [ /* tutte */ ] }
 ```
 
-`schema_version` vale la costante `SCHEMA_VERSION` dello script (oggi `2`).
+È il comando con cui si legge il tracker dall'esterno: `status-cli.mjs` e `docs-gate.mjs` passano
+di qui, e chiunque altro debba vedere tutte le issue fa lo stesso. **Nessuno legge i file
+`.md` per conto proprio**: un lettore in più di quel formato è un posto in più da correggere
+ogni volta che si muove, ed è la ragione per cui questo comando esiste invece di documentare il
+layout.
 
-**Se il file esiste già, rifiuta con `ALREADY_EXISTS` e non scrive niente** — il file
-preesistente resta identico byte per byte. Nessun flag di conferma o `--force`: un `--init` che
-sovrascrive è un `--init` che cancella un tracker vivo, e chi vuole ripartire da zero rimuove il
-file a mano, esplicitamente.
+`--get-all` resta il comando per una fetta sola — uno stato, una pagina — e il suo default su
+`backlog` è il motivo per cui non serve a vedere tutto.
+
+## `--init`
+
+Crea `.harness/issues/` nella directory del progetto (default cwd, o `--project-dir`). La
+directory nasce vuota: il tracker è l'insieme dei file dentro, e un tracker vuoto è una directory
+senza file.
+
+Se `.harness/config.json` **esiste già**, ci timbra `schema_version: SCHEMA_VERSION` come prima
+chiave. **Non lo crea**: avere o no una configurazione è una decisione del progetto, e
+`harness-config.mjs` è il comando che la prende.
+
+**Se il tracker esiste già — Markdown o `issues.json` legacy — rifiuta con `ALREADY_EXISTS` e non
+scrive niente.** Nessun flag di conferma o `--force`: un `--init` che sovrascrive è un `--init`
+che cancella un tracker vivo, e chi vuole ripartire da zero rimuove i file a mano,
+esplicitamente.
 
 `data`: `{ path, created: true }`.
 
 ## `--upgrade`
 
-Porta `issues.json` dal proprio `schema_version` (assente = versione `0`) a `SCHEMA_VERSION`,
-eseguendo solo le migrazioni comprese fra le due versioni. La logica vive in una **lista
-ordinata** di migrazioni interna allo script, ognuna con la versione che produce (`to`); si
-applicano solo quelle con `to` maggiore della versione del file e non superiore a
-`SCHEMA_VERSION`. La migrazione `0 → 1` materializza `depends_on: []` dove la chiave manca; la
-`1 → 2` fa lo stesso con `covers: []`; la `2 → 3` con `tasks: []` e, sulle sole issue che hanno un
-oggetto `validation`, `validation.tasks: []` — una `validation` a `null` non ne guadagna uno,
-perché non ci sarebbe dove metterli.
+Porta un progetto dal tracker `issues.json` legacy allo storage Markdown a `SCHEMA_VERSION`,
+applicando per strada le migrazioni di campo comprese fra la versione che il file dichiara
+(assente = versione `0`) e questa. La logica vive in una **lista ordinata** di migrazioni interna
+allo script, ognuna con la versione che produce (`to`); si applicano solo quelle con `to`
+maggiore della versione del file e non superiore a `SCHEMA_VERSION`. La migrazione `0 → 1`
+materializza `depends_on: []` dove la chiave manca; la `1 → 2` fa lo stesso con `covers: []`; la
+`2 → 3` con `tasks: []` e, sulle sole issue che hanno un oggetto `validation`,
+`validation.tasks: []` — una `validation` a `null` non ne guadagna uno, perché non ci sarebbe
+dove metterli. Lo schema `4` non aggiunge campi: **è il formato di storage**, e la migrazione
+`3 → 4` è il travaso da un file JSON a un file per issue.
 
-- **aggiunge soltanto:** ogni migrazione mette il default sui campi nuovi, non tocca i valori
-  esistenti e non rimuove niente. Un campo deprecato lo cancella l'utente, quando decide di
-  cancellarlo;
-- **idempotente:** un file già a `SCHEMA_VERSION` risponde `ok:true` con `migrated: 0` e **non
-  viene riscritto** — il file resta identico byte per byte, anche a `--upgrade` lanciato più
-  volte di fila;
+L'ordine di scrittura è: archivio, file delle issue, config, e **per ultima** la rimozione di
+`issues.json`. È l'ordine che tiene ogni crash recuperabile — finché il file legacy c'è, sul
+disco esiste una copia completa del tracker.
+
+- **niente viene scritto** finché ogni issue non è stata migrata e serializzata in memoria e ogni
+  short id controllato per collisioni: un record che il codec non sa rappresentare deve fermare
+  la migrazione mentre il progetto è ancora intero, non a metà;
+- **aggiunge soltanto:** ogni migrazione di campo mette il default sui campi nuovi, non tocca i
+  valori esistenti e non rimuove niente;
+- **l'originale non si perde:** `issues.json` viene copiato **verbatim** in
+  `.harness/archive/upgrade-<timestamp>.json` prima di sparire. È lì che sopravvivono le chiavi
+  radice che lo storage Markdown non ha dove mettere — `project`, `tags`, `status_legend`,
+  `last_updated`;
+- **idempotente:** un progetto già su storage Markdown risponde `ok:true` con `migrated: 0` e
+  **non viene riscritto**, nemmeno di un byte, a `--upgrade` lanciato più volte di fila. La
+  versione che un file JSON dichiara non lo rende storage Markdown: un `issues.json` che dichiara
+  già `4` viene comunque travasato;
+- **riprende un upgrade interrotto:** un progetto che ha **entrambi** gli storage popolati è
+  quello che un crash lascia dietro di sé. `--upgrade` lo completa quando ogni issue Markdown è,
+  campo per campo, una che questa migrazione avrebbe scritto; se una diverge o è sconosciuta al
+  JSON, quelli sono due tracker veri e non una migrazione a metà, e rifiuta con
+  `STORAGE_CONFLICT` senza scrivere niente. Ogni altro comando, davanti allo stesso stato,
+  rifiuta con lo stesso codice e rimanda qui;
 - **un file a versione superiore a `SCHEMA_VERSION`** viene rifiutato con `SCHEMA_TOO_NEW` e non
-  scrive niente: è uno script vecchio davanti a dati più nuovi di lui, e riscriverli
-  degraderebbe quello che lo schema più recente porta;
-- **mai automatico:** né `--insert` né `--update` eseguono una migrazione al posto tuo — restano
-  a leggere e scrivere `schema_version` così come lo trovano (vedi sopra). L'upgrade è
-  un'azione esplicita.
+  scrive niente: è uno script vecchio davanti a dati più nuovi di lui, e migrarli contro uno
+  schema che non conosce degraderebbe quello che lo schema più recente porta;
+- **mai automatico:** né `--insert` né `--update` eseguono una migrazione al posto tuo, e nessun
+  comando legge un `issues.json` di nascosto. L'upgrade è un'azione esplicita.
+
+`data`: `{ from, to, migrated, issues, archivePath, resumed }`. `migrated` conta le **issue**
+cambiate da una migrazione di campo, non le modifiche fatte; `issues` quante ne ha il tracker
+dopo il travaso; `resumed` se questo run ha completato un upgrade interrotto da un altro.
 
 ```bash
 node "$SCRIPTS/issue-manager.mjs" --upgrade
@@ -181,9 +223,14 @@ volta sola).
 
 ## `--compact`
 
-Rimpicciolisce `issues.json` senza perdere lo storico: le issue chiuse che gli vengono nominate
+Rimpicciolisce il tracker senza perdere lo storico: le issue chiuse che gli vengono nominate
 escono dal tracker, finiscono **intere** in un archivio, e al loro posto resta una issue per
 blocco che le riassume e dice dove sono andate.
+
+Con un file per issue, «rimpicciolire» vuol dire **togliere file**: `--compact` cancella i `.md`
+delle issue archiviate e ne scrive uno per blocco. Ogni altro file del tracker resta identico
+byte per byte — non viene riscritto un tracker intero per una modifica che riguarda tre issue,
+che è precisamente quello che il file JSON unico faceva a ogni comando.
 
 **È una primitiva: non decide i raggruppamenti.** Sapere che due issue chiuse parlano dello
 stesso argomento è giudizio, e il giudizio sta a monte — i blocchi arrivano già decisi nel
@@ -202,8 +249,8 @@ Il payload si passa come per gli altri comandi (`--issue-data` o, meglio, `--iss
 (80 / 1200 caratteri): un blocco diventa una issue come le altre.
 
 **Cosa viene rifiutato, e in che ordine.** Ogni controllo gira *prima* che venga scritto un solo
-byte, quindi **un rifiuto non lascia niente dietro di sé**: né `issues.json` toccato, né
-l'archivio, né la directory `.harness/`.
+byte, quindi **un rifiuto non lascia niente dietro di sé**: né un file di issue toccato, né
+l'archivio.
 
 1. `HARNESS_ROLE=worker` → `FORBIDDEN_ROLE`. Il controllo è il primo e non guarda nemmeno il
    payload: ogni blocco che questo comando scrive è un record `done` / `pass`, che è esattamente
@@ -239,27 +286,27 @@ schema stava leggendo. Il nome del file è il timestamp del giro con i `:` sosti
 (illegali in un nome di file su Windows); due compattazioni nello stesso secondo prendono un
 suffisso numerico invece di sovrascriversi.
 
-L'archivio finisce in `.harness/`, e **se versionarlo lo decide il progetto**: harness non
+L'archivio finisce in `.harness/archive/`, e **se versionarlo lo decide il progetto**: harness non
 scrive nessun `.gitignore`, né qui né altrove ([config.md](config.md)). Vale la pena deciderlo
-invece di ereditarlo, perché `issues.json` è condiviso e ogni blocco porta il path
-dell'archivio che ne contiene gli originali: tenere quel file fuori dal repository significa
+invece di ereditarlo, perché il tracker è condiviso e ogni blocco porta il path
+dell'archivio che ne contiene gli originali: tenere quei file fuori dal repository significa
 lasciare a chi clona un puntatore verso il nulla.
 
-La scrittura avviene in quest'ordine — archivio, poi `issues.json` — così un errore a metà non
-lascia mai il tracker senza la copia.
+La scrittura avviene in quest'ordine — archivio, poi i file delle issue — così un errore a metà
+non lascia mai il tracker senza la copia.
 
-**L'archivio non viene mai riletto.** Non è un secondo tracker: `--get`, `--get-all` e il
-riepilogo continuano a vedere **solo** `issues.json`. Un `--get` su una issue archiviata risponde
-`NOT_FOUND`. È storia congelata, e il blocco che la sostituisce ne porta il path.
+**L'archivio non viene mai riletto.** Non è un secondo tracker: `--get`, `--get-all`, `--dump` e
+il riepilogo continuano a vedere **solo** `.harness/issues/`. Un `--get` su una issue archiviata
+risponde `NOT_FOUND`. È storia congelata, e il blocco che la sostituisce ne porta il path.
 
 **La issue blocco** viene inserita con `status: "done"`, `validation.state: "pass"`,
 `depends_on: []`, `covers: []` e `tier: null`. I suoi `validation.criteria` sono l'evidenza della
-compattazione: il path dell'archivio (relativo al progetto — `issues.json` è condiviso nel
+compattazione: il path dell'archivio (relativo al progetto — il tracker è condiviso nel
 repository, un path assoluto di un clone non significherebbe niente in un altro) e una riga
 `id + titolo` per ogni issue coperta.
 
 `data`: `{ archivePath, removed, blocks: [ { id, title, archivedCount } ] }`, con `archivePath`
-assoluto (il chiamante può aprirlo subito) e `removed` il numero di issue tolte da `issues.json`.
+assoluto (il chiamante può aprirlo subito) e `removed` il numero di issue tolte dal tracker.
 
 ### Il giro che `--compact` non fa
 
@@ -404,8 +451,8 @@ l'aggiornamento appaiato più sotto impedisce che divergano.
 
 I task **indicizzano, non sostituiscono**: `full_description` porta quanto serve ad agire — il
 comando, l'esito atteso, il riferimento al passo di piano — non l'analisi che ci sta dietro.
-`issues.json` è committato, condiviso e riletto a ogni comando, e ogni lettura lo paga: il tracker
-guadagna l'avanzamento, non diventa il documento.
+Il tracker è committato, condiviso e riletto a ogni comando, e ogni lettura lo paga: guadagna
+l'avanzamento, non diventa il documento.
 
 I **task di validazione stanno dentro `validation`**, non accanto: è lì che vive tutto ciò che
 riguarda il giudizio, guard compreso, e tenerli fuori spargerebbe la stessa nozione in due punti
@@ -568,8 +615,11 @@ Il `code` è stabile: usalo per la logica, il messaggio è per gli umani.
 | `MISSING_ARGS` | flag richiesto assente, o `--issue-data` e `--issue-data-file` insieme |
 | `UNKNOWN_COMMAND` | nessun comando riconosciuto (vedi `--help`) |
 | `FORBIDDEN_ROLE` | con `HARNESS_ROLE=worker`, tentativo di impostare `status=done` o `validation.state=pass`, di spuntare una voce di `validation.tasks`, oppure qualunque `--compact` |
-| `ALREADY_EXISTS` | `--init` quando `issues.json` esiste già: rifiutato, niente viene scritto |
-| `SCHEMA_TOO_NEW` | `--upgrade` su un file con `schema_version` maggiore di `SCHEMA_VERSION`: rifiutato, niente viene scritto |
+| `ALREADY_EXISTS` | `--init` quando un tracker esiste già: rifiutato, niente viene scritto |
+| `SCHEMA_TOO_NEW` | `schema_version` dichiarato maggiore di `SCHEMA_VERSION`: rifiutato, niente viene scritto |
+| `STORAGE_NOT_MIGRATED` | il progetto ha ancora il tracker `issues.json` legacy: ogni comando rifiuta, tranne `--upgrade` |
+| `STORAGE_CONFLICT` | `issues.json` e issue Markdown popolati entrambi: un `--upgrade` interrotto, che `--upgrade` riprende se i due combaciano |
+| `ID_COLLISION` | due issue che condividono gli otto caratteri con cui si chiama il loro file |
 
 `FORBIDDEN_ROLE` è il guard tecnico contro la self-validation: un processo lanciato con
 `HARNESS_ROLE=worker` non può chiudere la propria issue, può arrivare al massimo a
