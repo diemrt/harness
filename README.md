@@ -4,7 +4,7 @@
 
 **A controlled development harness for AI agents — an issue tracker, independent verification,
 and a set of agent operating rules — installed as a Claude Code plugin, leaving nothing in your
-project but `issues.json`.**
+project but a `.harness/` directory.**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/diemrt/harness/ci.yml?branch=main&label=CI)](https://github.com/diemrt/harness/actions/workflows/ci.yml)
 [![license](https://img.shields.io/github/license/diemrt/harness)](LICENSE)
@@ -94,24 +94,51 @@ skill and invoke the plain Node.js scripts directly.
   is the push, or the merge, that the pass authorises.
 
 The workflow itself is the plugin's `harness` skill, which Claude loads on its own when a
-project has an `issues.json`. [`skills/harness/SKILL.md`](skills/harness/SKILL.md) and its
-`references/` are the authoritative description; this README does not restate them.
+project has a `.harness/` directory. [`skills/harness/SKILL.md`](skills/harness/SKILL.md) and
+its `references/` are the authoritative description; this README does not restate them.
 
 ## What it leaves in your project
 
 | Path | What it is |
 |---|---|
-| `issues.json` | the tracker's data, at the project root |
-| `.harness/` | configuration, the archives `/harness:compact` writes, and worker logs |
+| `.harness/issues/` | the tracker: one Markdown file per issue, named by the first eight characters of its id |
+| `.harness/config.json` | the setup and verification commands, the docs-gate globs, the schema version |
+| `.harness/archive/` | the originals `/harness:compact` takes out of the tracker |
+| `.harness/runs/` | worker logs |
 
 Nothing else: no scripts, no documents, no HTML viewer to keep in sync.
+
+One file per issue is a deliberate choice about diffs. A single JSON tracker is rewritten whole
+on every command, so two agents working on two issues conflict over one file and every review
+shows a diff nobody asked for. A directory of files conflicts only where the work actually
+overlaps.
 
 **What of that gets versioned is your call.** Harness writes no `.gitignore` — not yours,
 which it never touches, and none of its own inside `.harness/`. The directory turns up as
 untracked and you decide: commit `config.json` so the team shares one verification gate, or
-keep it per clone; commit `.harness/archive/` so the blocks in `issues.json` still point at
+keep it per clone; commit `.harness/archive/` so the blocks in the tracker still point at
 something after a fresh clone, or accept that they will not. A tool that ignores files on your
-behalf has taken that decision away from you, in a file you never asked for.
+behalf has taken that decision away from you, in a file you never asked for. The one part where
+the decision is already made in practice is `issues/`: a tracker nobody else can read tracks
+nothing for anybody else.
+
+### Coming from an older harness
+
+Up to schema 3 the tracker was a single `issues.json` at the project root. **A project still in
+that state does not read**: every command refuses with `STORAGE_NOT_MIGRATED` until you run the
+migration, which is one command and writes a verbatim copy of the old file into
+`.harness/archive/` before touching anything:
+
+```
+node "<plugin>/scripts/issue-manager.mjs" --upgrade
+```
+
+It moves every issue across unchanged, is safe to re-run, and resumes itself if it is
+interrupted. Two things do not survive the move, both of them from the JSON root object: the
+decorative `project` name, which the summary now takes from the directory, and `last_updated`,
+which is now the newest `updated_at` among the issues. Both are in the archived copy. One more
+edge worth knowing: a CRLF inside an issue `description` comes back as a plain LF, because the
+description lives in the Markdown body.
 
 ## Slash commands
 
@@ -135,7 +162,7 @@ issue (`done` / `pass`) is the verifier's job alone — `/harness:issue` will no
 
 ## Contributing
 
-This repository is the plugin, and it develops itself with it: the issues in `issues.json`
+This repository is the plugin, and it develops itself with it: the issues in `.harness/issues/`
 here are harness's own. See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the development loop
 and the release process, and [CLAUDE.md](CLAUDE.md) for the rules of this repository.
 

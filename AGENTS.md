@@ -1,8 +1,8 @@
 # AGENTS.md
 
-Questo repository **è** il plugin harness per Claude Code: issue tracciate su `issues.json`,
+Questo repository **è** il plugin harness per Claude Code: issue tracciate in `.harness/issues/`,
 una sola issue in corso per catena di dipendenza, verifica indipendente obbligatoria prima di
-ogni commit. Cosa fa e come si installa: [README.md](README.md).
+pubblicare sul ramo condiviso. Cosa fa e come si installa: [README.md](README.md).
 
 Qui non sono scritte regole operative, per non averne due versioni:
 
