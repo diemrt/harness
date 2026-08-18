@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "project": "MyProject",
-  "last_updated": "2026-08-18T07:47:30Z",
+  "last_updated": "2026-08-18T07:56:11Z",
   "rules": {
     "single_active_issue": false
   },
@@ -1817,7 +1817,7 @@
           "full_description": "Validare e preservare schema_version, aggiornare i default docs gate e la config del repository."
         },
         {
-          "checked": false,
+          "checked": true,
           "id": 5,
           "short_title": "Migrare status e docs gate",
           "full_description": "Fare consumare issue-manager --dump a status-cli e docs-gate preservando i rispettivi contratti di errore."
@@ -1879,7 +1879,7 @@
         "state": "unknown"
       },
       "created_at": "2026-08-17T12:49:45Z",
-      "updated_at": "2026-08-18T07:47:30Z"
+      "updated_at": "2026-08-18T07:56:11Z"
     },
     {
       "id": "1d1fef48-e1ec-46f4-b387-4be1b6a7a854",

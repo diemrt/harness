@@ -308,7 +308,12 @@ function requireMarkdownStorage() {
     fail("Run --upgrade before using this tracker.", "STORAGE_NOT_MIGRATED");
   }
   if (storage.kind === "conflict") {
-    fail("Legacy JSON and Markdown issues are both populated.", "STORAGE_CONFLICT");
+    fail(
+      "Legacy JSON and Markdown issues are both populated. That is what an interrupted --upgrade " +
+        "leaves behind: run --upgrade again to finish it, or reconcile the two by hand if they are " +
+        "genuinely two trackers.",
+      "STORAGE_CONFLICT"
+    );
   }
   return storage;
 }

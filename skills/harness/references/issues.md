@@ -1,52 +1,56 @@
 # Tracker delle issue
 
-Le issue vivono in `issues.json` alla radice del progetto e si gestiscono **solo** tramite lo
-script del plugin. **Non modificare `issues.json` a mano**: si perde la consistenza dei dati.
+Le issue vivono in `.harness/issues/`, **un file Markdown per issue**, e si gestiscono **solo**
+tramite lo script del plugin. **Non modificare quei file a mano**: si perde la consistenza dei dati.
 
 `$SCRIPTS` = `${CLAUDE_PLUGIN_ROOT}/scripts`.
 
-## Dove sta il file
+## Dove stanno i file
 
-Lo script vive nel plugin, i dati nel progetto. `issues.json` viene risolto contro la
+Lo script vive nel plugin, i dati nel progetto. `.harness/issues/` viene risolto contro la
 **directory del progetto**, mai accanto allo script:
 
 - default: la directory corrente del processo;
 - `--project-dir <path>`: override esplicito, quando non controlli la cwd.
 
-Un progetto senza `issues.json` si legge come tracker vuoto (nessun errore, nessun file
-creato). Il file nasce al **primo `--insert`**, oppure di proposito con `--init` (sotto).
+Ogni issue sta in `<primi 8 caratteri del suo id>.md`: frontmatter per tutti i campi, corpo
+Markdown per il titolo e la `description`. Il codec e le scritture atomiche stanno in
+`$SCRIPTS/issue-store.mjs`, e **`issue-manager.mjs` è l'unico che lo importa**: chi legge il
+tracker — `status-cli.mjs`, `docs-gate.mjs`, chiunque altro — passa da `--dump`, mai dai file.
+Un lettore in più di quel formato sarebbe un posto in più da correggere ogni volta che si muove.
+
+Un progetto senza tracker si legge come tracker vuoto (nessun errore, nessun file creato). La
+directory nasce al **primo `--insert`**, oppure di proposito con `--init` (sotto).
 
 ## `schema_version`
 
-`issues.json` può portare, **come prima chiave dell'oggetto radice**, la chiave `schema_version`:
-la versione dello schema descritto in questa pagina. Lo script conosce la propria versione tramite
-la costante `SCHEMA_VERSION` (oggi `3`).
+Lo schema descritto in questa pagina è il `4`, ed è **anche il formato di storage**: schema 4
+vuol dire un file per issue. Lo script conosce la propria versione tramite la costante
+`SCHEMA_VERSION`.
 
-Ce la mettono in testa entrambi i comandi che la scrivono: `--init` la semina lì, e `--upgrade`
-ricostruisce l'oggetto radice — senza, l'assegnazione la farebbe atterrare in **coda**, dando a un
-tracker migrato una forma diversa da uno appena creato. Le altre chiavi restano nell'ordine che
-avevano.
+La versione è dichiarata in `.harness/config.json`, come **prima chiave dell'oggetto**, dai due
+comandi che la scrivono: `issue-manager --init` e `issue-manager --upgrade`. `harness-config.mjs`
+non la scrive mai di suo — la **preserva** quando riscrive il file, perché `--init` lì ricostruisce
+la configurazione da capo e una riscrittura che la perdesse farebbe leggere un tracker migrato come
+uno mai timbrato.
 
-**Nessun comando legge la posizione**, quindi un tracker migrato da un plugin più vecchio di questa
-correzione ce l'ha in coda ed è legale così. È l'ordine che i due comandi *scrivono*, non un
-invariante di ogni file esistente: il primo `--upgrade` che passa da una versione all'altra
-ricostruisce la radice e la chiave si sposta in testa da sé, senza che nessuno debba andarla a
-correggere.
+- **chiave assente = versione corrente.** Un progetto già su storage Markdown ma senza config
+  timbrata si legge come schema 4, non come un tracker rotto: `.harness/issues/` esiste, e quello
+  è il fatto. `--upgrade` la timbra quando la trova in disaccordo, e non riscrive niente quando è
+  già giusta.
+- **la config non viene creata da nessuno dei due comandi.** Se il progetto non ha
+  `.harness/config.json`, `--init` e `--upgrade` non lo inventano: averla o no è una decisione del
+  progetto, e `harness-config.mjs` è il comando che la prende.
+- **`--compact` legge la versione, non la scrive**, per timbrarla sull'archivio: così l'archivio
+  dice sotto quale schema erano scritte le issue che porta.
 
-La pagina **non** promette che stia accanto a `last_updated`: vale nel seed di `--init`, dove
-`last_updated` è la seconda chiave, e non vale su nessun tracker che porti un `project` o altre
-chiavi proprie. Le due cose coincidono solo in un caso, e prometterle insieme era la descrizione di
-quel caso spacciata per regola.
+### Tracker legacy `issues.json`
 
-- **chiave assente = versione 0, e il file si legge lo stesso.** Nessun comando cambia
-  comportamento in base a questa chiave, nessun progetto va aggiornato per continuare a
-  funzionare — stessa scelta già fatta per `tier` e per `depends_on`.
-- **il writer preserva quello che trova.** Se il file ha `schema_version`, ogni scrittura
-  (`--insert`, `--update`, `--delete`, `--compact`) lo riscrive identico; se non ce l'ha, non lo
-  aggiunge. Solo `--init` (file nuovo) e `--upgrade` (file già presente) scrivono deliberatamente
-  quel campo. Né `--insert` né `--update` fanno mai la migrazione al posto tuo. `--compact` non
-  lo scrive nemmeno lui: lo **legge** per timbrarlo sull'archivio, così l'archivio dice sotto
-  quale schema erano scritte le issue che porta.
+Fino allo schema 3 il tracker era un solo file JSON alla radice del progetto. Un progetto ancora
+in quello stato **non si legge**: ogni comando che tocca le issue rifiuta con
+`STORAGE_NOT_MIGRATED` e dice di lanciare `--upgrade`, che è l'unico comando che quel tracker lo
+accetta ancora (vedi `--upgrade` sotto). Nessun comando migra al posto tuo, e nessuno legge un
+`issues.json` di nascosto.
 
 ## Comandi
 

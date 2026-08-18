@@ -16,12 +16,13 @@ import {
 } from "../scripts/docs-gate.mjs";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { serializeIssue } from "../scripts/issue-store.mjs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const INCLUDE = ["**/*.mjs", "**/*.ts"];
-const EXCLUDE = ["docs/**", "test/**", "**/*.md", "issues.json"];
+const EXCLUDE = ["docs/**", "test/**", "**/*.md", ".harness/**"];
 
 function commit(sha, files, subject = `commit ${sha}`) {
   return { sha, subject, files };
@@ -39,15 +40,15 @@ test("**/ matches zero directories as well as many", () => {
 test("a trailing ** matches everything under a directory, and * never crosses a separator", () => {
   assert.ok(globToRegExp("docs/**").test("docs/superpowers/specs/x.md"));
   assert.ok(!globToRegExp("docs/**").test("scripts/x.md"));
-  assert.ok(globToRegExp("*.json").test("issues.json"));
-  assert.ok(!globToRegExp("*.json").test("nested/issues.json"));
+  assert.ok(globToRegExp("*.json").test("package.json"));
+  assert.ok(!globToRegExp("*.json").test("nested/package.json"));
 });
 
 test("a glob's literal characters are escaped, not read as a regexp", () => {
-  // Without escaping, `issues.json` would also match `issuesXjson` — quietly, and only on the one
-  // file the default exclude list exists to protect.
-  assert.ok(globToRegExp("issues.json").test("issues.json"));
-  assert.ok(!globToRegExp("issues.json").test("issuesXjson"));
+  // Without escaping, `package.json` would also match `packageXjson` — quietly, on exactly the
+  // kind of literal filename an exclude list is written with.
+  assert.ok(globToRegExp("package.json").test("package.json"));
+  assert.ok(!globToRegExp("package.json").test("packageXjson"));
 });
 
 test("exclude wins over include", () => {
@@ -56,7 +57,7 @@ test("exclude wins over include", () => {
   assert.ok(isCodeFile("scripts/docs-gate.mjs", INCLUDE, EXCLUDE));
   assert.ok(!isCodeFile("test/plugin-docs-gate.test.mjs", INCLUDE, EXCLUDE));
   assert.ok(!isCodeFile("README.md", INCLUDE, EXCLUDE));
-  assert.ok(!isCodeFile("issues.json", INCLUDE, EXCLUDE));
+  assert.ok(!isCodeFile(".harness/issues/aaaaaaaa.md", INCLUDE, EXCLUDE), "the tracker is not code");
 });
 
 test("declaredRefs collects covers from issues of EVERY status", () => {
@@ -262,17 +263,34 @@ function makeCommit(dir, files, subject) {
 // Written AFTER the commits on purpose: the tracker and the config are the gate's input, not part
 // of the history it reads.
 function writeHarness(dir, { issues = [], docsGate } = {}) {
-  mkdirSync(path.join(dir, ".harness"), { recursive: true });
+  mkdirSync(path.join(dir, ".harness", "issues"), { recursive: true });
   writeFileSync(
     path.join(dir, ".harness", "config.json"),
     JSON.stringify({ verify: "npm test", ...(docsGate === undefined ? {} : { docsGate }) }, null, 2),
     "utf8"
   );
-  writeFileSync(
-    path.join(dir, "issues.json"),
-    JSON.stringify({ schema_version: 2, last_updated: "2026-01-01T00:00:00Z", issues }, null, 2),
-    "utf8"
-  );
+  // One file per issue, named by the first eight characters of its id, so a fixture describing
+  // several issues needs ids that differ there: position supplies them.
+  issues.forEach((entry, index) => {
+    const id = `${String(index + 1).repeat(8)}-1111-1111-1111-111111111111`;
+    writeFileSync(
+      path.join(dir, ".harness", "issues", `${id.slice(0, 8)}.md`),
+      serializeIssue({
+        id,
+        title: `Issue ${index + 1}`,
+        description: "fixture",
+        status: entry.status,
+        tier: null,
+        depends_on: [],
+        covers: entry.covers,
+        tasks: [],
+        validation: null,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      }),
+      "utf8"
+    );
+  });
 }
 
 function issue(covers, status = "backlog") {
@@ -418,6 +436,29 @@ test("a --since that does not resolve is exit 1", () => {
     const result = runGate(dir, ["--since", "not-a-revision"]);
     assert.equal(result.status, 1);
     assert.match(result.stdout, /not-a-revision/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a tracker still on the legacy issues.json is exit 1, naming the command that migrates it", () => {
+  const dir = gitRepo();
+  try {
+    const first = makeCommit(dir, { "a.mjs": "1" }, "feat: first");
+    writeHarness(dir, { issues: [] });
+    // The gate reads the tracker through issue-manager --dump, so an unmigrated project fails the
+    // same way everywhere instead of each reader inventing its own answer.
+    writeFileSync(
+      path.join(dir, "issues.json"),
+      JSON.stringify({ schema_version: 3, issues: [issue([first])] }),
+      "utf8"
+    );
+
+    const result = runGate(dir);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /non è leggibile/);
+    assert.match(result.stdout, /--upgrade/);
+    assert.equal(result.stderr, "", "nothing is ever written to stderr");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

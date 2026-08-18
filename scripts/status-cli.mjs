@@ -13,10 +13,11 @@
 // a pipe to the agent and a colour branch would never run. Alignment and ASCII icons carry the
 // distinctions instead, and they survive a markdown code block.
 
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, statSync } from "node:fs";
 import { parseArgs } from "node:util";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   buildAlerts,
@@ -126,11 +127,11 @@ function formatWhen(lastUpdated) {
 
 // The instant of the render, in local time, and the whole tail of the status line.
 //
-// It is the line's heartbeat: the command has no cache — every run rereads issues.json and exits —
+// It is the line's heartbeat: the command has no cache — every run rereads the tracker and exits —
 // so a line that RUNS is aligned by construction, and the only possible mismatch is not running at
 // all, which a frozen line and a fresh one showing the same counts cannot be told apart by.
 //
-// The line used to carry the age of the tracker beside it — how long ago issues.json was written.
+// The line used to carry the age of the tracker beside it — how long ago the tracker was written.
 // That answered a question nobody asks of a status bar, and it took a reading to answer: an age has
 // to be watched moving. The clock is checked against a clock the reader already has, in one glance,
 // and it is the only one of the two that the reader wanted.
@@ -346,8 +347,10 @@ const USAGE = [
   "Prints one screen of tracker status: counts, what is in flight, what can be taken now.",
   "Output is text, not JSON, and nothing is ever written to stderr.",
   "",
-  "--project-dir  directory holding issues.json (default: the current directory).",
-  "               A project without issues.json reads as an empty tracker, not an error.",
+  "--project-dir  root of the project whose tracker to read (default: the current directory).",
+  "               The tracker is read through `issue-manager --dump`, never off disk: a project",
+  "               with no tracker at all reads as an empty one, not an error, and a project still",
+  "               on the legacy issues.json says so and names the command that migrates it.",
   "--oneline      one ASCII line of counts for a host status bar (tmux, starship, a shell",
   "               prompt, the Claude Code statusLine). Always exits 0 and stays silent on",
   "               any problem: an error repeated on every refresh is worse than no line.",
@@ -358,8 +361,8 @@ const USAGE = [
   "--color        add ANSI colour to --oneline. Off by default: the host may be a prompt",
   "               that renders the escape codes literally. No effect without --oneline.",
   "",
-  "Exit codes: 0 on success and on an empty tracker; 1 on a missing project directory, an",
-  "unreadable issues.json, or an unknown flag. --oneline always exits 0.",
+  "Exit codes: 0 on success and on an empty tracker; 1 on a missing project directory, a tracker",
+  "issue-manager cannot read, or an unknown flag. --oneline always exits 0.",
   "",
 ].join("\n");
 
@@ -376,6 +379,52 @@ function resolveProjectDir(projectDir) {
   return dir;
 }
 
+const ISSUE_MANAGER = path.join(path.dirname(fileURLToPath(import.meta.url)), "issue-manager.mjs");
+
+// The tracker is read through `issue-manager --dump`, never off disk. Storage is one Markdown file
+// per issue now, and a second reader of that layout would be a second place to fix every time it
+// moves — a cost a single JSON file never had, because a JSON file is its own reader. The price is
+// one child process per run, on a command that already is one.
+//
+// Never throws: it returns the failure instead, because its two callers want opposite things done
+// with it. The screen prints it and exits 1; the status line swallows it and prints nothing.
+function readDump(projectDir) {
+  const result = spawnSync(process.execPath, [ISSUE_MANAGER, "--dump", "--project-dir", projectDir], {
+    encoding: "utf8",
+    // A tracker has no size a status screen can outgrow. The 1 MiB default does.
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (result.error) {
+    return { ok: false, error: result.error.message };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(result.stdout.trim());
+  } catch {
+    return { ok: false, error: "issue-manager --dump non ha risposto con un envelope JSON." };
+  }
+  if (!parsed.ok) {
+    return { ok: false, error: parsed.error };
+  }
+  return { ok: true, issues: Array.isArray(parsed.data.issues) ? parsed.data.issues : [] };
+}
+
+// The tracker has no `last_updated` of its own any more: with one file per issue there is no root
+// object to hold one. The newest `updated_at` in the tracker is the same fact, read off the issues
+// instead of maintained beside them — and it cannot go stale against them, which the root key could.
+export function lastUpdatedOf(issues) {
+  let latest = null;
+  for (const issue of issues) {
+    const stamp = issue.updated_at;
+    // Lexical comparison, which is exact on the format harness writes and only that one: ISO-8601
+    // in UTC, always the same width. Nothing in the tracker ever writes an offset.
+    if (typeof stamp === "string" && (latest === null || stamp > latest)) {
+      latest = stamp;
+    }
+  }
+  return latest;
+}
+
 // Every way this can go wrong, collected in one place and turned into an empty line. It does not
 // share resolveProjectDir() on purpose: that one calls fail(), which exits 1, and this command must
 // not — see the branch in main() for why.
@@ -383,13 +432,11 @@ function onelineFor(projectDirArg, color) {
   try {
     const dir = path.resolve(projectDirArg ?? process.cwd());
     if (!existsSync(dir) || !statSync(dir).isDirectory()) return "";
-    const trackerPath = path.join(dir, "issues.json");
-    // A missing tracker is not an error: issue-manager.mjs reads it as an empty tracker, and so
-    // does this. The line comes out empty because every count is zero, not because we gave up.
-    if (!existsSync(trackerPath)) return "";
-    const data = JSON.parse(readFileSync(trackerPath, "utf8"));
-    const issues = Array.isArray(data.issues) ? data.issues : [];
-    return renderOneline(buildSnapshot(issues), { color });
+    // A tracker that cannot be read is silence here, exactly like a missing one: this line is the
+    // one surface of harness that must never argue with its host.
+    const dump = readDump(dir);
+    if (!dump.ok) return "";
+    return renderOneline(buildSnapshot(dump.issues), { color });
   } catch {
     return "";
   }
@@ -433,26 +480,21 @@ function main() {
   }
 
   const projectDir = resolveProjectDir(values["project-dir"]);
-  const fallbackName = path.basename(projectDir);
-  const trackerPath = path.join(projectDir, "issues.json");
 
-  if (!existsSync(trackerPath)) {
-    process.stdout.write(` ${fallbackName} · tracker vuoto\n`);
-    return;
+  const dump = readDump(projectDir);
+  if (!dump.ok) {
+    // The reason comes from issue-manager and is passed on verbatim: a tracker still on the legacy
+    // JSON says so and names the command that fixes it, and repeating that here in other words
+    // would only make the two disagree.
+    fail(`Il tracker di '${projectDir}' non è leggibile: ${dump.error}`);
   }
 
-  let data;
-  try {
-    data = JSON.parse(readFileSync(trackerPath, "utf8"));
-  } catch {
-    fail(`'${trackerPath}' non è un JSON valido: il tracker non è leggibile.`);
-  }
-
-  const issues = Array.isArray(data.issues) ? data.issues : [];
-  const project = typeof data.project === "string" && data.project ? data.project : fallbackName;
-  const rendered = renderSnapshot(buildSnapshot(issues), {
-    project,
-    lastUpdated: data.last_updated ?? null,
+  // The project name is the directory, and only the directory. It used to come from a `project`
+  // key in issues.json when that key was there — decorative metadata of the root object, which
+  // Markdown storage has no room for and no reason to reinvent.
+  const rendered = renderSnapshot(buildSnapshot(dump.issues), {
+    project: path.basename(projectDir),
+    lastUpdated: lastUpdatedOf(dump.issues),
   });
   process.stdout.write(`${rendered}\n`);
 }

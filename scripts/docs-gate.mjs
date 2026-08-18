@@ -15,16 +15,20 @@
 // end of the day gets all fifteen commits back, not the last one: forgetting costs a delay, not a
 // loss.
 //
-// Autonomous like every other script in this plugin: it resolves the project, reads
-// .harness/config.json and issues.json on its own, and imports nothing from its neighbours. The
-// pure functions below are exported so the tests can prove the decision without a fake repository
-// and without a process, the way status-cli.mjs exports buildSnapshot.
+// Autonomous like every other script in this plugin: it resolves the project and reads
+// .harness/config.json on its own, and imports nothing from its neighbours. The tracker is the one
+// exception, and it is a deliberate one: it comes from `issue-manager --dump`, run as a child
+// process, because storage is one Markdown file per issue and a second reader of that layout would
+// be a second place to fix every time it moves. Running it is not importing it — no module of the
+// storage crosses into this script.
+// The pure functions below are exported so the tests can prove the decision without a fake
+// repository and without a process, the way status-cli.mjs exports buildSnapshot.
 
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { parseArgs } from "node:util";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 // Fixed 80 columns, no colour, no ANSI, no isTTY: the surface this exists for is
 // `/harness:docs-gate`, where stdout is a pipe to the agent and a colour branch would never run.
@@ -226,7 +230,7 @@ const DEFAULT_DOCS_GATE = {
     "**/*.rs",
     "**/*.php",
   ],
-  exclude: ["docs/**", "test/**", "tests/**", "**/*.md", "issues.json"],
+  exclude: ["docs/**", "test/**", "tests/**", "**/*.md", ".harness/**"],
 };
 
 // Unit separator: it cannot occur in a commit subject or in a path, so it separates the fields of
@@ -244,7 +248,7 @@ const USAGE = [
   "pointwise: it answers over a window of history, not about HEAD.",
   "Output is text, not JSON, and nothing is ever written to stderr.",
   "",
-  "--project-dir  directory holding issues.json and .harness/config.json (default: the current one)",
+  "--project-dir  root of the project, holding .harness/config.json (default: the current one)",
   "--since <rev>  start the window at this revision instead of the oldest declared one",
   "",
   "The window starts at the oldest revision any issue declares in 'covers'. When no issue declares",
@@ -253,7 +257,8 @@ const USAGE = [
   "",
   "Exit codes: 0 on a printed report, including one that found uncovered commits, and on a gate",
   "disabled in config.json; 1 when the request could not be carried out at all — missing project,",
-  "missing or unreadable .harness/config.json, unreadable issues.json, no window and no --since,",
+  "missing or unreadable .harness/config.json, a tracker issue-manager cannot read, no window and",
+  "no --since,",
   "a --since that does not resolve, no git repository, an unknown flag.",
   "",
 ].join("\n");
@@ -304,20 +309,36 @@ function readDocsGate(projectDir) {
   return { ...DEFAULT_DOCS_GATE, ...(parsed.docsGate ?? {}) };
 }
 
+const ISSUE_MANAGER = path.join(path.dirname(fileURLToPath(import.meta.url)), "issue-manager.mjs");
+
+// The tracker is read through `issue-manager --dump`, never off disk. Storage is one Markdown file
+// per issue, and a second reader of that layout would be a second place to fix every time it moves.
+// This is the one thing this script does not do on its own any more, and the exception is the
+// point: the gate cares about what an issue DECLARES in `covers`, not about where issues are kept.
+//
+// A project with no tracker at all is still an empty tracker and not an error — --dump says so
+// itself, with ok:true and no issues. It declares no revision, so the window question comes up next.
 function readIssues(projectDir) {
-  const trackerPath = path.join(projectDir, "issues.json");
-  if (!existsSync(trackerPath)) {
-    // Same reading as everywhere else in harness: a project without issues.json is an empty
-    // tracker, not an error. It declares no revision, so the window question comes up next.
-    return [];
+  const result = spawnSync(process.execPath, [ISSUE_MANAGER, "--dump", "--project-dir", projectDir], {
+    encoding: "utf8",
+    // A tracker has no size this gate can outgrow. The 1 MiB default does.
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (result.error) {
+    fail(`issue-manager non è eseguibile: ${result.error.message}`);
   }
-  let data;
+  let parsed;
   try {
-    data = JSON.parse(readFileSync(trackerPath, "utf8"));
+    parsed = JSON.parse(result.stdout.trim());
   } catch {
-    fail(`'${trackerPath}' non è un JSON valido: il tracker non è leggibile.`);
+    fail("issue-manager --dump non ha risposto con un envelope JSON: il tracker non è leggibile.");
   }
-  return Array.isArray(data.issues) ? data.issues : [];
+  if (!parsed.ok) {
+    // Verbatim from issue-manager: a tracker still on the legacy JSON says so and names the command
+    // that migrates it, and repeating that here in other words would only make the two disagree.
+    fail(`Il tracker di '${projectDir}' non è leggibile: ${parsed.error}`);
+  }
+  return Array.isArray(parsed.data.issues) ? parsed.data.issues : [];
 }
 
 // Every declared reference goes through rev-parse, so a short sha and a long one are the same

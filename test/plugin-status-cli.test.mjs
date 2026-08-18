@@ -17,10 +17,11 @@ import {
   taskProgress,
 } from "../scripts/status-cli.mjs";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { serializeIssue } from "../scripts/issue-store.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPT = path.join(__dirname, "..", "scripts", "status-cli.mjs");
@@ -31,10 +32,42 @@ function runIn(projectDir, args = []) {
   });
 }
 
+// The fixtures name issues by the eight characters that identify them on screen; storage wants the
+// whole GUID, because that is what the file name is derived from. Padding here keeps every fixture
+// as readable as it was instead of turning each id into thirty-six characters of noise.
+function fullId(id) {
+  return /^[0-9a-f]{8}$/i.test(id) ? `${id}-0000-0000-0000-000000000000` : id;
+}
+
+// The tracker is one Markdown file per issue now, and status-cli reads it through
+// `issue-manager --dump`. The fixtures still describe it as the root JSON object they always did:
+// this factory translates. A string that is NOT that object stands for a tracker that cannot be
+// read at all, and is written as a malformed issue file — the Markdown-storage spelling of the
+// same failure.
 function tempProject(tracker) {
   const dir = mkdtempSync(path.join(tmpdir(), "harness-status-"));
-  if (tracker !== undefined) {
-    writeFileSync(path.join(dir, "issues.json"), tracker);
+  if (tracker === undefined) return dir;
+
+  let parsed = null;
+  try {
+    parsed = JSON.parse(tracker);
+  } catch {
+    parsed = null;
+  }
+
+  const issuesDir = path.join(dir, ".harness", "issues");
+  mkdirSync(issuesDir, { recursive: true });
+  if (parsed === null) {
+    writeFileSync(path.join(issuesDir, "aaaaaaaa.md"), tracker, "utf8");
+    return dir;
+  }
+  for (const entry of parsed.issues ?? []) {
+    const stored = {
+      ...entry,
+      id: fullId(entry.id),
+      depends_on: (entry.depends_on ?? []).map(fullId),
+    };
+    writeFileSync(path.join(issuesDir, `${stored.id.slice(0, 8)}.md`), serializeIssue(stored), "utf8");
   }
   return dir;
 }
@@ -575,7 +608,7 @@ test("the project name falls back to the directory when the tracker does not car
   }
 });
 
-test("a project with no issues.json is an empty tracker, not an error", () => {
+test("a project with no tracker at all is an empty tracker, not an error", () => {
   const dir = tempProject(undefined);
   try {
     const run = runIn(dir);
@@ -587,13 +620,63 @@ test("a project with no issues.json is an empty tracker, not an error", () => {
   }
 });
 
-test("a corrupt issues.json fails loudly instead of printing a plausible screen", () => {
+test("a corrupt tracker fails loudly instead of printing a plausible screen", () => {
   const dir = tempProject("{ not json");
   try {
     const run = runIn(dir);
     assert.equal(run.status, 1);
-    assert.match(run.stdout, /non è un JSON valido/);
+    assert.match(run.stdout, /non è leggibile/);
     assert.equal(run.stderr, "");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a project still on the legacy issues.json says so and names the command that fixes it", () => {
+  const dir = tempProject(undefined);
+  try {
+    writeFileSync(path.join(dir, "issues.json"), JSON.stringify({ issues: [] }), "utf8");
+    const run = runIn(dir);
+    assert.equal(run.status, 1);
+    assert.match(run.stdout, /non è leggibile/);
+    // Passed on verbatim from issue-manager: saying it here in other words is how the two start
+    // disagreeing about what the reader is supposed to do next.
+    assert.match(run.stdout, /--upgrade/);
+    assert.equal(run.stderr, "");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the tracker is read through issue-manager --dump, not off disk", () => {
+  const dir = tempProject(JSON.stringify({ issues: [issue("aaaaaaaa", { status: "in_progress" })] }));
+  try {
+    assert.match(runIn(dir).stdout, /IN CORSO/);
+
+    // Same bytes, a name the storage does not recognise: a reader that walked the directory itself
+    // would still find the issue, and a reader that goes through --dump cannot.
+    const issuesDir = path.join(dir, ".harness", "issues");
+    const stored = path.join(issuesDir, "aaaaaaaa.md");
+    writeFileSync(path.join(issuesDir, "ignored.txt"), readFileSync(stored, "utf8"), "utf8");
+    rmSync(stored);
+
+    assert.match(runIn(dir).stdout, /tracker vuoto/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the summary dates the tracker by the newest updated_at, with no root object to hold one", () => {
+  const dir = tempProject(
+    JSON.stringify({
+      issues: [
+        issue("aaaaaaaa", { updated_at: "2026-03-01T08:00:00Z" }),
+        issue("bbbbbbbb", { status: "in_progress", updated_at: "2026-08-04T09:12:00Z" }),
+      ],
+    })
+  );
+  try {
+    assert.match(runIn(dir).stdout, /aggiornato 2026-08-04/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
