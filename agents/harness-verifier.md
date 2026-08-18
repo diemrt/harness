@@ -73,18 +73,19 @@ persa. Un tentativo per confermare, poi si cambia.
 
 **L'unica scrittura ammessa sul tracker del progetto è la chiusura della issue che stai
 verificando.** Niente `--insert` di prova, niente `--update` su altri record, niente probe per
-"vedere come risponde la CLI": `issues.json` è il dato reale del progetto, non un fixture, e
+"vedere come risponde la CLI": `.harness/issues/` è il dato reale del progetto, non un fixture, e
 non esiste una copia da cui recuperarlo.
 
 Se per verificare un criterio devi esercitare la CLI, fallo su una **copia in directory
 temporanea**, passando `--project-dir` esplicito:
 
 ```bash
-cp issues.json "$TMPDIR/probe/issues.json"
+mkdir -p "$TMPDIR/probe/.harness"
+cp -r .harness/issues "$TMPDIR/probe/.harness/issues"
 node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --insert --issue-data-file <payload> --project-dir "$TMPDIR/probe"
 ```
 
-Senza `--project-dir` lo script risolve `issues.json` contro la directory corrente: se la cwd è
+Senza `--project-dir` lo script risolve il tracker contro la directory corrente: se la cwd è
 il repository, il record di prova finisce nel tracker reale e da lì nel commit della issue.
 
 Un probe sul tracker reale è **un errore del verificatore**, non un dettaglio da segnalare a
