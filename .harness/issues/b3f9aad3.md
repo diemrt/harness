@@ -1,7 +1,7 @@
 ---
 id: b3f9aad3-153e-44b8-bb96-1da6147ec3b0
 title: Core storage Markdown e migrazione schema 4
-status: in_progress
+status: in_review
 tier: reasoning
 depends_on: []
 covers: []
@@ -37,7 +37,7 @@ tasks:
     short_title: Migrare il tracker live
     full_description: Catturare il baseline, eseguire --upgrade sul repository e provare uguaglianza semantica e idempotenza.
   -
-    checked: false
+    checked: true
     id: 7
     short_title: Verificare e affidare review
     full_description: Eseguire suite mirate e completa, allineare i task e portare la issue in review per il verificatore indipendente.
@@ -77,7 +77,7 @@ validation:
       full_description: Confrontare baseline e tracker migrato, quindi provare idempotenza e letture reali.
   state: unknown
 created_at: "2026-08-17T12:49:45Z"
-updated_at: "2026-08-18T07:58:42Z"
+updated_at: "2026-08-18T08:02:39Z"
 ---
 
 # Core storage Markdown e migrazione schema 4
