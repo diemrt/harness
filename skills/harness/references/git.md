@@ -73,14 +73,15 @@ vanno in `.claude/settings.local.json`, non committato — mai in `.claude/setti
 
 ## Cosa harness scrive nel progetto
 
-`issues.json` alla radice e `.harness/` (configurazione, archivi di `--compact`, log dei
-worker).
+Solo `.harness/`: il tracker in `issues/` (un file Markdown per issue), la configurazione, gli
+archivi di `--compact` e `--upgrade`, i log dei worker.
 
 **Cosa di questo entri in git lo decidi tu.** Harness non scrive nessun `.gitignore`: né il
 tuo, che resta intatto, né uno proprio dentro `.harness/`. La directory compare fra gli
 untracked e la scelta resta una scelta.
 
-Un caso in cui vale la pena farla di proposito: se hai compattato il tracker, ogni blocco in
-`issues.json` porta il path del proprio archivio sotto `.harness/archive/`. `issues.json` è
+Un caso in cui vale la pena farla di proposito: se hai compattato il tracker, ogni blocco porta
+il path del proprio archivio sotto `.harness/archive/`. Il tracker in `.harness/issues/` è
 condiviso; l'archivio lo è solo se lo versioni. Lasciarlo fuori significa consegnare a chi
-clona otto puntatori verso il nulla.
+clona otto puntatori verso il nulla. Lo stesso vale per l'archivio che `--upgrade` scrive
+migrando un tracker `issues.json` legacy: è l'unica copia rimasta del file originale.

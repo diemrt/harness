@@ -130,7 +130,7 @@ markdown reso dalla sessione, e le distinzioni le portano allineamento e icone.
 | `--since` che non risolve | 1, una riga |
 | `--project-dir` inesistente | 1, una riga |
 | `.harness/config.json` mancante o illeggibile | 1, una riga |
-| `issues.json` illeggibile | 1, una riga |
+| tracker che `issue-manager --dump` non riesce a leggere, o non ancora migrato | 1, una riga |
 | la directory non è un repository git, o git non c'è | 1, una riga |
 | flag sconosciuto | 1, una riga |
 

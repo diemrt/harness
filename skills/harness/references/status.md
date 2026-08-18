@@ -48,14 +48,19 @@ portano le icone e l'allineamento, che sopravvivono al blocco di codice markdown
 |---|---|
 | riepilogo stampato | 0 |
 | `--help` | 0 |
-| nessun `issues.json`, oppure tracker con zero issue | 0, una riga `tracker vuoto` |
+| nessun tracker, oppure tracker con zero issue | 0, una riga `tracker vuoto` |
 | `--project-dir` inesistente | 1, una riga |
-| `issues.json` illeggibile o JSON non valido | 1, una riga |
+| tracker che `issue-manager --dump` non riesce a leggere | 1, una riga |
 | flag sconosciuto o senza valore | 1, una riga |
 
 Un tracker vuoto **non** è un errore: è un progetto che non ha ancora aperto una issue. Vale
-sia quando `issues.json` manca sia quando esiste con `issues: []`, come lo scrive `--init`: in
-entrambi i casi la riga è la stessa e non si stampa né barra né sezioni.
+sia quando il tracker manca del tutto sia quando `.harness/issues/` esiste vuota, come la crea
+`--init`: in entrambi i casi la riga è la stessa e non si stampa né barra né sezioni.
+
+**Il tracker non viene letto dal disco**: il comando lancia `issue-manager --dump` e riceve le
+issue da lì ([issues.md](issues.md)). Perciò il motivo di un exit 1 arriva **verbatim** da
+quello script — un progetto ancora sul tracker `issues.json` legacy dice così e nomina
+`--upgrade`, invece di ricevere qui una spiegazione diversa che col tempo divergerebbe.
 
 ## `--oneline`: il contratto qui si inverte
 
@@ -104,7 +109,7 @@ Un dato solo: **l'ora in cui questa riga è stata prodotta**. La `T` è l'etiche
 perché in una barra di stato la riga è la risorsa scarsa, e l'ora accanto si spiega da sé.
 
 Non ha rami: c'è sempre, su qualunque tracker, perché «adesso» è sempre conoscibile. Niente di
-quello che sta scritto in `issues.json` la cambia.
+quello che sta scritto nel tracker la cambia.
 
 Per un tratto la coda ha portato anche da quanto il tracker non veniva riscritto. Rispondeva a una
 domanda che nessuno pone a una barra di stato, e per rispondere chiedeva due sguardi — una durata
@@ -127,7 +132,7 @@ d'occhio e senza aspettare: se la riga dice `16:34:50` e sono le 16:45, quella r
 minuti fa e non c'è altro da stabilire.
 
 E funziona per una ragione precisa, non per fortuna: **questo comando non ha cache**. Rilegge
-`issues.json` a ogni esecuzione e il processo esce, quindi l'istante del render *è* la freschezza
+il tracker a ogni esecuzione e il processo esce, quindi l'istante del render *è* la freschezza
 dei conteggi. Un solo dato risponde a entrambe le domande.
 
 Il caso peggiore, che il 2026-08-13 si è presentato davvero: la riga congelata mostrava
@@ -158,7 +163,7 @@ meno urgente che ci sta sopra.
 |---|---|
 | qualunque cosa accada | **0**, e mai niente su stderr |
 | `--project-dir` inesistente | 0, riga vuota |
-| `issues.json` illeggibile o non valido | 0, riga vuota |
+| tracker illeggibile, o non ancora migrato | 0, riga vuota |
 
 **Perché**, e non è un dettaglio d'implementazione. Questo comando gira a ogni aggiornamento di una
 barra di stato, cioè di continuo. Un messaggio d'errore ripetuto lì è **peggio del silenzio**:
@@ -184,7 +189,7 @@ Le ricette qui sotto sono complete: **si copiano e si sostituiscono solo i due p
 
 - `<plugin>` — la radice del plugin harness, cioè la directory che contiene `scripts/`. È quella
   che la skill chiama `$SCRIPTS` una volta aggiunto `/scripts`.
-- `<progetto>` — la radice del progetto, cioè la directory che contiene `issues.json`.
+- `<progetto>` — la radice del progetto, cioè la directory che contiene `.harness/`.
 
 `--project-dir` c'è in tutte e tre **apposta**: la cwd con cui l'ospite lancia il comando non è
 garantita, e senza il flag una barra configurata una volta stampa la riga vuota appena la si guarda
@@ -282,12 +287,16 @@ finisce in un blocco markdown reso dalla sessione.
 
 `<progetto> · <n> issue · aggiornato <data ora>`.
 
-`<n>` conta l'intero tracker, `done` incluse. La data viene da `last_updated`, resa in ora
-locale come `YYYY-MM-DD HH:mm`; se il campo manca o non è interpretabile, l'intestazione si
-ferma al conteggio invece di stampare un valore grezzo.
+`<n>` conta l'intero tracker, `done` incluse. La data è l'`updated_at` **più recente fra le
+issue**, resa in ora locale come `YYYY-MM-DD HH:mm`; se non ce n'è nessuno interpretabile,
+l'intestazione si ferma al conteggio invece di stampare un valore grezzo. Con un file per issue
+non esiste più un oggetto radice che tenga un `last_updated`, e la data più recente fra i record
+è lo stesso fatto — ricavato dai dati invece che mantenuto accanto a loro, quindi incapace di
+andare fuori sincrono con essi.
 
-Il nome è il campo `project` di `issues.json` quando c'è, altrimenti il basename della
-directory del progetto.
+Il nome è il basename della directory del progetto. Veniva dal campo `project` del tracker JSON
+quando c'era: era metadato decorativo dell'oggetto radice, e lo storage Markdown non ha dove
+metterlo né motivo per reinventarlo.
 
 ### Icone
 
@@ -377,7 +386,7 @@ cose che le sezioni non possono mostrare da sé:
   problema di oggi, e segnalarlo ogni volta insegnerebbe a saltare la riga. Un ciclo non
   interrompe il resto dell'output; le issue coinvolte semplicemente non risultano lavorabili.
 - `<n> issue dipendono da id inesistenti: <id> ...` — `depends_on` che puntano al nulla.
-  Succede dopo una modifica a mano di `issues.json`, o dopo un archivio che ha portato via
+  Succede dopo una modifica a mano dei file del tracker, o dopo un archivio che ha portato via
   qualcosa ancora referenziato.
 - `backlog fermo: <n> issue, nessuna lavorabile — tutte attendono qualcosa` — stallo: il
   backlog non è vuoto e nessuna delle sue issue è prendibile. `<n>` è il **totale del backlog**.

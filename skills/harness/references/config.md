@@ -5,16 +5,23 @@ Quello che serve per lavorare vive in `.harness/` alla radice del progetto.
 ```
 .harness/
   config.json       # comandi e opzioni
-  archive/          # gli originali che --compact toglie da issues.json
+  issues/           # il tracker: un file Markdown per issue
+  archive/          # gli originali che --compact e --upgrade tolgono dal tracker
   runs/             # log dei worker esterni
 ```
+
+`config.json` porta anche `schema_version`, come prima chiave: la versione dello schema del
+tracker ([issues.md](issues.md)). La scrivono solo `issue-manager --init` e
+`issue-manager --upgrade`; `harness-config.mjs` non la inventa mai e si limita a **preservarla**
+quando riscrive il file.
 
 **Cosa di tutto questo va versionato lo decide il progetto, non harness.** Lo script non
 scrive nessun `.gitignore`: né quello del progetto, che non tocca mai, né uno proprio dentro
 `.harness/`. La directory compare fra gli untracked e la scelta è di chi possiede il
 repository — committare `config.json` perché la squadra condivida un solo gate di verifica
-oppure tenerlo per clone, committare `archive/` perché i blocchi in `issues.json` continuino a
-puntare a qualcosa dopo un clone fresco oppure no.
+oppure tenerlo per clone, committare `archive/` perché i blocchi del tracker continuino a
+puntare a qualcosa dopo un clone fresco oppure no. Su `issues/` la decisione è già presa nei
+fatti: è il tracker, e un tracker che non si condivide non traccia niente per nessun altro.
 
 Uno strumento che ignora file al posto tuo quella decisione te l'ha tolta, in un file che non
 hai chiesto e che potresti non notare mai.
@@ -42,7 +49,7 @@ progetti diversi senza confonderli.
   "docsGate": {
     "enabled": true,
     "include": ["**/*.mjs", "**/*.ts", "**/*.py", "**/*.go", "**/*.cs"],
-    "exclude": ["docs/**", "test/**", "tests/**", "**/*.md", "issues.json"]
+    "exclude": ["docs/**", "test/**", "tests/**", "**/*.md", ".harness/**"]
   },
   "execution": { "mode": "auto" }
 }
@@ -68,7 +75,7 @@ L'esempio sopra è **abbreviato**. Quello che `--init` scrive davvero per i camp
 | `setup` | `null` — nessun comando di preparazione |
 | `externalWorker` | `{ "enabled": false, "command": null }` |
 | `docsGate.include` | `**/*.mjs`, `**/*.js`, `**/*.cjs`, `**/*.ts`, `**/*.tsx`, `**/*.jsx`, `**/*.py`, `**/*.go`, `**/*.cs`, `**/*.java`, `**/*.rb`, `**/*.rs`, `**/*.php` |
-| `docsGate.exclude` | `docs/**`, `test/**`, `tests/**`, `**/*.md`, `issues.json` |
+| `docsGate.exclude` | `docs/**`, `test/**`, `tests/**`, `**/*.md`, `.harness/**` |
 | `docsGate.enabled` | `true` |
 | `execution` | `{ "mode": "auto" }` |
 
@@ -137,7 +144,7 @@ niente**.
 |---|---|
 | `CONFIG_NOT_FOUND` | `.harness/config.json` non esiste |
 | `CONFIG_EXISTS` | configurazione già presente e nessun `--force` |
-| `INVALID_INPUT` | campo sconosciuto, `verify` mancante o vuoto, `setup` non stringa/`null`, worker abilitato senza `{promptFile}`, `docsGate`/`externalWorker`/`execution` non un oggetto, `docsGate.enabled` non booleano, `docsGate.include`/`exclude` non un array di stringhe, `docsGate.include` vuoto a gate acceso, `execution.mode` fuori enum, campo sconosciuto dentro `execution` |
+| `INVALID_INPUT` | campo sconosciuto, `verify` mancante o vuoto, `setup` non stringa/`null`, `schema_version` non intero non negativo, worker abilitato senza `{promptFile}`, `docsGate`/`externalWorker`/`execution` non un oggetto, `docsGate.enabled` non booleano, `docsGate.include`/`exclude` non un array di stringhe, `docsGate.include` vuoto a gate acceso, `execution.mode` fuori enum, campo sconosciuto dentro `execution` |
 | `INVALID_JSON` | payload non JSON valido |
 | `FILE_NOT_FOUND` | `--config-file` o `--project-dir` inesistente |
 | `MISSING_ARGS` | payload assente, o `--config-data` e `--config-file` insieme |

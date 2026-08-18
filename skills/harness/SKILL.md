@@ -1,6 +1,6 @@
 ---
 name: harness
-description: Usa quando lavori allo sviluppo di un progetto con il workflow harness — issue tracciate su issues.json, una sola issue in corso per catena di dipendenza, verifica indipendente obbligatoria prima di pubblicare. Si attiva su "clock in", "clock out", "lavora la issue", "apri una issue", "stato del tracker", o quando il progetto contiene un issues.json.
+description: Usa quando lavori allo sviluppo di un progetto con il workflow harness — issue tracciate in .harness/issues, una sola issue in corso per catena di dipendenza, verifica indipendente obbligatoria prima di pubblicare. Si attiva su "clock in", "clock out", "lavora la issue", "apri una issue", "stato del tracker", o quando il progetto contiene una directory .harness.
 ---
 
 # Harness
@@ -10,11 +10,15 @@ qualcun altro è una issue tracciata — quale sia, lo dice il capitolo «Cosa d
 ogni issue viene verificata da un agente **diverso** da chi l'ha svolta, e niente raggiunge il
 ramo condiviso prima di quella verifica.
 
-**Cosa harness scrive nel progetto:** `issues.json` alla radice (i dati del tracker) e
-`.harness/` (configurazione, archivi di `--compact`, log dei worker). Nient'altro: script e
-regole vivono in questo plugin. Cosa di tutto questo entri in git lo decide il
-progetto — harness non scrive nessun `.gitignore`
+**Cosa harness scrive nel progetto:** soltanto `.harness/` — il tracker in `issues/`, un file
+Markdown per issue, più configurazione, archivi di `--compact` e `--upgrade`, log dei worker.
+Nient'altro: script e regole vivono in questo plugin. Cosa di tutto questo entri in git lo decide
+il progetto — harness non scrive nessun `.gitignore`
 ([references/config.md](references/config.md)).
+
+Fino allo schema 3 il tracker era un solo `issues.json` alla radice. Un progetto ancora in quello
+stato **non si legge**: ogni comando rifiuta con `STORAGE_NOT_MIGRATED` finché non passa da
+`issue-manager --upgrade` ([references/issues.md](references/issues.md)).
 
 Nel resto del documento `$SCRIPTS` sta per `${CLAUDE_PLUGIN_ROOT}/scripts`.
 
@@ -368,7 +372,7 @@ Ai due momenti che sono atti dichiarati — il **clock-out**, e l'istante in cui
 **Il congelamento non ha bisogno di altro.** La decisione lasciata in sospeso — quella che alla
 ripresa vale più di tutto il resto — è un task non spuntato il cui `short_title` è la decisione da
 prendere. E lo stato di git non entra nel tracker: ramo, commit avanti, commit non spinti sono a un
-comando di distanza e cambiano di continuo; duplicarli in `issues.json` produrrebbe un dato stantio
+comando di distanza e cambiano di continuo; duplicarli nel tracker produrrebbe un dato stantio
 con l'aria di essere fresco. Il tracker dice cosa è fatto e cosa è aperto, git dice dov'è.
 
 ## Verifica indipendente
@@ -477,7 +481,7 @@ ogni invocazione e `$SCRIPTS` si calcola da quella. **Non** si copiano gli scrip
 **non** si tocca il `PATH`, **non** si scrive un path assoluto da nessuna parte — quello del plugin
 installato porta la versione, e a ogni rilascio punterebbe a una copia vecchia che esiste ancora.
 
-Nel progetto restano `issues.json` e `.harness/`, niente altro.
+Nel progetto resta `.harness/`, niente altro.
 
 Un plugin appena installato o appena aggiornato **non è attivo nella sessione in corso**: la
 sessione va riavviata perché la nuova copia venga caricata. Se il sospetto è di star eseguendo una
