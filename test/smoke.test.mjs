@@ -6,7 +6,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -56,6 +56,29 @@ test("package.json declares no npm publishing surface", () => {
       undefined,
       `${field} belongs to publishing a package this repository does not publish`
     );
+  }
+});
+
+test("no script imports a name it never uses", () => {
+  // Removing a helper orphans whatever it was the only caller of, and an unused import is invisible
+  // at runtime: nothing fails, the line just sits there claiming the script needs something it does
+  // not. It has already happened twice in this repository, both times caught by a person reading
+  // the file. A word count is not a compiler — a name mentioned only in a comment would mask an
+  // unused import — but it costs nothing and catches the case that actually occurs.
+  const scriptsDir = path.resolve(rootDir, "scripts");
+  for (const file of readdirSync(scriptsDir).filter((f) => f.endsWith(".mjs"))) {
+    const source = readFileSync(path.join(scriptsDir, file), "utf8");
+    for (const block of source.matchAll(/^import\s*\{([^}]*)\}\s*from\s*["'][^"']+["'];/gm)) {
+      for (const raw of block[1].split(",")) {
+        const name = raw.split(" as ").pop().trim();
+        if (name === "") continue;
+        const uses = source.match(new RegExp(`\\b${name}\\b`, "g")) ?? [];
+        assert.ok(
+          uses.length > 1,
+          `scripts/${file} imports '${name}' and never uses it: whatever called it is gone`
+        );
+      }
+    }
   }
 });
 

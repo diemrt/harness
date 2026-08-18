@@ -1,7 +1,7 @@
 ---
 id: adccd454-a30a-498e-adad-f076b5137203
 title: Residui e buchi di presidio dopo il travaso a storage Markdown
-status: in_review
+status: in_progress
 tier: economy
 depends_on: []
 covers: [6769512f0a0053d7cf93cf970ab9b259fed05ce8]
@@ -36,6 +36,11 @@ tasks:
     short_title: Verificare e affidare review
     full_description: Suite completa, gate documentale, allineamento dei task e passaggio in review.
     checked: true
+  -
+    id: 7
+    short_title: Togliere l import orfano e presidiarlo
+    full_description: "Il verificatore ha trovato renameSync ancora importato in issue-manager.mjs e mai chiamato: era writeIssuesFile il suo unico chiamante. Rimuoverlo e aggiungere il test strutturale che rende visibile un import senza usi, perche' e' la seconda volta che ne passa uno."
+    checked: true
 validation:
   criteria:
     - writeIssuesFile e ogni altra funzione rimasta senza chiamanti dopo il travaso non esistono piu', e la suite resta verde.
@@ -49,25 +54,25 @@ validation:
       id: 1
       short_title: Verificare la rimozione del codice morto
       full_description: Cercare chiamanti delle funzioni rimosse e controllare che la suite completa resti verde.
-      checked: false
+      checked: true
     -
       id: 2
       short_title: Verificare help e payload
       full_description: Confrontare i codici elencati da --help con quelli della reference, e il payload di --upgrade sui due percorsi con cio' che i documenti dichiarano.
-      checked: false
+      checked: true
     -
       id: 3
       short_title: Verificare i commenti
       full_description: Rileggere i commenti dei due script cercando descrizioni di issues.json come tracker vivo.
-      checked: false
+      checked: true
     -
       id: 4
       short_title: Verificare i due presidi nuovi
       full_description: Provare la lettura singola su un nome fuori formato e su uno che contraddice il frontmatter, e controllare che il test dell ordine fallisca invertendo scrittura e cancellazione.
-      checked: false
+      checked: true
   state: unknown
 created_at: "2026-08-18T08:55:05Z"
-updated_at: "2026-08-18T09:28:58Z"
+updated_at: "2026-08-18T09:41:44Z"
 ---
 
 # Residui e buchi di presidio dopo il travaso a storage Markdown
