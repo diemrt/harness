@@ -274,7 +274,7 @@ function writeHarness(dir, { issues = [], docsGate } = {}) {
   issues.forEach((entry, index) => {
     const id = `${String(index + 1).repeat(8)}-1111-1111-1111-111111111111`;
     writeFileSync(
-      path.join(dir, ".harness", "issues", `${id.slice(0, 8)}.md`),
+      path.join(dir, ".harness", "issues", `${entry.status}-${id.slice(0, 8)}.md`),
       serializeIssue({
         id,
         title: `Issue ${index + 1}`,

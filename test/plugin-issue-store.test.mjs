@@ -201,7 +201,7 @@ test("classifyStorage distinguishes empty, markdown, legacy, and conflict", () =
     writeFileSync(path.join(legacy, "issues.json"), "{}", "utf8");
     mkdirSync(path.join(legacy, ".harness", "issues"), { recursive: true });
     writeFileSync(path.join(conflict, "issues.json"), "{}", "utf8");
-    writeRawIssue(conflict, "11111111.md", completeIssue());
+    writeRawIssue(conflict, "backlog-11111111.md", completeIssue());
 
     assert.equal(classifyStorage(empty).kind, "empty");
     assert.equal(classifyStorage(markdown).kind, "markdown");
@@ -220,9 +220,9 @@ test("writeIssue stores one atomic file named by short id", () => {
   try {
     const stored = writeIssue(dir, completeIssue());
 
-    assert.equal(stored, path.join(dir, ".harness", "issues", "11111111.md"));
+    assert.equal(stored, path.join(dir, ".harness", "issues", "backlog-11111111.md"));
     assert.deepEqual(readIssue(dir, ID_ONE), completeIssue());
-    assert.deepEqual(readdirSync(path.dirname(stored)), ["11111111.md"]);
+    assert.deepEqual(readdirSync(path.dirname(stored)), ["backlog-11111111.md"]);
   } finally {
     cleanup(dir);
   }
@@ -235,7 +235,7 @@ test("writeIssue atomically replaces only its target file", () => {
     writeIssue(dir, completeIssue({ title: "Updated title", updated_at: "2026-08-17T11:00:00.000Z" }));
 
     const issuesDir = path.join(dir, ".harness", "issues");
-    assert.deepEqual(readdirSync(issuesDir), ["11111111.md"]);
+    assert.deepEqual(readdirSync(issuesDir), ["backlog-11111111.md"]);
     assert.equal(readIssue(dir, ID_ONE).title, "Updated title");
   } finally {
     cleanup(dir);
@@ -259,7 +259,7 @@ test("readAllIssues rejects invalid issue filenames", () => {
 test("readAllIssues rejects a filename that disagrees with its issue id", () => {
   const dir = tempProject();
   try {
-    writeRawIssue(dir, "11111111.md", completeIssue({ id: ID_TWO }));
+    writeRawIssue(dir, "backlog-11111111.md", completeIssue({ id: ID_TWO }));
 
     assert.throws(
       () => readAllIssues(dir),
@@ -285,7 +285,7 @@ test("readIssue ignores unrelated malformed files", () => {
 test("readAllIssues rejects colliding prefixes", () => {
   const dir = tempProject();
   try {
-    writeRawIssue(dir, "11111111.md", completeIssue({ id: ID_ONE }));
+    writeRawIssue(dir, "backlog-11111111.md", completeIssue({ id: ID_ONE }));
     writeRawIssue(dir, "collision.md", completeIssue({ id: COLLIDING_ID }));
 
     assert.throws(
@@ -297,11 +297,118 @@ test("readAllIssues rejects colliding prefixes", () => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// The status lives in the file name. A directory listing is the cheapest view of a tracker there
+// is, and one of hex ids answers nothing at all — not what state the work is in, not how much of
+// it is in each state. The cost is that the path is no longer a pure function of the id: whoever
+// reads or deletes has to find the file, and whoever writes has to clean up the old name.
+// ---------------------------------------------------------------------------
+
+test("the file name carries the status, so a listing groups by it", () => {
+  const dir = tempProject();
+  try {
+    for (const [id, status] of [
+      [ID_ONE, "in_progress"],
+      [ID_TWO, "done"],
+    ]) {
+      writeIssue(dir, completeIssue({ id, status }));
+    }
+
+    assert.deepEqual(readdirSync(path.join(dir, ".harness", "issues")).sort(), [
+      "done-22222222.md",
+      "in_progress-11111111.md",
+    ]);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("a status change renames the file and leaves exactly one behind", () => {
+  const dir = tempProject();
+  try {
+    writeIssue(dir, completeIssue());
+    const issuesDir = path.join(dir, ".harness", "issues");
+    assert.deepEqual(readdirSync(issuesDir), ["backlog-11111111.md"]);
+
+    writeIssue(dir, completeIssue({ status: "in_review" }));
+
+    assert.deepEqual(readdirSync(issuesDir), ["in_review-11111111.md"], "the old name must not survive");
+    assert.equal(readIssue(dir, ID_ONE).status, "in_review");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("two files for one id fail loudly, naming both", () => {
+  const dir = tempProject();
+  try {
+    // What a crash between the write and the cleanup would leave. It is the whole reason the status
+    // goes in the name rather than into a generated index: a stale index is wrong in silence, while
+    // this is a refusal that says which two files disagree.
+    writeRawIssue(dir, "backlog-11111111.md", completeIssue());
+    writeRawIssue(dir, "done-11111111.md", completeIssue({ status: "done" }));
+
+    assert.throws(
+      () => readAllIssues(dir),
+      (error) =>
+        error instanceof StorageError &&
+        error.code === "ID_COLLISION" &&
+        error.message.includes("backlog-11111111.md") &&
+        error.message.includes("done-11111111.md")
+    );
+    assert.throws(
+      () => readIssue(dir, ID_ONE),
+      (error) => error instanceof StorageError && error.code === "ID_COLLISION"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("readAllIssues rejects a name whose status prefix contradicts the frontmatter", () => {
+  const dir = tempProject();
+  try {
+    writeRawIssue(dir, "done-11111111.md", completeIssue({ status: "backlog" }));
+
+    assert.throws(
+      () => readAllIssues(dir),
+      (error) => error instanceof StorageError && error.code === "INVALID_INPUT"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("readIssue and deleteIssueFile find the file from the id alone, whatever the status", () => {
+  const dir = tempProject();
+  try {
+    writeIssue(dir, completeIssue({ status: "blocked" }));
+
+    assert.equal(readIssue(dir, ID_ONE).status, "blocked", "the caller never has to know the status");
+    deleteIssueFile(dir, ID_ONE);
+    assert.deepEqual(readdirSync(path.join(dir, ".harness", "issues")), []);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("issuePath rejects a status that is not one of the five", () => {
+  const dir = tempProject();
+  try {
+    assert.throws(
+      () => issuePath(dir, ID_ONE, "almost_done"),
+      (error) => error instanceof StorageError && error.code === "INVALID_INPUT"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("issuePath and readIssue reject invalid ids without touching storage", () => {
   const dir = tempProject();
   try {
     assert.throws(
-      () => issuePath(dir, "not-a-guid"),
+      () => issuePath(dir, "not-a-guid", "backlog"),
       (error) => error instanceof StorageError && error.code === "INVALID_INPUT"
     );
     assert.throws(
@@ -323,7 +430,7 @@ test("readIssue returns null for a missing target and deleteIssueFile removes on
     deleteIssueFile(dir, ID_ONE);
     assert.equal(readIssue(dir, ID_ONE), null);
     assert.deepEqual(readIssue(dir, ID_TWO), completeIssue({ id: ID_TWO, title: "Issue Two" }));
-    assert.ok(existsSync(path.join(dir, ".harness", "issues", "22222222.md")));
+    assert.ok(existsSync(path.join(dir, ".harness", "issues", "backlog-22222222.md")));
   } finally {
     cleanup(dir);
   }

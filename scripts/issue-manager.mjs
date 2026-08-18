@@ -112,13 +112,14 @@ import {
 } from "node:fs";
 import path from "node:path";
 import {
+  STATUSES,
   StorageError,
   classifyStorage,
   deleteIssueFile,
-  issuePath,
   readAllIssues,
   readIssue,
   serializeIssue,
+  shortId,
   writeIssue,
 } from "./issue-store.mjs";
 
@@ -647,7 +648,9 @@ function validateDependencyGraph(dependsOn, issues, selfId) {
 
 // Helper: validate the provided status value
 function validateStatus(status) {
-  const validStatuses = ["backlog", "in_progress", "in_review", "blocked", "done"];
+  // Imported, not restated: issue-store spells a status into every file name, so a second list of
+  // the same five strings is a bug waiting to produce a file nobody can read.
+  const validStatuses = STATUSES;
   if (!validStatuses.includes(status)) {
     fail(
       `Invalid status value '${status}'. Valid values are: backlog, in_progress, in_review, blocked, done.`,
@@ -1130,18 +1133,19 @@ function upgradeTracker() {
   // that is not a string, an id that is not a GUID, two ids sharing the eight characters that name
   // the file — has to stop the migration while the project is still whole. Discovering it halfway
   // through would leave a tracker split across two storages for a reason nobody asked for.
-  const claimedFiles = new Map();
+  const claimedShortIds = new Map();
   for (const issue of migratedIssues) {
     serializeIssue(issue);
-    const filePath = issuePath(projectDir, issue.id);
-    const owner = claimedFiles.get(filePath);
+    validateStatus(issue.status);
+    // Compared on the SHORT ID and not on the file name: the name also carries the status, so two
+    // issues sharing those eight characters in different states would produce two different names
+    // and slip through — while every read still finds both when it looks the id up.
+    const key = shortId(issue.id);
+    const owner = claimedShortIds.get(key);
     if (owner !== undefined && owner !== issue.id) {
-      fail(
-        `Issues '${owner}' and '${issue.id}' would both be stored as '${path.basename(filePath)}'.`,
-        "ID_COLLISION"
-      );
+      fail(`Issues '${owner}' and '${issue.id}' would both be stored as '<status>-${key}.md'.`, "ID_COLLISION");
     }
-    claimedFiles.set(filePath, issue.id);
+    claimedShortIds.set(key, issue.id);
   }
 
   // Both storages populated: either a previous run of this command died before it could remove

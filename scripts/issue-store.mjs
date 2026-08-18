@@ -10,7 +10,22 @@ import {
 import path from "node:path";
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ISSUE_FILE_RE = /^[0-9a-f]{8}\.md$/i;
+
+// The five states an issue can be in. It lives HERE, and issue-manager imports it, because this is
+// the module that has to spell one into every file name: two lists of the same five strings is the
+// shape of a bug that shows up as a file nobody can read.
+export const STATUSES = ["backlog", "in_progress", "in_review", "blocked", "done"];
+
+// `<status>-<first eight characters of the id>.md`.
+//
+// The status is in the name because a directory listing is the cheapest view of a tracker there is,
+// and one of bare hex ids answers nothing: not what state the work is in, not how much of it sits
+// in each state. Alphabetical order groups by status — it does not put the states in workflow
+// order, and a numeric prefix that did would encode a ranking nobody agreed on.
+//
+// The cost is real and paid below: the path stops being a pure function of the id, so readers and
+// deleters have to FIND the file and writers have to remove the name the issue used to have.
+const ISSUE_FILE_RE = new RegExp(`^(${STATUSES.join("|")})-([0-9a-f]{8})\\.md$`, "i");
 
 export class StorageError extends Error {
   constructor(message, code = "INVALID_INPUT") {
@@ -23,11 +38,18 @@ function fail(message, code = "INVALID_INPUT") {
   throw new StorageError(message, code);
 }
 
-function shortId(id) {
+export function shortId(id) {
   if (typeof id !== "string" || !GUID_RE.test(id)) {
     fail(`Invalid issue id '${id}'.`);
   }
   return id.slice(0, 8).toLowerCase();
+}
+
+function statusOf(status) {
+  if (!STATUSES.includes(status)) {
+    fail(`Invalid issue status '${status}'. Valid values are: ${STATUSES.join(", ")}.`);
+  }
+  return status;
 }
 
 function encodeString(value) {
@@ -285,8 +307,31 @@ function issuesDirectory(projectDir) {
   return path.join(projectDir, ".harness", "issues");
 }
 
-export function issuePath(projectDir, id) {
-  return path.join(issuesDirectory(projectDir), `${shortId(id)}.md`);
+// Where an issue in THIS state belongs. For finding one whose state you do not know, see
+// findIssueFile below: that is the asymmetry the status in the name buys and costs.
+export function issuePath(projectDir, id, status) {
+  return path.join(issuesDirectory(projectDir), `${statusOf(status)}-${shortId(id)}.md`);
+}
+
+// The file that currently holds this issue, or null. A directory scan, not a computed path: the
+// caller knows the id and has no reason to know the state.
+//
+// More than one match is the half-finished rename a crash leaves behind — see writeIssue. It is
+// refused here rather than resolved by picking one, because either file could be the newer, and a
+// reader that guessed would hand back a stale issue with no sign that it did.
+function findIssueFile(projectDir, id) {
+  const dir = issuesDirectory(projectDir);
+  const suffix = `-${shortId(id)}.md`;
+  if (!existsSync(dir)) return null;
+  const matches = readdirSync(dir).filter((entry) => entry.toLowerCase().endsWith(suffix));
+  if (matches.length > 1) {
+    fail(
+      `Issue '${id}' is stored in more than one file (${matches.sort().join(", ")}). That is what an ` +
+        "interrupted status change leaves behind: keep the one that is right and remove the other.",
+      "ID_COLLISION"
+    );
+  }
+  return matches.length === 1 ? path.join(dir, matches[0]) : null;
 }
 
 export function classifyStorage(projectDir) {
@@ -300,8 +345,8 @@ export function classifyStorage(projectDir) {
 }
 
 function parsedFile(projectDir, id) {
-  const filePath = issuePath(projectDir, id);
-  if (!existsSync(filePath)) return null;
+  const filePath = findIssueFile(projectDir, id);
+  if (filePath === null) return null;
   const issue = parseIssue(readFileSync(filePath, "utf8"), filePath);
   const actualShortId = shortId(issue.id);
   if (actualShortId !== shortId(id)) fail(`Issue file '${filePath}' does not match its id.`);
@@ -330,9 +375,32 @@ export function readAllIssues(projectDir) {
     }
     idsByShortId.set(key, issue.id);
   }
+  // The same id in two files: the half-finished rename writeIssue guards against. Caught here and
+  // not only in findIssueFile, so a full read refuses too instead of silently reporting the issue
+  // twice — and the message names both files, because the fix is choosing between them.
+  const fileById = new Map();
   for (const { entry, issue } of issues) {
-    if (!ISSUE_FILE_RE.test(entry) || entry.slice(0, 8).toLowerCase() !== shortId(issue.id)) {
+    const previous = fileById.get(issue.id);
+    if (previous !== undefined) {
+      fail(
+        `Issue '${issue.id}' is stored in more than one file (${[previous, entry].sort().join(", ")}). ` +
+          "That is what an interrupted status change leaves behind: keep the one that is right and " +
+          "remove the other.",
+        "ID_COLLISION"
+      );
+    }
+    fileById.set(issue.id, entry);
+  }
+  for (const { entry, issue } of issues) {
+    const match = ISSUE_FILE_RE.exec(entry);
+    if (match === null || match[2].toLowerCase() !== shortId(issue.id)) {
       fail(`Issue file '${entry}' does not match its id.`);
+    }
+    // A name that says one state while the frontmatter says another is the failure mode the whole
+    // scheme has to rule out: the listing is read at a glance and believed, so it can never be the
+    // half that lies.
+    if (match[1].toLowerCase() !== issue.status) {
+      fail(`Issue file '${entry}' says '${match[1]}' but the issue is '${issue.status}'.`);
     }
   }
   return issues.map(({ issue }) => issue);
@@ -340,8 +408,9 @@ export function readAllIssues(projectDir) {
 
 export function writeIssue(projectDir, issue) {
   if (issue === null || typeof issue !== "object" || Array.isArray(issue)) fail("An issue must be an object.");
-  const filePath = issuePath(projectDir, issue.id);
+  const filePath = issuePath(projectDir, issue.id, issue.status);
   mkdirSync(path.dirname(filePath), { recursive: true });
+  const previousPath = findIssueFile(projectDir, issue.id);
   const existing = parsedFile(projectDir, issue.id);
   if (existing !== null && existing.id !== issue.id) {
     fail(`Issue id '${issue.id}' collides with '${existing.id}'.`, "ID_COLLISION");
@@ -357,9 +426,16 @@ export function writeIssue(projectDir, issue) {
     rmSync(tempPath, { force: true });
     throw error;
   }
+  // The old name goes LAST, and only once the new one is on disk. The other order would open a
+  // window where a crash leaves no file at all; this one leaves two, which every reader refuses
+  // loudly with ID_COLLISION and a human resolves by deleting the wrong one.
+  if (previousPath !== null && previousPath !== filePath) {
+    rmSync(previousPath, { force: true });
+  }
   return filePath;
 }
 
 export function deleteIssueFile(projectDir, id) {
-  rmSync(issuePath(projectDir, id), { force: true });
+  const filePath = findIssueFile(projectDir, id);
+  if (filePath !== null) rmSync(filePath, { force: true });
 }

@@ -92,6 +92,13 @@ function migrateSeedIssueToSchema3(issue) {
   return migrated;
 }
 
+// The name storage gives an issue: its state, then the eight characters that identify it. Derived
+// here rather than spelled out at each fixture, so a status change in a seed cannot leave a file
+// name behind that contradicts it.
+function issueFileName(issue) {
+  return `${issue.status}-${issue.id.slice(0, 8)}.md`;
+}
+
 // Sets up a fresh Markdown-backed tracker unless seed === null.
 function setupTempProject(seed = baseSeed()) {
   const dir = mkdtempSync(path.join(tmpdir(), "harness-"));
@@ -100,10 +107,7 @@ function setupTempProject(seed = baseSeed()) {
     writeFileSync(path.join(dir, ".harness", "config.json"), JSON.stringify({ schema_version: 4 }) + "\n");
     for (const issue of seed.issues) {
       const normalized = migrateSeedIssueToSchema3(issue);
-      writeFileSync(
-        path.join(dir, ".harness", "issues", `${normalized.id.slice(0, 8)}.md`),
-        serializeIssue(normalized)
-      );
+      writeFileSync(path.join(dir, ".harness", "issues", issueFileName(normalized)), serializeIssue(normalized));
     }
   }
   return { dir };
@@ -1818,11 +1822,8 @@ function projectFiles(dir) {
 // half-finished state an interrupted --upgrade leaves behind.
 function stageMarkdownIssue(dir, issue) {
   mkdirSync(path.join(dir, ".harness", "issues"), { recursive: true });
-  writeFileSync(
-    path.join(dir, ".harness", "issues", `${issue.id.slice(0, 8)}.md`),
-    serializeIssue(migrateSeedIssueToSchema3(issue)),
-    "utf8"
-  );
+  const normalized = migrateSeedIssueToSchema3(issue);
+  writeFileSync(path.join(dir, ".harness", "issues", issueFileName(normalized)), serializeIssue(normalized), "utf8");
 }
 
 test("(a) --upgrade on a tracker without schema_version moves every issue to Markdown and removes issues.json", () => {
@@ -1841,7 +1842,8 @@ test("(a) --upgrade on a tracker without schema_version moves every issue to Mar
     assert.equal(readAllIssues(dir).length, 3, "every issue must survive as a Markdown file");
     assert.deepEqual(
       readdirSync(path.join(dir, ".harness", "issues")).sort(),
-      [ID_ONE, ID_TWO, ID_THREE].map((id) => `${id.slice(0, 8)}.md`).sort()
+      upgradeSeed().issues.map(issueFileName).sort(),
+      "each issue lands under the name its own status gives it"
     );
   } finally {
     cleanup(dir);
@@ -2238,7 +2240,8 @@ test("--compact touches only the files it names: every issue left alone stays by
   const { dir } = setupTempProject(compactSeed());
   try {
     const issuesDir = path.join(dir, ".harness", "issues");
-    const untouchedPath = path.join(issuesDir, `${ID_THREE.slice(0, 8)}.md`);
+    const untouched = issueFileName(compactSeed().issues.find((i) => i.id === ID_THREE));
+    const untouchedPath = path.join(issuesDir, untouched);
     const before = readFileSync(untouchedPath);
 
     const data = assertOk(run(dir, ["--compact", "--issue-data", oneBlock([ID_ONE, ID_TWO])]));
@@ -2248,8 +2251,8 @@ test("--compact touches only the files it names: every issue left alone stays by
     assert.ok(readFileSync(untouchedPath).equals(before), "an issue outside the block must not be rewritten");
     assert.deepEqual(
       readdirSync(issuesDir).sort(),
-      [`${ID_THREE.slice(0, 8)}.md`, `${data.blocks[0].id.slice(0, 8)}.md`].sort(),
-      "the archived files go, the block file arrives, nothing else moves"
+      [untouched, `done-${data.blocks[0].id.slice(0, 8)}.md`].sort(),
+      "the archived files go, the block file arrives under its own status, nothing else moves"
     );
   } finally {
     cleanup(dir);

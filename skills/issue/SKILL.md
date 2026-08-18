@@ -19,7 +19,7 @@ annunciata, fermati e chiedila: non indovinarla e non riusare un path assoluto v
 porta il numero di versione e continuerebbe a girare sulla copia sbagliata invece di fallire.
 
 Tutte le invocazioni passano dallo script del plugin. **Non aprire e non editare i file del
-tracker a mano** — `.harness/issues/<primi 8 caratteri dell'id>.md` — nemmeno per un campo: si
+tracker a mano** — `.harness/issues/<stato>-<primi 8 caratteri dell'id>.md` — nemmeno per un campo: si
 perde la consistenza dei dati.
 
 ```bash

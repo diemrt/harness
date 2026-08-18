@@ -67,7 +67,13 @@ function tempProject(tracker) {
       id: fullId(entry.id),
       depends_on: (entry.depends_on ?? []).map(fullId),
     };
-    writeFileSync(path.join(issuesDir, `${stored.id.slice(0, 8)}.md`), serializeIssue(stored), "utf8");
+    // Storage names a file by the issue's status and id, so the fixture must too — a name that
+    // disagreed with the frontmatter is refused, which is the point of the scheme.
+    writeFileSync(
+      path.join(issuesDir, `${stored.status}-${stored.id.slice(0, 8)}.md`),
+      serializeIssue(stored),
+      "utf8"
+    );
   }
   return dir;
 }
@@ -656,7 +662,7 @@ test("the tracker is read through issue-manager --dump, not off disk", () => {
     // Same bytes, a name the storage does not recognise: a reader that walked the directory itself
     // would still find the issue, and a reader that goes through --dump cannot.
     const issuesDir = path.join(dir, ".harness", "issues");
-    const stored = path.join(issuesDir, "aaaaaaaa.md");
+    const stored = path.join(issuesDir, "in_progress-aaaaaaaa.md");
     writeFileSync(path.join(issuesDir, "ignored.txt"), readFileSync(stored, "utf8"), "utf8");
     rmSync(stored);
 

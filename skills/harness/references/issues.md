@@ -13,11 +13,24 @@ Lo script vive nel plugin, i dati nel progetto. `.harness/issues/` viene risolto
 - default: la directory corrente del processo;
 - `--project-dir <path>`: override esplicito, quando non controlli la cwd.
 
-Ogni issue sta in `<primi 8 caratteri del suo id>.md`: frontmatter per tutti i campi, corpo
-Markdown per il titolo e la `description`. Il codec e le scritture atomiche stanno in
+Ogni issue sta in `<stato>-<primi 8 caratteri del suo id>.md`: frontmatter per tutti i campi,
+corpo Markdown per il titolo e la `description`. Il codec e le scritture atomiche stanno in
 `$SCRIPTS/issue-store.mjs`, e **`issue-manager.mjs` è l'unico che lo importa**: chi legge il
 tracker — `status-cli.mjs`, `docs-gate.mjs`, chiunque altro — passa da `--dump`, mai dai file.
 Un lettore in più di quel formato sarebbe un posto in più da correggere ogni volta che si muove.
+
+**Lo stato apre il nome**, così un `ls` risponde alla domanda che uno si fa davvero — in che stato
+sono le issue, e quante per stato — invece di mostrare venticinque stringhe esadecimali. L'ordine
+alfabetico **raggruppa** per stato, non lo mette in ordine di workflow: un prefisso numerico che lo
+facesse codificherebbe nel nome una gerarchia che nessuno ha deciso.
+
+Il prezzo è che il path non è più una funzione del solo id: chi legge o cancella **cerca** il file,
+chi scrive lo calcola da id e stato. Un cambio di stato quindi rinomina, e il nome nuovo viene
+scritto **prima** che il vecchio sparisca: l'ordine opposto aprirebbe una finestra in cui un crash
+non lascia nessun file, questo ne lascia due — e due file per un id fanno fallire ogni lettura con
+`ID_COLLISION` che li nomina entrambi, invece di far scegliere a caso al lettore. Per lo stesso
+motivo un nome il cui prefisso non combacia con lo `status` del frontmatter viene rifiutato: la
+riga che si legge a colpo d'occhio non può essere quella che mente.
 
 Un progetto senza tracker si legge come tracker vuoto (nessun errore, nessun file creato). La
 directory nasce al **primo `--insert`**, oppure di proposito con `--init` (sotto).
@@ -618,7 +631,7 @@ Il `code` è stabile: usalo per la logica, il messaggio è per gli umani.
 | `SCHEMA_TOO_NEW` | `schema_version` dichiarato maggiore di `SCHEMA_VERSION`: rifiutato, niente viene scritto |
 | `STORAGE_NOT_MIGRATED` | il progetto ha ancora il tracker `issues.json` legacy: ogni comando rifiuta, tranne `--upgrade` |
 | `STORAGE_CONFLICT` | `issues.json` e issue Markdown popolati entrambi: un `--upgrade` interrotto, che `--upgrade` riprende se i due combaciano |
-| `ID_COLLISION` | due issue che condividono gli otto caratteri con cui si chiama il loro file |
+| `ID_COLLISION` | due issue che condividono gli otto caratteri del nome del file, o una sola issue trovata in due file — la rinomina di stato lasciata a metà |
 
 `FORBIDDEN_ROLE` è il guard tecnico contro la self-validation: un processo lanciato con
 `HARNESS_ROLE=worker` non può chiudere la propria issue, può arrivare al massimo a

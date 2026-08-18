@@ -101,7 +101,7 @@ its `references/` are the authoritative description; this README does not restat
 
 | Path | What it is |
 |---|---|
-| `.harness/issues/` | the tracker: one Markdown file per issue, named by the first eight characters of its id |
+| `.harness/issues/` | the tracker: one Markdown file per issue, named `<status>-<first eight characters of its id>.md` |
 | `.harness/config.json` | the setup and verification commands, the docs-gate globs, the schema version |
 | `.harness/archive/` | the originals `/harness:compact` takes out of the tracker |
 | `.harness/runs/` | worker logs |
@@ -112,6 +112,18 @@ One file per issue is a deliberate choice about diffs. A single JSON tracker is 
 on every command, so two agents working on two issues conflict over one file and every review
 shows a diff nobody asked for. A directory of files conflicts only where the work actually
 overlaps.
+
+The status leads the file name so that a listing answers the question you actually have:
+
+```
+$ ls .harness/issues
+backlog-adccd454.md  done-1ed3a712.md  done-24f39ab4.md  in_progress-95f601ad.md
+```
+
+Alphabetical order groups by status; it does not put the states in workflow order, and a numeric
+prefix that did would encode a ranking nobody agreed on. A status change renames the file — the
+new name is written before the old one is removed, so the worst a crash can leave is two files
+for one issue, which every read refuses by name rather than quietly preferring one.
 
 **What of that gets versioned is your call.** Harness writes no `.gitignore` — not yours,
 which it never touches, and none of its own inside `.harness/`. The directory turns up as

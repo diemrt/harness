@@ -10,22 +10,22 @@ tasks:
     id: 1
     short_title: Scrivere i test del naming
     full_description: "Test fallenti prima: nome derivato da stato e id, ricerca del file dal solo id, rinomina alla transizione di stato, ID_COLLISION su due file per lo stesso id, rifiuto di un prefisso che non combacia col frontmatter."
-    checked: false
+    checked: true
   -
     id: 2
     short_title: Implementare in issue-store
     full_description: issuePath da id e stato, findIssueFile dal solo id, writeIssue che scrive il nuovo prima di cancellare il vecchio, readAllIssues che valida prefisso e unicita' dell id.
-    checked: false
+    checked: true
   -
     id: 3
     short_title: Adeguare issue-manager e le fixture
     full_description: Il punto di issue-manager che calcola il path nella prova a secco di --upgrade, e le fixture delle suite di manager, store, status-cli e docs-gate.
-    checked: false
+    checked: true
   -
     id: 4
     short_title: Rinominare il tracker vivo
     full_description: Catturare lo stato attuale, rinominare i file delle 25 issue e provare che il tracker resti semanticamente identico, senza aggiungere codice di migrazione.
-    checked: false
+    checked: true
   -
     id: 5
     short_title: Allineare i documenti
@@ -66,7 +66,7 @@ validation:
       checked: false
   state: unknown
 created_at: "2026-08-18T08:54:39Z"
-updated_at: "2026-08-18T08:55:28Z"
+updated_at: "2026-08-18T09:03:10Z"
 ---
 
 # Lo stato della issue nel nome del file
