@@ -232,6 +232,11 @@ più migrazioni nello stesso giro conta una volta sola; `issues` quante ne ha il
 travaso; `archivePath` dove è finita la copia del file legacy; `resumed` se questo run ha
 completato un upgrade interrotto da un altro.
 
+**Le chiavi sono le stesse su ogni percorso.** Sul no-op — progetto già su storage Markdown —
+`archivePath` è `null` e `resumed` è `false`, scritti, non omessi: un payload le cui chiavi
+dipendono da quale ramo è girato costringe ogni chiamante a controllarne l'esistenza prima di
+leggerle, e chi se ne dimentica legge `undefined` come se fosse un dato.
+
 ## `--compact`
 
 Rimpicciolisce il tracker senza perdere lo storico: le issue chiuse che gli vengono nominate

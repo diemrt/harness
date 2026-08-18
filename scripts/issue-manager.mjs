@@ -2,7 +2,7 @@
 // Issue tracker CLI shipped inside the harness plugin. Used by agents to get, insert, update and
 // delete the issues of the project they are working on.
 //
-// The script lives in the plugin, the data lives in the project: issues.json is resolved against
+// The script lives in the plugin, the data lives in the project: the tracker is resolved against
 // the project directory (the process cwd by default, or --project-dir), never against the location
 // of this file. That is what lets a single installed copy serve every project without being
 // copied into any of them.
@@ -27,7 +27,8 @@
 //
 // Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_TIER, INVALID_DEPENDENCY,
 //              INVALID_INPUT, INVALID_JSON, LIMIT_EXCEEDED, NOT_FOUND, FILE_NOT_FOUND,
-//              MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE, ALREADY_EXISTS, SCHEMA_TOO_NEW.
+//              MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE, ALREADY_EXISTS, SCHEMA_TOO_NEW,
+//              STORAGE_NOT_MIGRATED, STORAGE_CONFLICT, ID_COLLISION.
 //
 // Length limits: title and description are capped (see LIMITS) so an issue stays readable by a
 // human instead of turning into an untitled document. Over the cap the payload is rejected with
@@ -48,7 +49,7 @@
 // the session that held them ends. The check is on the transition — a payload asking for
 // in_progress — and never on an unrelated update to an issue already in flight.
 
-// Every issue in the issues.json file should have the following structure:
+// Every issue file in .harness/issues holds one issue with the following structure:
 // {
 //     "id": "<guid>",
 //     "title": "<string>",
@@ -154,16 +155,16 @@ const LIMITS = {
 const TIERS = ["economy", "standard", "reasoning"];
 
 // The schema this script currently implements, i.e. the shape documented in references/issues.md.
-// A tracker declares which version it was written against via the root-level `schema_version` key,
-// written first in the root object — by --init, which seeds it there, and by --upgrade, which
-// rebuilds the root so a migrated tracker has the same shape as a freshly created one. It is NOT
-// promised adjacent to `last_updated`: that holds only for the --init seed, where last_updated is
-// the second key, and never for a tracker carrying `project` or anything else of its own.
-// Only --init and --upgrade ever WRITE that key; every other
-// command here only reads issues.json and rewrites it unchanged on the fields it does not own —
-// see writeIssuesFile(). An absent key reads as version 0, and that is not an error: it is the
-// same choice already made for `tier` and `depends_on`, a new field never invalidates data
-// written before it existed.
+// Version 4 IS the storage layout: one Markdown file per issue under .harness/issues, named
+// `<status>-<short id>.md`. A project declares which version it was written against through
+// `schema_version` in .harness/config.json, written first in the object by the only two commands
+// that write it at all — --init and --upgrade. Nothing else touches it, and no command changes
+// behaviour by reading it.
+//
+// An absent key reads as THIS version, not as 0: the presence of .harness/issues is the fact, and
+// a config that was never stamped does not make a tracker unreadable. Version 0 is what an absent
+// key means in a LEGACY issues.json, which is a different file answering a different question —
+// see upgradeTracker().
 const SCHEMA_VERSION = 4;
 
 // Ordered migrations for --upgrade. Each entry names the schema version it PRODUCES (`to`) and a
@@ -173,14 +174,14 @@ const SCHEMA_VERSION = 4;
 // version later than one that upgraded right away. --upgrade applies only the entries whose `to`
 // falls strictly after the file's current version and at most SCHEMA_VERSION — see
 // upgradeTracker() below.
-// Where --compact parks the issues it takes out of issues.json. `.harness/` is the project-local
+// Where --compact parks the issues it takes out of the tracker, and where --upgrade parks a
 // directory the harness already uses for its own state (see scripts/harness-config.mjs), and an
 // archive is frozen history for whoever wants to read it back, not a second tracker. Nothing in
-// this script ever reads it — --get and --get-all keep seeing issues.json and nothing
+// this script ever reads it back — --get, --get-all and --dump keep seeing .harness/issues and
 // else.
 //
 // Whether the archive is committed is the project's decision: harness writes no .gitignore, here
-// or anywhere. It is worth deciding rather than inheriting, because issues.json is shared and
+// or anywhere. It is worth deciding rather than inheriting, because the tracker is shared and
 // every block it holds names the archive that has the originals — leave that file out of the
 // repository and whoever clones finds a pointer to nothing.
 const HARNESS_DIR = ".harness";
@@ -293,7 +294,7 @@ function nowTimestamp() {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
-// Helper: resolve the project directory whose issues.json this invocation operates on.
+// Helper: resolve the project directory whose tracker this invocation operates on.
 // Defaults to the process cwd, which is the project an agent is working in; --project-dir
 // overrides it for callers that cannot control their cwd.
 function resolveProjectDir(projectDirArg) {
@@ -623,7 +624,7 @@ function validateDependencyGraph(dependsOn, issues, selfId) {
     return;
   }
 
-  // The visited set is not an optimisation: issues.json is a file, and a cycle hand-edited into it
+  // The visited set is not an optimisation: these are files, and a cycle hand-edited into them
   // before this call would otherwise keep the walk going forever.
   const visited = new Set();
   const stack = [...dependsOn];
@@ -759,7 +760,7 @@ function validateIssueInput(issue, partial = false) {
   }
 
   // covers: optional everywhere, absent reads as []. Nothing here needs the stored tracker — a
-  // reference is checked against git, not against issues.json — so unlike depends_on the whole
+  // reference is checked against git, not against the tracker — so unlike depends_on the whole
   // validation happens right here.
   if (hasProp(issue, "covers")) {
     validateCoversShape(issue.covers);
@@ -982,43 +983,23 @@ function parseIssueData(issueData) {
   }
 }
 
-// Helper: the shape of a brand new tracker. Deliberately minimal: issues.json is the file every
-// clone of the project reads, so it carries data and nothing decorative.
-function emptyIssuesData() {
-  return { last_updated: nowTimestamp(), issues: [] };
-}
-
-// Helper: load issues.json and return the root data object.
-// A project that has never used the harness has no issues.json: reads treat that as an empty
-// tracker instead of an error, and nothing is written to disk. The file is created lazily, by
-// writeIssuesFile, the first time there is an actual issue to store.
+// Helper: read the LEGACY issues.json and return its root object. The only remaining reader of
+// that file, and it exists for one caller: upgradeTracker(), which migrates it away. Nothing here
+// writes it any more — the counterpart writeIssuesFile() was removed once --upgrade stopped
+// rewriting the tracker in place, because a helper kept "in case" is one the next reader assumes
+// is still part of how this script works.
+//
+// A project with no issues.json at all is an empty tracker rather than an error, so --upgrade on a
+// project that never had one has nothing to migrate instead of something to refuse.
 function readIssuesFile() {
   if (!existsSync(issuesFilePath)) {
-    return emptyIssuesData();
+    return { issues: [] };
   }
   const raw = readFileSync(issuesFilePath, "utf8");
   return JSON.parse(raw);
 }
 
-// Helper: save the root data object back to issues.json, updating last_updated.
-// Written atomically: a temp file in the same directory is written first, then renamed over the
-// target, so a crash mid-write never leaves issues.json truncated or corrupt.
-//
-// `data` is the object readIssuesFile() handed back, only ever mutated on the fields a command
-// actually owns (issues, last_updated here). Any other root key found on disk — schema_version
-// included — rides along untouched: this function never enumerates or filters root keys, so a
-// file that has schema_version gets it back byte-for-byte, and a file that does not have it never
-// gets one added. Only --init and --upgrade are meant to write that key.
-function writeIssuesFile(data) {
-  data.last_updated = nowTimestamp();
-  const serialized = JSON.stringify(data, null, 2);
-  const dir = path.dirname(issuesFilePath);
-  const tmpPath = path.join(dir, `.issues.json.${process.pid}.${Date.now()}.tmp`);
-  writeFileSync(tmpPath, serialized, "utf8");
-  renameSync(tmpPath, issuesFilePath);
-}
-
-// Function to create a brand new issues.json in the project directory, seeded minimally.
+// Function to create a brand new tracker in the project directory.
 // Refuses outright when the file already exists: an --init that overwrote it would be an --init
 // that erases a live tracker, and no confirmation flag is worth that risk — starting over is a
 // deliberate `rm` by the caller, not a flag on this command. Nothing is written on that path.
@@ -1085,7 +1066,17 @@ function upgradeTracker() {
     // in line if it disagrees — a repair, not a migration — and stampConfigSchemaVersion() writes
     // nothing when it already agrees, which is what makes the second run in a row cost no bytes.
     stampConfigSchemaVersion();
-    writeOk({ from: declared, to: SCHEMA_VERSION, migrated: 0 });
+    // The SAME shape as the migrating path, with the fields that have no value here spelled out as
+    // null and false rather than left off. A payload whose keys depend on which branch ran makes
+    // every caller check `in` before reading, and the ones that forget read undefined as a fact.
+    writeOk({
+      from: declared,
+      to: SCHEMA_VERSION,
+      migrated: 0,
+      issues: readAllIssues(projectDir).length,
+      archivePath: null,
+      resumed: false,
+    });
     return;
   }
 
@@ -1312,7 +1303,7 @@ function resolveArchivePath(projectDir, timestamp, prefix = "") {
   return candidate;
 }
 
-// Function to shrink issues.json without losing what was done: the closed issues named by the
+// Function to shrink the tracker without losing what was done: the closed issues named by the
 // caller are moved, whole, into .harness/archive/<timestamp>.json, and one issue per block takes
 // their place.
 //
@@ -1386,7 +1377,7 @@ function compactTracker(compactData) {
   const now = nowTimestamp();
   const archivePath = resolveArchivePath(projectDir, now);
   // Project-relative and with forward slashes: this string is what the block issue carries as
-  // evidence, and issues.json is the one file the harness shares through the repository. An
+  // evidence, and the tracker is what the harness shares through the repository. An
   // absolute path from one clone means nothing in another.
   const archiveRelPath = `${HARNESS_DIR}/${ARCHIVE_DIR}/${path.basename(archivePath)}`;
 
@@ -1428,7 +1419,7 @@ function compactTracker(compactData) {
     updated_at: now,
   }));
 
-  // Write order is not arbitrary: the archive first, issues.json second. A failure while writing
+  // Write order is not arbitrary: the archive first, the issue files second. A failure while writing
   // the archive leaves the tracker exactly as it was and loses nothing; the reverse order would
   // put a window between "the issues are gone" and "the copy exists".
   // Recursive, so it creates .harness/ too when this is the first thing the project writes there.
@@ -1483,7 +1474,7 @@ function showHelp() {
     "Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_TIER, INVALID_DEPENDENCY,",
     "             INVALID_INPUT, INVALID_JSON, LIMIT_EXCEEDED, NOT_FOUND, FILE_NOT_FOUND,",
     "             MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE, ALREADY_EXISTS, SCHEMA_TOO_NEW,",
-    "             STORAGE_NOT_MIGRATED, STORAGE_CONFLICT",
+    "             STORAGE_NOT_MIGRATED, STORAGE_CONFLICT, ID_COLLISION",
     "",
     "Role guard: when env var HARNESS_ROLE=worker, --insert/--update requests that set",
     "status=done, validation.state=pass, or check an entry of validation.tasks are rejected with",
@@ -1521,7 +1512,9 @@ function showHelp() {
     "                written until every issue has been migrated and serialized in memory: a",
     "                refusal leaves the project exactly as it was.",
     "                Schema 4 IS the file layout, so a JSON tracker already declaring 4 still moves;",
-    "                a project already on Markdown storage returns migrated: 0 and is NOT rewritten.",
+    "                a project already on Markdown storage returns migrated: 0 with archivePath null",
+    "                and resumed false, and is NOT rewritten. The payload has the same keys on every",
+    "                path: a caller never has to check which branch ran before reading one.",
     "                A project holding BOTH is an upgrade that was interrupted: it is resumed when",
     "                every Markdown issue matches, field for field, the one issues.json would",
     "                produce, and refused with STORAGE_CONFLICT when any of them diverges or is",

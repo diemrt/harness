@@ -33,7 +33,7 @@ export function shortId(id) {
 }
 
 // A dangling id — one that matches no issue in the tracker — leaves the issue unworkable. It
-// happens after a hand edit of issues.json, and after an archive that took away something still
+// happens after a hand edit of a tracker file, and after an archive that took away something still
 // referenced. Either way we do not know what is missing, so we do not clear the issue for work.
 export function danglingDeps(issue, byId) {
   return dependsOn(issue).filter((id) => !byId.has(id));

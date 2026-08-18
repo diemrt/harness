@@ -1956,7 +1956,15 @@ test("(c) a second --upgrade in a row reports migrated:0 and rewrites nothing at
     const beforeSecondRun = projectFiles(dir);
 
     const data = assertOk(run(dir, ["--upgrade"]));
-    assert.deepEqual(data, { from: SCHEMA_VERSION, to: SCHEMA_VERSION, migrated: 0 });
+    // The same keys the migrating path returns, so a caller never checks which branch ran.
+    assert.deepEqual(data, {
+      from: SCHEMA_VERSION,
+      to: SCHEMA_VERSION,
+      migrated: 0,
+      issues: 3,
+      archivePath: null,
+      resumed: false,
+    });
 
     assert.deepEqual(
       projectFiles(dir),
@@ -1972,7 +1980,14 @@ test("--upgrade on a project with no tracker at all is a no-op", () => {
   const { dir } = setupTempProject(null);
   try {
     const data = assertOk(run(dir, ["--upgrade"]));
-    assert.deepEqual(data, { from: SCHEMA_VERSION, to: SCHEMA_VERSION, migrated: 0 });
+    assert.deepEqual(data, {
+      from: SCHEMA_VERSION,
+      to: SCHEMA_VERSION,
+      migrated: 0,
+      issues: 0,
+      archivePath: null,
+      resumed: false,
+    });
     assert.deepEqual(projectFiles(dir), { legacy: null, harness: [] });
   } finally {
     cleanup(dir);

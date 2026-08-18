@@ -365,6 +365,33 @@ test("two files for one id fail loudly, naming both", () => {
   }
 });
 
+test("a status change that fails to write leaves the issue where it was", () => {
+  const dir = tempProject();
+  try {
+    writeIssue(dir, completeIssue());
+
+    // This is the ORDER of the rename, tested by its consequence rather than by watching the
+    // calls. Every other test here checks what survives a SUCCESSFUL status change, and all of
+    // them stay green if the two steps are swapped — remove the old name first, then write the new
+    // one — at which point a failure in between loses the issue entirely instead of leaving two
+    // files a reader refuses loudly. A title that is not a string fails inside the write, which is
+    // the only moment where the two orders differ in what they leave behind.
+    assert.throws(
+      () => writeIssue(dir, completeIssue({ status: "in_review", title: 42 })),
+      (error) => error instanceof StorageError
+    );
+
+    assert.deepEqual(readIssue(dir, ID_ONE), completeIssue(), "the stored issue must be untouched");
+    assert.deepEqual(
+      readdirSync(path.join(dir, ".harness", "issues")),
+      ["backlog-11111111.md"],
+      "no half-written file, and no lost one"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("readAllIssues rejects a name whose status prefix contradicts the frontmatter", () => {
   const dir = tempProject();
   try {
@@ -378,6 +405,30 @@ test("readAllIssues rejects a name whose status prefix contradicts the frontmatt
     cleanup(dir);
   }
 });
+
+for (const [label, fileName] of [
+  ["a prefix outside the five statuses", "wip-11111111.md"],
+  ["a prefix that contradicts the frontmatter", "done-11111111.md"],
+  ["no prefix at all", "11111111.md"],
+]) {
+  test(`readIssue rejects ${label}`, () => {
+    const dir = tempProject();
+    try {
+      // The single read has to refuse exactly what the full read refuses. A guard that only fires
+      // when someone happens to list the whole tracker is a guard that lets --get hand back an
+      // issue whose file name says something else — and the file name is the half people read at a
+      // glance and believe.
+      writeRawIssue(dir, fileName, completeIssue({ status: "backlog" }));
+
+      assert.throws(
+        () => readIssue(dir, ID_ONE),
+        (error) => error instanceof StorageError && error.code === "INVALID_INPUT"
+      );
+    } finally {
+      cleanup(dir);
+    }
+  });
+}
 
 test("readIssue and deleteIssueFile find the file from the id alone, whatever the status", () => {
   const dir = tempProject();

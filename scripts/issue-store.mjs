@@ -321,9 +321,17 @@ export function issuePath(projectDir, id, status) {
 // reader that guessed would hand back a stale issue with no sign that it did.
 function findIssueFile(projectDir, id) {
   const dir = issuesDirectory(projectDir);
-  const suffix = `-${shortId(id)}.md`;
+  const short = shortId(id);
   if (!existsSync(dir)) return null;
-  const matches = readdirSync(dir).filter((entry) => entry.toLowerCase().endsWith(suffix));
+  // Deliberately looser than the file-name format: a file that carries THIS id must be found even
+  // when its name is wrong, so the read can refuse it by name instead of answering NOT_FOUND about
+  // an issue that is sitting right there. Bare `<shortid>.md` is matched for the same reason —
+  // that is what the naming before this one produced. A file belonging to no id in the query is
+  // still untouched: an unrelated broken file never breaks a read of something else.
+  const matches = readdirSync(dir).filter((entry) => {
+    const lower = entry.toLowerCase();
+    return lower === `${short}.md` || lower.endsWith(`-${short}.md`);
+  });
   if (matches.length > 1) {
     fail(
       `Issue '${id}' is stored in more than one file (${matches.sort().join(", ")}). That is what an ` +
@@ -344,6 +352,27 @@ export function classifyStorage(projectDir) {
   return { kind, jsonPath, issuesDir };
 }
 
+// One name check, shared by the single read and the full one. A guard that only fires when
+// somebody happens to list the whole tracker is a guard that lets a single read hand back an issue
+// whose file name says something else — and the name is the half people read at a glance and
+// believe, so it is the half that can never be allowed to lie.
+//
+// It refuses rather than repairing. Rewriting the name would be choosing the frontmatter as the
+// truth without knowing which of the two the last edit meant to change; these are plain files in a
+// directory, and saying which name is expected is enough for a person to fix it.
+function validateIssueFileName(entry, issue) {
+  const match = ISSUE_FILE_RE.exec(entry);
+  if (match === null || match[2].toLowerCase() !== shortId(issue.id)) {
+    fail(`Issue file '${entry}' does not match its id: expected '${issue.status}-${shortId(issue.id)}.md'.`);
+  }
+  if (match[1].toLowerCase() !== issue.status) {
+    fail(
+      `Issue file '${entry}' says '${match[1]}' but the issue is '${issue.status}': ` +
+        `rename it to '${issue.status}-${shortId(issue.id)}.md', or fix the status inside it.`
+    );
+  }
+}
+
 function parsedFile(projectDir, id) {
   const filePath = findIssueFile(projectDir, id);
   if (filePath === null) return null;
@@ -351,6 +380,7 @@ function parsedFile(projectDir, id) {
   const actualShortId = shortId(issue.id);
   if (actualShortId !== shortId(id)) fail(`Issue file '${filePath}' does not match its id.`);
   if (issue.id !== id) fail(`Issue id '${issue.id}' collides with '${id}'.`, "ID_COLLISION");
+  validateIssueFileName(path.basename(filePath), issue);
   return issue;
 }
 
@@ -392,16 +422,7 @@ export function readAllIssues(projectDir) {
     fileById.set(issue.id, entry);
   }
   for (const { entry, issue } of issues) {
-    const match = ISSUE_FILE_RE.exec(entry);
-    if (match === null || match[2].toLowerCase() !== shortId(issue.id)) {
-      fail(`Issue file '${entry}' does not match its id.`);
-    }
-    // A name that says one state while the frontmatter says another is the failure mode the whole
-    // scheme has to rule out: the listing is read at a glance and believed, so it can never be the
-    // half that lies.
-    if (match[1].toLowerCase() !== issue.status) {
-      fail(`Issue file '${entry}' says '${match[1]}' but the issue is '${issue.status}'.`);
-    }
+    validateIssueFileName(entry, issue);
   }
   return issues.map(({ issue }) => issue);
 }
