@@ -342,11 +342,11 @@ test("--update with unchanged dependencies ignores an unrelated malformed Markdo
   }
 });
 
-test("--upgrade refuses Markdown storage without creating legacy JSON", () => {
+test("--upgrade on Markdown storage is a no-op and creates no legacy JSON", () => {
   const { dir } = setupTempProject();
   try {
     const before = trackerFiles(dir);
-    assertFail(run(dir, ["--upgrade"]), "INVALID_INPUT");
+    assertOk(run(dir, ["--upgrade"]));
     assert.equal(existsSync(path.join(dir, "issues.json")), false);
     assert.deepEqual(trackerFiles(dir), before);
   } finally {
@@ -1788,8 +1788,8 @@ test("--help lists --init among the commands", () => {
 });
 
 // ---------------------------------------------------------------------------
-// --upgrade — migrates issues.json from its own schema_version (absent reads as 0) up to
-// SCHEMA_VERSION, applying only the migrations in between.
+// --upgrade — migrates a legacy issues.json (its own schema_version, absent reads as 0) into
+// Markdown issue files at SCHEMA_VERSION, applying only the field migrations in between.
 // ---------------------------------------------------------------------------
 
 // A seed with mixed depends_on presence: ID_TWO already declares one (pointing at ID_ONE, itself
@@ -1804,36 +1804,99 @@ function upgradeSeed() {
   return seed;
 }
 
-test("(a) --upgrade on a tracker without schema_version reports ok:true, from:0, and writes SCHEMA_VERSION", () => {
+// Everything --upgrade is allowed to touch, in one comparable value: the legacy file (bytes or
+// null when it is gone) plus every file under .harness. A refusal must leave this identical.
+function projectFiles(dir) {
+  const legacyPath = path.join(dir, "issues.json");
+  return {
+    legacy: existsSync(legacyPath) ? readFileSync(legacyPath, "utf8") : null,
+    harness: trackerFiles(dir),
+  };
+}
+
+// Writes one Markdown issue as the migration would have written it, so a test can stage the
+// half-finished state an interrupted --upgrade leaves behind.
+function stageMarkdownIssue(dir, issue) {
+  mkdirSync(path.join(dir, ".harness", "issues"), { recursive: true });
+  writeFileSync(
+    path.join(dir, ".harness", "issues", `${issue.id.slice(0, 8)}.md`),
+    serializeIssue(migrateSeedIssueToSchema3(issue)),
+    "utf8"
+  );
+}
+
+test("(a) --upgrade on a tracker without schema_version moves every issue to Markdown and removes issues.json", () => {
   const { dir } = setupLegacyProject(upgradeSeed());
   try {
     assert.ok(!("schema_version" in rootData(dir)), "the fixture must start without the key");
 
     const data = assertOk(run(dir, ["--upgrade"]));
-    assert.deepEqual(data, { from: 0, to: SCHEMA_VERSION, migrated: 3 });
+    assert.equal(data.from, 0);
+    assert.equal(data.to, SCHEMA_VERSION);
+    assert.equal(data.migrated, 3);
+    assert.equal(data.issues, 3);
+    assert.equal(data.resumed, false);
 
-    assert.equal(rootData(dir).schema_version, SCHEMA_VERSION, "the file on disk must carry the new version");
+    assert.equal(existsSync(path.join(dir, "issues.json")), false, "the legacy file must be gone");
+    assert.equal(readAllIssues(dir).length, 3, "every issue must survive as a Markdown file");
+    assert.deepEqual(
+      readdirSync(path.join(dir, ".harness", "issues")).sort(),
+      [ID_ONE, ID_TWO, ID_THREE].map((id) => `${id.slice(0, 8)}.md`).sort()
+    );
   } finally {
     cleanup(dir);
   }
 });
 
-test("(a2) --upgrade writes schema_version as the FIRST root key and leaves the other root keys in their original order", () => {
+test("(a2) --upgrade parks the original issues.json in the archive, byte for byte", () => {
   const { dir } = setupLegacyProject(upgradeSeed());
   try {
-    const keysBefore = Object.keys(rootData(dir));
-    assert.ok(!keysBefore.includes("schema_version"), "the fixture must start without the key");
+    const before = readFileSync(path.join(dir, "issues.json"), "utf8");
 
-    assertOk(run(dir, ["--upgrade"]));
-    const keysAfter = Object.keys(rootData(dir));
+    const data = assertOk(run(dir, ["--upgrade"]));
 
-    // Plain assignment would append the key, which is what this repository's own tracker got on its
-    // first real migration: references/issues.md promises the top of the root object, so a migrated
-    // tracker must have the same shape as one seeded by --init.
-    assert.equal(keysAfter[0], "schema_version", "schema_version must lead the root object");
-    assert.deepEqual(keysAfter.slice(1), keysBefore, "every other root key keeps its original order");
+    assert.match(path.basename(data.archivePath), /^upgrade-.*\.json$/);
+    assert.equal(
+      readFileSync(data.archivePath, "utf8"),
+      before,
+      "the archive must hold the original file unchanged, root metadata included"
+    );
   } finally {
     cleanup(dir);
+  }
+});
+
+test("(a3) --upgrade stamps schema_version first into an existing config and creates none where there is none", () => {
+  const withConfig = setupLegacyProject(upgradeSeed());
+  const withoutConfig = setupLegacyProject(upgradeSeed());
+  try {
+    mkdirSync(path.join(withConfig.dir, ".harness"), { recursive: true });
+    writeFileSync(
+      path.join(withConfig.dir, ".harness", "config.json"),
+      JSON.stringify({ verify: "npm test", setup: null }, null, 2) + "\n",
+      "utf8"
+    );
+
+    assertOk(run(withConfig.dir, ["--upgrade"]));
+    const config = rootData(withConfig.dir);
+    assert.equal(Object.keys(config)[0], "schema_version", "schema_version must lead the config object");
+    assert.equal(config.schema_version, SCHEMA_VERSION);
+    assert.equal(config.verify, "npm test", "every other field must survive");
+    assert.match(
+      readFileSync(path.join(withConfig.dir, ".harness", "config.json"), "utf8"),
+      /\n {2}"verify"/,
+      "the config stays indented: it is a file people open and edit"
+    );
+
+    assertOk(run(withoutConfig.dir, ["--upgrade"]));
+    assert.equal(
+      existsSync(path.join(withoutConfig.dir, ".harness", "config.json")),
+      false,
+      "--upgrade stamps a config, it never creates one"
+    );
+  } finally {
+    cleanup(withConfig.dir);
+    cleanup(withoutConfig.dir);
   }
 });
 
@@ -1842,7 +1905,7 @@ test("(b) after --upgrade every issue has depends_on; issues that already had it
   const before = upgradeSeed();
   try {
     assertOk(run(dir, ["--upgrade"]));
-    const after = rootData(dir).issues;
+    const after = readAllIssues(dir);
 
     assert.equal(after.length, before.issues.length);
     for (const beforeIssue of before.issues) {
@@ -1883,22 +1946,32 @@ test("(b) after --upgrade every issue has depends_on; issues that already had it
   }
 });
 
-test("(c) a second --upgrade in a row reports ok:true, migrated:0, and leaves the file byte-for-byte identical", () => {
+test("(c) a second --upgrade in a row reports migrated:0 and rewrites nothing at all", () => {
   const { dir } = setupLegacyProject(upgradeSeed());
   try {
-    assertOk(run(dir, ["--upgrade"])); // first upgrade: 0 -> SCHEMA_VERSION, writes the file
+    assertOk(run(dir, ["--upgrade"])); // first upgrade: JSON at 0 -> Markdown at SCHEMA_VERSION
 
-    const issuesPath = path.join(dir, "issues.json");
-    const beforeSecondRun = readFileSync(issuesPath); // Buffer, not string: compare raw bytes
+    const beforeSecondRun = projectFiles(dir);
 
     const data = assertOk(run(dir, ["--upgrade"]));
     assert.deepEqual(data, { from: SCHEMA_VERSION, to: SCHEMA_VERSION, migrated: 0 });
 
-    const afterSecondRun = readFileSync(issuesPath);
-    assert.ok(
-      beforeSecondRun.equals(afterSecondRun),
-      "an --upgrade on a tracker already at SCHEMA_VERSION must not rewrite the file at all"
+    assert.deepEqual(
+      projectFiles(dir),
+      beforeSecondRun,
+      "an --upgrade on a tracker already on Markdown storage must not write anything at all"
     );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--upgrade on a project with no tracker at all is a no-op", () => {
+  const { dir } = setupTempProject(null);
+  try {
+    const data = assertOk(run(dir, ["--upgrade"]));
+    assert.deepEqual(data, { from: SCHEMA_VERSION, to: SCHEMA_VERSION, migrated: 0 });
+    assert.deepEqual(projectFiles(dir), { legacy: null, harness: [] });
   } finally {
     cleanup(dir);
   }
@@ -1907,30 +1980,28 @@ test("(c) a second --upgrade in a row reports ok:true, migrated:0, and leaves th
 test("SCHEMA_TOO_NEW: --upgrade on a file with schema_version above SCHEMA_VERSION exits 1 and writes nothing", () => {
   const { dir } = setupLegacyProject(seedWithSchemaVersion(SCHEMA_VERSION + 1));
   try {
-    const issuesPath = path.join(dir, "issues.json");
-    const before = readFileSync(issuesPath); // Buffer, not string: compare raw bytes
+    const before = projectFiles(dir);
 
-    const result = run(dir, ["--upgrade"]);
-    assertFail(result, "SCHEMA_TOO_NEW");
+    assertFail(run(dir, ["--upgrade"]), "SCHEMA_TOO_NEW");
 
-    const after = readFileSync(issuesPath);
-    assert.ok(before.equals(after), "a tracker newer than this script must be left untouched byte for byte");
+    assert.deepEqual(projectFiles(dir), before, "a tracker newer than this script must be left untouched");
   } finally {
     cleanup(dir);
   }
 });
 
-test("--upgrade on a legacy tracker already at SCHEMA_VERSION is a same-run no-op", () => {
+test("--upgrade on a legacy tracker already declaring SCHEMA_VERSION still moves it to Markdown", () => {
   const { dir } = setupLegacyProject(seedWithSchemaVersion(SCHEMA_VERSION));
   try {
-    const issuesPath = path.join(dir, "issues.json");
-    const before = readFileSync(issuesPath);
-
     const data = assertOk(run(dir, ["--upgrade"]));
-    assert.deepEqual(data, { from: SCHEMA_VERSION, to: SCHEMA_VERSION, migrated: 0 });
+    assert.equal(data.from, SCHEMA_VERSION);
+    assert.equal(data.migrated, 0, "no field migration is left to run");
+    assert.equal(data.issues, 3);
 
-    const after = readFileSync(issuesPath);
-    assert.ok(before.equals(after), "a current legacy tracker must not be rewritten");
+    // The version a JSON file declares does not make it Markdown storage: schema 4 IS the file
+    // layout, so the tracker still has to move.
+    assert.equal(existsSync(path.join(dir, "issues.json")), false);
+    assert.equal(readAllIssues(dir).length, 3);
   } finally {
     cleanup(dir);
   }
@@ -1940,17 +2011,110 @@ test("--upgrade respects --project-dir", () => {
   const target = setupLegacyProject(upgradeSeed());
   const elsewhere = setupTempProject(null);
   try {
-    const result = runFrom(elsewhere.dir, ["--upgrade", "--project-dir", target.dir]);
-    const data = assertOk(result);
-    assert.deepEqual(data, { from: 0, to: SCHEMA_VERSION, migrated: 3 });
-    assert.equal(
-      existsSync(path.join(elsewhere.dir, "issues.json")),
-      false,
-      "the cwd must be left alone when --project-dir is given"
-    );
+    const data = assertOk(runFrom(elsewhere.dir, ["--upgrade", "--project-dir", target.dir]));
+    assert.equal(data.from, 0);
+    assert.equal(data.issues, 3);
+    assert.deepEqual(projectFiles(elsewhere.dir), { legacy: null, harness: [] }, "the cwd must be left alone");
   } finally {
     cleanup(target.dir);
     cleanup(elsewhere.dir);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// --upgrade, interrupted: issues.json and Markdown issues both on disk. That is the half-finished
+// state of a run that died between writing the files and removing the legacy tracker, so --upgrade
+// resumes it — and only it. Anything the JSON cannot account for is two real trackers, not one
+// interrupted migration, and is refused.
+// ---------------------------------------------------------------------------
+
+test("--upgrade resumes a run interrupted after only some issues were written", () => {
+  const { dir } = setupLegacyProject(upgradeSeed());
+  try {
+    stageMarkdownIssue(dir, upgradeSeed().issues.find((i) => i.id === ID_ONE));
+
+    const data = assertOk(run(dir, ["--upgrade"]));
+    assert.equal(data.resumed, true);
+    assert.equal(data.issues, 3, "the issues the interrupted run never wrote must be written now");
+    assert.equal(existsSync(path.join(dir, "issues.json")), false);
+    assert.equal(readAllIssues(dir).length, 3);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--upgrade resumes a run interrupted after every issue was written but before the legacy file went", () => {
+  const { dir } = setupLegacyProject(upgradeSeed());
+  try {
+    for (const issue of upgradeSeed().issues) stageMarkdownIssue(dir, issue);
+    const markdownBefore = trackerFiles(dir);
+
+    const data = assertOk(run(dir, ["--upgrade"]));
+    assert.equal(data.resumed, true);
+    assert.equal(data.issues, 3);
+    assert.equal(existsSync(path.join(dir, "issues.json")), false);
+    assert.deepEqual(
+      trackerFiles(dir).filter(([name]) => name.includes("issues")),
+      markdownBefore.filter(([name]) => name.includes("issues")),
+      "issues already written identically must come out unchanged"
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("STORAGE_CONFLICT: --upgrade refuses when a Markdown issue diverges from the JSON, and writes nothing", () => {
+  const { dir } = setupLegacyProject(upgradeSeed());
+  try {
+    const diverged = upgradeSeed().issues.find((i) => i.id === ID_ONE);
+    diverged.title = "Edited on the Markdown side";
+    stageMarkdownIssue(dir, diverged);
+    const before = projectFiles(dir);
+
+    assertFail(run(dir, ["--upgrade"]), "STORAGE_CONFLICT");
+
+    assert.deepEqual(projectFiles(dir), before, "a refused --upgrade writes nothing at all");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("STORAGE_CONFLICT: --upgrade refuses when Markdown holds an issue the JSON never had", () => {
+  const { dir } = setupLegacyProject(upgradeSeed());
+  try {
+    stageMarkdownIssue(dir, {
+      id: UNKNOWN_GUID,
+      title: "Born on the Markdown side",
+      description: "D",
+      status: "backlog",
+      validation: null,
+      created_at: "2026-01-04T00:00:00Z",
+      updated_at: "2026-01-04T00:00:00Z",
+    });
+    const before = projectFiles(dir);
+
+    assertFail(run(dir, ["--upgrade"]), "STORAGE_CONFLICT");
+
+    assert.deepEqual(projectFiles(dir), before);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--upgrade refuses an unserializable legacy issue before writing a single file", () => {
+  const seed = upgradeSeed();
+  seed.issues[0].title = 42; // a title that is not a string cannot become a Markdown heading
+  const { dir } = setupLegacyProject(seed);
+  try {
+    const before = projectFiles(dir);
+
+    const result = run(dir, ["--upgrade"]);
+    assert.equal(result.status, 1);
+
+    assert.deepEqual(projectFiles(dir), before, "no issue file and no archive may survive a refusal");
+    assert.deepEqual(archiveFiles(dir), []);
+  } finally {
+    cleanup(dir);
   }
 });
 
@@ -2065,6 +2229,28 @@ test("--compact archives a block of done issues: they leave issues.json, a done/
     assert.equal(block.tier, null);
     assert.equal(typeof block.created_at, "string");
     assert.equal(typeof block.updated_at, "string");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--compact touches only the files it names: every issue left alone stays byte-identical", () => {
+  const { dir } = setupTempProject(compactSeed());
+  try {
+    const issuesDir = path.join(dir, ".harness", "issues");
+    const untouchedPath = path.join(issuesDir, `${ID_THREE.slice(0, 8)}.md`);
+    const before = readFileSync(untouchedPath);
+
+    const data = assertOk(run(dir, ["--compact", "--issue-data", oneBlock([ID_ONE, ID_TWO])]));
+
+    // One file per issue is the point of the storage: a compaction that rewrote the whole tracker
+    // would produce a diff over issues nobody named, which is exactly what the JSON file did.
+    assert.ok(readFileSync(untouchedPath).equals(before), "an issue outside the block must not be rewritten");
+    assert.deepEqual(
+      readdirSync(issuesDir).sort(),
+      [`${ID_THREE.slice(0, 8)}.md`, `${data.blocks[0].id.slice(0, 8)}.md`].sort(),
+      "the archived files go, the block file arrives, nothing else moves"
+    );
   } finally {
     cleanup(dir);
   }
@@ -2845,7 +3031,9 @@ test("(d) 2 -> 3 materializes tasks and validation.tasks, and creates no validat
   const { dir } = setupLegacyProject(seed);
   try {
     const data = assertOk(run(dir, ["--upgrade"]));
-    assert.deepEqual(data, { from: 2, to: SCHEMA_VERSION, migrated: 2 });
+    assert.equal(data.from, 2);
+    assert.equal(data.to, SCHEMA_VERSION);
+    assert.equal(data.migrated, 2);
 
     const [first, second] = storedIssues(dir);
     assert.deepEqual(first.tasks, []);
@@ -2856,9 +3044,9 @@ test("(d) 2 -> 3 materializes tasks and validation.tasks, and creates no validat
     assert.equal(second.validation.state, "unknown");
 
     // Idempotent down to the bytes, like every migration before it.
-    const bytes = readFileSync(path.join(dir, "issues.json"), "utf8");
+    const bytes = trackerFiles(dir);
     assert.equal(assertOk(run(dir, ["--upgrade"])).migrated, 0);
-    assert.equal(readFileSync(path.join(dir, "issues.json"), "utf8"), bytes);
+    assert.deepEqual(trackerFiles(dir), bytes);
   } finally {
     cleanup(dir);
   }

@@ -105,6 +105,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  rmSync,
   statSync,
   writeFileSync,
   renameSync,
@@ -114,8 +115,10 @@ import {
   StorageError,
   classifyStorage,
   deleteIssueFile,
+  issuePath,
   readAllIssues,
   readIssue,
+  serializeIssue,
   writeIssue,
 } from "./issue-store.mjs";
 
@@ -310,16 +313,53 @@ function requireMarkdownStorage() {
   return storage;
 }
 
-function readSchemaVersion() {
-  const configPath = path.join(projectDir, HARNESS_DIR, "config.json");
-  if (!existsSync(configPath)) return SCHEMA_VERSION;
+function configPathOf() {
+  return path.join(projectDir, HARNESS_DIR, "config.json");
+}
+
+// Helper: read the config object, or null when the project has none. Both callers below need the
+// same two refusals — unparsable, or not an object — and a config nobody can read is not a config
+// whose schema_version can be trusted either.
+function readConfigObject() {
+  const configPath = configPathOf();
+  if (!existsSync(configPath)) return null;
   let config;
   try {
     config = JSON.parse(readFileSync(configPath, "utf8"));
   } catch {
     fail(`Config file '${configPath}' is not valid JSON.`, "INVALID_INPUT");
   }
+  if (config === null || typeof config !== "object" || Array.isArray(config)) {
+    fail(`Config file '${configPath}' must contain a JSON object.`, "INVALID_INPUT");
+  }
+  return config;
+}
+
+function readSchemaVersion() {
+  const config = readConfigObject();
+  if (config === null) return SCHEMA_VERSION;
   return typeof config.schema_version === "number" ? config.schema_version : SCHEMA_VERSION;
+}
+
+// Helper: write schema_version into .harness/config.json, leading the object and leaving every
+// other field exactly where it was. Two rules, and both matter:
+//
+// It never CREATES the config. Whether a project has one is the project's decision
+// (scripts/harness-config.mjs owns that file), and a migration is not the moment to make it.
+//
+// It rewrites nothing when the value is already right, so a second --init or --upgrade in a row
+// touches no byte on disk. Indented and newline-terminated because this is a file people open and
+// edit by hand, unlike an issue file, which only ever passes through the codec.
+function stampConfigSchemaVersion() {
+  const config = readConfigObject();
+  if (config === null || config.schema_version === SCHEMA_VERSION) return false;
+  const { schema_version, ...rest } = config;
+  writeFileSync(
+    configPathOf(),
+    JSON.stringify({ schema_version: SCHEMA_VERSION, ...rest }, null, 2) + "\n",
+    "utf8"
+  );
+  return true;
 }
 
 function dumpIssues() {
@@ -981,35 +1021,66 @@ function initTracker() {
       "ALREADY_EXISTS"
     );
   }
-  const configPath = path.join(projectDir, HARNESS_DIR, "config.json");
-  let config = null;
-  if (existsSync(configPath)) {
-    try {
-      config = JSON.parse(readFileSync(configPath, "utf8"));
-    } catch {
-      fail(`Config file '${configPath}' is not valid JSON.`, "INVALID_INPUT");
-    }
-    if (config === null || typeof config !== "object" || Array.isArray(config)) {
-      fail(`Config file '${configPath}' must contain a JSON object.`, "INVALID_INPUT");
-    }
-  }
+  // Read before the directory is created, so a config nobody can parse refuses while the project
+  // is still untouched.
+  readConfigObject();
   mkdirSync(storage.issuesDir, { recursive: true });
-  if (config !== null) {
-    writeFileSync(configPath, JSON.stringify({ ...config, schema_version: SCHEMA_VERSION }) + "\n", "utf8");
-  }
+  stampConfigSchemaVersion();
   writeOk({ path: storage.issuesDir, created: true });
 }
 
-// Function to bring issues.json from its own schema_version up to SCHEMA_VERSION, running only
-// the migrations in between. An absent key reads as version 0 (see the SCHEMA_VERSION comment
-// above) — the same tracker every other command already accepts without a migration.
+// Helper: compare two issue objects by VALUE, blind to key order. The resume check below reads one
+// side off disk through the codec and builds the other in memory, and those two never agree on key
+// order — an object comparison that cared about it would call every interrupted upgrade a conflict.
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
+  }
+  return value;
+}
+
+function sameIssue(left, right) {
+  return JSON.stringify(canonicalize(left)) === JSON.stringify(canonicalize(right));
+}
+
+// Function to move a project from the legacy issues.json tracker to Markdown issue files at
+// SCHEMA_VERSION, applying on the way the field migrations between the version the file declares
+// (absent reads as version 0, see the SCHEMA_VERSION comment above) and this one.
 //
-// Idempotent by construction: a file already at SCHEMA_VERSION returns before touching disk at
-// all, so a second --upgrade in a row leaves the file byte-for-byte identical to the first result.
+// Schema 4 IS the file layout, which is why a JSON tracker that already declares 4 still moves:
+// the version a file claims does not make it Markdown storage. And a project already ON Markdown
+// storage is a no-op that writes nothing at all, so a second --upgrade in a row leaves every byte
+// where it was.
+//
 // A file AHEAD of SCHEMA_VERSION — declaring a version this script does not know — is refused with
-// SCHEMA_TOO_NEW and nothing is written: that is a script older than its data, and rewriting the
-// file would silently degrade whatever the newer schema added.
+// SCHEMA_TOO_NEW and nothing is written: that is a script older than its data, and migrating it
+// against a schema it does not know would silently degrade whatever the newer schema added.
+//
+// The write order is archive, issue files, config, then the removal of issues.json. It is the
+// order that keeps a crash recoverable at every point: the legacy file is the last thing to go, so
+// until it does there is always a complete copy of the tracker on disk. What a crash leaves behind
+// is a project holding both — see resumeState() for how the next run tells that apart from two
+// real trackers.
 function upgradeTracker() {
+  if (storage.kind === "markdown" || storage.kind === "empty") {
+    const declared = readSchemaVersion();
+    if (declared > SCHEMA_VERSION) {
+      fail(
+        `'${configPathOf()}' declares schema_version ${declared}, newer than the ${SCHEMA_VERSION} this ` +
+          "script implements. This is an old copy of the harness plugin in front of newer data; " +
+          "upgrade the plugin instead of running --upgrade.",
+        "SCHEMA_TOO_NEW"
+      );
+    }
+    // Nothing to migrate: the tracker is already one file per issue. The config is still brought
+    // in line if it disagrees — a repair, not a migration — and stampConfigSchemaVersion() writes
+    // nothing when it already agrees, which is what makes the second run in a row cost no bytes.
+    stampConfigSchemaVersion();
+    writeOk({ from: declared, to: SCHEMA_VERSION, migrated: 0 });
+    return;
+  }
+
   const data = readIssuesFile();
   const fromVersion = hasProp(data, "schema_version") ? data.schema_version : 0;
 
@@ -1028,13 +1099,6 @@ function upgradeTracker() {
         "schema it does not know and degrade it.",
       "SCHEMA_TOO_NEW"
     );
-  }
-
-  if (fromVersion === SCHEMA_VERSION) {
-    // Nothing to do, and nothing written: re-running --upgrade on an up-to-date tracker must be a
-    // no-op all the way down to the bytes on disk.
-    writeOk({ from: fromVersion, to: SCHEMA_VERSION, migrated: 0 });
-    return;
   }
 
   const issues = Array.isArray(data.issues) ? data.issues : [];
@@ -1057,17 +1121,78 @@ function upgradeTracker() {
     });
   }
 
-  data.issues = migratedIssues;
-  data.schema_version = SCHEMA_VERSION;
-  // Assigning the key on a file that does not have it appends it to the END of the root object,
-  // where both references/issues.md and the SCHEMA_VERSION comment above promise it sits at the
-  // top, next to last_updated. --init already seeds it first, so leaving the assignment as-is
-  // gives a migrated tracker a different shape from a freshly created one for no reason other than
-  // how it got there — and this repository's own tracker proved it, ending up with the key last.
-  // Rebuilding the root puts it first and keeps every other key in the order the file already had.
-  const { schema_version, ...rest } = data;
-  writeIssuesFile({ schema_version, ...rest });
-  writeOk({ from: fromVersion, to: SCHEMA_VERSION, migrated: touched.filter(Boolean).length });
+  // A dry run of the whole write, in memory. A legacy record the codec cannot represent — a title
+  // that is not a string, an id that is not a GUID, two ids sharing the eight characters that name
+  // the file — has to stop the migration while the project is still whole. Discovering it halfway
+  // through would leave a tracker split across two storages for a reason nobody asked for.
+  const claimedFiles = new Map();
+  for (const issue of migratedIssues) {
+    serializeIssue(issue);
+    const filePath = issuePath(projectDir, issue.id);
+    const owner = claimedFiles.get(filePath);
+    if (owner !== undefined && owner !== issue.id) {
+      fail(
+        `Issues '${owner}' and '${issue.id}' would both be stored as '${path.basename(filePath)}'.`,
+        "ID_COLLISION"
+      );
+    }
+    claimedFiles.set(filePath, issue.id);
+  }
+
+  // Both storages populated: either a previous run of this command died before it could remove
+  // issues.json, or the project genuinely has two trackers. The first is resumable and the second
+  // is not, and what tells them apart is whether every Markdown issue is one this migration would
+  // have written, unchanged.
+  const alreadyWritten = storage.kind === "conflict" ? readAllIssues(projectDir) : [];
+  if (alreadyWritten.length > 0) {
+    const expected = new Map(migratedIssues.map((issue) => [issue.id, issue]));
+    for (const stored of alreadyWritten) {
+      const target = expected.get(stored.id);
+      if (target === undefined) {
+        fail(
+          `Markdown issue '${stored.id}' is not in '${issuesFilePath}': this is not an interrupted ` +
+            "upgrade but two populated trackers. Reconcile them by hand; --upgrade will not choose for you.",
+          "STORAGE_CONFLICT"
+        );
+      }
+      if (!sameIssue(stored, target)) {
+        fail(
+          `Markdown issue '${stored.id}' differs from the one '${issuesFilePath}' would produce: this is ` +
+            "not an interrupted upgrade but two populated trackers. Reconcile them by hand; --upgrade " +
+            "will not choose for you.",
+          "STORAGE_CONFLICT"
+        );
+      }
+    }
+  }
+
+  // ---- Nothing above this line writes. Everything below does. ----
+
+  const archivePath = resolveArchivePath(projectDir, nowTimestamp(), "upgrade-");
+  mkdirSync(path.dirname(archivePath), { recursive: true });
+  // Copied verbatim rather than re-serialized: this is the only surviving copy of the legacy file,
+  // and the root metadata that has no home under Markdown storage — project, tags, status_legend —
+  // lives on in it. A backup that normalised what it backed up would not be one.
+  writeFileSync(archivePath, readFileSync(issuesFilePath, "utf8"), "utf8");
+
+  // Created even when the tracker holds no issue at all: without it the project would read as
+  // 'empty' rather than as a Markdown tracker that happens to be empty, and the next --upgrade
+  // would have nothing to tell the two apart by.
+  mkdirSync(storage.issuesDir, { recursive: true });
+  for (const issue of migratedIssues) {
+    writeIssue(projectDir, issue);
+  }
+  stampConfigSchemaVersion();
+  rmSync(issuesFilePath, { force: true });
+
+  writeOk({
+    from: fromVersion,
+    to: SCHEMA_VERSION,
+    migrated: touched.filter(Boolean).length,
+    issues: migratedIssues.length,
+    archivePath,
+    resumed: alreadyWritten.length > 0,
+  });
 }
 
 // Helper: validate the --compact payload — everything that can be judged from the payload alone,
@@ -1163,13 +1288,16 @@ function validateCompactInput(payload) {
 // the record, with ':' swapped for '-' because a colon cannot appear in a filename on Windows.
 // Two compactions inside the same second get a numeric suffix rather than overwriting each other:
 // an archive is the only surviving copy of what it holds, so it never gets clobbered.
-function resolveArchivePath(projectDir, timestamp) {
+// The prefix names what produced the archive: a compaction (none) or a storage migration
+// ('upgrade-'). The two are read back by a human looking for one of them, and a directory where
+// both are called the same makes that a guessing game.
+function resolveArchivePath(projectDir, timestamp, prefix = "") {
   const dir = path.join(projectDir, HARNESS_DIR, ARCHIVE_DIR);
   const stamp = timestamp.replace(/:/g, "-");
-  let candidate = path.join(dir, `${stamp}.json`);
+  let candidate = path.join(dir, `${prefix}${stamp}.json`);
   let suffix = 1;
   while (existsSync(candidate)) {
-    candidate = path.join(dir, `${stamp}-${suffix}.json`);
+    candidate = path.join(dir, `${prefix}${stamp}-${suffix}.json`);
     suffix += 1;
   }
   return candidate;
@@ -1370,18 +1498,28 @@ function showHelp() {
     "  --init      : { path, created: true } — creates .harness/issues. If .harness/config.json",
     "                already exists, it stamps schema_version: 4 there; it never creates config.",
     "                Fails with ALREADY_EXISTS if Markdown storage or legacy JSON already exists.",
-    "  --upgrade   : legacy issues.json tracker only; Markdown migration is not available yet. It",
-    "                brings issues.json's schema_version (absent reads as",
-    "                0) up to SCHEMA_VERSION, running only the migrations in between. Adds new",
-    "                fields with their default (0->1 materializes depends_on: [] where missing,",
-    "                1->2 does the same with covers: [], 2->3 with tasks: [] and, on the issues",
-    "                that carry a validation object, validation.tasks: []); never touches or",
-    "                removes an existing",
-    "                value. Idempotent: a file already at SCHEMA_VERSION returns migrated: 0 and",
-    "                is NOT rewritten. A file declaring a schema_version ABOVE SCHEMA_VERSION fails",
-    "                with SCHEMA_TOO_NEW and writes",
-    "                nothing: that is an old script in front of newer data. Neither --insert nor",
-    "                --update ever runs a migration on your behalf.",
+    "  --upgrade   : { from, to, migrated, issues, archivePath, resumed } — moves a",
+    "                legacy issues.json tracker to Markdown issue files at SCHEMA_VERSION, applying",
+    "                on the way the field migrations between the version the file declares (absent",
+    "                reads as 0) and this one. Those add new fields with their default (0->1 materializes",
+    "                depends_on: [] where missing, 1->2 does the same with covers: [], 2->3 with",
+    "                tasks: [] and, on the issues that carry a validation object,",
+    "                validation.tasks: []); they never touch or remove an existing value.",
+    "                In order: issues.json is copied verbatim into",
+    "                .harness/archive/upgrade-<timestamp>.json, one file per issue is written under",
+    "                .harness/issues, schema_version is stamped into .harness/config.json when that",
+    "                file exists (it is never created), and issues.json is removed last. Nothing is",
+    "                written until every issue has been migrated and serialized in memory: a",
+    "                refusal leaves the project exactly as it was.",
+    "                Schema 4 IS the file layout, so a JSON tracker already declaring 4 still moves;",
+    "                a project already on Markdown storage returns migrated: 0 and is NOT rewritten.",
+    "                A project holding BOTH is an upgrade that was interrupted: it is resumed when",
+    "                every Markdown issue matches, field for field, the one issues.json would",
+    "                produce, and refused with STORAGE_CONFLICT when any of them diverges or is",
+    "                unknown to the JSON — that is two trackers, not one interrupted migration.",
+    "                A file declaring a schema_version ABOVE SCHEMA_VERSION fails with",
+    "                SCHEMA_TOO_NEW and writes nothing: that is an old script in front of newer",
+    "                data. Neither --insert nor --update ever runs a migration on your behalf.",
     "  --compact   : { archivePath, removed, blocks: [ { id, title, archivedCount } ] } — shrinks",
     "                Markdown issues without losing history. Takes the groupings ALREADY DECIDED by the",
     "                caller, as { blocks: [ { title, description, issue_ids } ] }; it groups",
@@ -1735,12 +1873,8 @@ function main() {
   } else if (values.init) {
     initTracker();
   } else if (values.upgrade) {
-    if (storage.kind !== "legacy") {
-      fail(
-        "--upgrade is only available for a legacy issues.json tracker until Markdown migration support is implemented.",
-        "INVALID_INPUT"
-      );
-    }
+    // The one command that must NOT go through requireMarkdownStorage(): a tracker that has not
+    // been migrated is precisely its input, and a conflict is the state it knows how to resume.
     upgradeTracker();
   } else if (values.compact) {
     if (!issueData) {
