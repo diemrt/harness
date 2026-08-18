@@ -65,7 +65,11 @@ const DEFAULT_DOCS_GATE = {
     "**/*.rs",
     "**/*.php",
   ],
-  exclude: ["docs/**", "test/**", "tests/**", "**/*.md", "issues.json"],
+  // `.harness/**` and not `issues.json`: the tracker is one Markdown file per issue under
+  // .harness/issues, and that directory is where every harness-owned file lives — issue files,
+  // the archives --compact and --upgrade write, the run logs. Naming the old root-level JSON file
+  // would be a promise about a file the storage no longer has.
+  exclude: ["docs/**", "test/**", "tests/**", "**/*.md", ".harness/**"],
 };
 
 // How the orchestrator dispatches the work of an issue. Spawning a subagent per issue is not always
@@ -228,7 +232,7 @@ function validateConfigInput(config) {
   if (config === null || typeof config !== "object" || Array.isArray(config)) {
     fail("Configuration must be a JSON object.", "INVALID_INPUT");
   }
-  const allowed = ["setup", "verify", "externalWorker", "docsGate", "execution"];
+  const allowed = ["schema_version", "setup", "verify", "externalWorker", "docsGate", "execution"];
   const unknown = Object.keys(config).filter((k) => !allowed.includes(k));
   if (unknown.length > 0) {
     fail(
@@ -243,6 +247,16 @@ function validateConfigInput(config) {
   }
   if (config.setup !== undefined && config.setup !== null && typeof config.setup !== "string") {
     fail("'setup' must be a command string or null.", "INVALID_INPUT");
+  }
+  // The value belongs to issue-manager.mjs, which is the only script that decides what a version
+  // MEANS and the only one that stamps it. All that is checked here is the shape, because this
+  // script has one job with that key and it is not losing it: --init rewrites config.json whole,
+  // and a rewrite that dropped it would make a migrated tracker read as an unstamped one.
+  if (config.schema_version !== undefined) {
+    const version = config.schema_version;
+    if (typeof version !== "number" || !Number.isInteger(version) || version < 0) {
+      fail("'schema_version' must be a non-negative integer.", "INVALID_INPUT");
+    }
   }
   // `execution` is merged field-by-field like the blocks below, so an unknown key inside it would be
   // written and then ignored downstream: a mode nobody reads looks, in config.json, exactly like one
@@ -320,6 +334,20 @@ function validateConfigInput(config) {
   }
 }
 
+// Helper: the schema_version of a config already on disk, or undefined when there is none and when
+// the file cannot be read as one. Deliberately silent on a malformed file: --init is about to
+// replace it anyway, and refusing to overwrite a broken config would leave the project with no way
+// to fix it through this command.
+function readStoredSchemaVersion(configPath) {
+  try {
+    const stored = JSON.parse(readFileSync(configPath, "utf8"));
+    const version = stored?.schema_version;
+    return typeof version === "number" && Number.isInteger(version) && version >= 0 ? version : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // Creates what `.harness/` is missing and nothing more: the directory when absent, config.json
 // when absent — or when --force says to replace it. Whatever else the directory already holds —
 // run logs, archives written by --compact, a .gitignore the project put there itself — is left
@@ -336,6 +364,13 @@ function initConfig(dir, config, force) {
     );
   }
 
+  // The version the project is already stamped with, read before the file is replaced. --init
+  // rebuilds config.json from a fixed set of fields, so anything it does not carry over is lost:
+  // the payload wins when it declares one, disk answers when it does not, and a project that has
+  // never been stamped stays unstamped — this script never invents a version.
+  const storedVersion = existsSync(configPath) ? readStoredSchemaVersion(configPath) : undefined;
+  const schemaVersion = config.schema_version ?? storedVersion;
+
   mkdirSync(harnessDir, { recursive: true });
 
   // Defaults are merged field-by-field, not swapped in wholesale, precisely so a partial
@@ -345,6 +380,10 @@ function initConfig(dir, config, force) {
   // fields the caller omitted keeps that impossible while still letting a caller override just
   // one field (say, add a glob to `exclude`) without having to restate everything else.
   const stored = {
+    // Leading the object, the way issue-manager.mjs stamps it, so a config written here and one
+    // stamped there have the same shape and a diff between two clones says nothing about which
+    // command last touched the file.
+    ...(schemaVersion === undefined ? {} : { schema_version: schemaVersion }),
     setup: config.setup ?? null,
     verify: config.verify,
     externalWorker: { enabled: false, command: null, ...(config.externalWorker ?? {}) },
@@ -380,7 +419,9 @@ function showHelp() {
     "--detect proposes setup/verify commands by inspecting the project. It writes nothing:",
     "         show the proposal to the user and let them confirm before calling --init.",
     "",
-    "Fields: setup (string|null), verify (string, required — the verification gate),",
+    "Fields: schema_version (non-negative integer, written by issue-manager.mjs --init/--upgrade;",
+    "        --init preserves the one already on disk and never invents one),",
+    "        setup (string|null), verify (string, required — the verification gate),",
     "        externalWorker ({enabled, command with {promptFile}}), docsGate ({enabled, include, exclude}),",
     `        execution ({mode: ${EXECUTION_MODES.join("|")}}, default ${DEFAULT_EXECUTION.mode} — how the work of an`,
     "        issue is dispatched; it never applies to verification, which stays a separate agent).",

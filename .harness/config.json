@@ -27,7 +27,10 @@
       "test/**",
       "tests/**",
       "**/*.md",
-      "issues.json"
+      ".harness/**"
     ]
+  },
+  "execution": {
+    "mode": "auto"
   }
 }

@@ -388,6 +388,96 @@ test("a disabled docsGate may have an empty include: a gate that is off matches 
   }
 });
 
+// ---------------------------------------------------------------------------
+// schema_version — issue-manager owns the value, this script only has to not lose it. --init
+// rewrites config.json whole, and a rewrite that dropped the key would make a schema 4 tracker
+// read as an unstamped one the next time anything asked.
+// ---------------------------------------------------------------------------
+
+test("--init preserves the schema_version already on disk when it overwrites the config", () => {
+  const dir = tempProject();
+  try {
+    assertOk(run(dir, ["--init", "--config-data", JSON.stringify({ verify: "npm test" })]));
+    const configPath = path.join(dir, ".harness", "config.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({ schema_version: 4, ...JSON.parse(readFileSync(configPath, "utf8")) }, null, 2) + "\n",
+      "utf8"
+    );
+
+    const written = assertOk(
+      run(dir, ["--init", "--force", "--config-data", JSON.stringify({ verify: "npm run test" })])
+    );
+
+    assert.equal(written.config.schema_version, 4, "the stored version must survive a --force rewrite");
+    const onDisk = JSON.parse(readFileSync(configPath, "utf8"));
+    assert.equal(onDisk.schema_version, 4);
+    assert.equal(Object.keys(onDisk)[0], "schema_version", "the key leads the object, as issue-manager writes it");
+    assert.equal(onDisk.verify, "npm run test", "the new payload still wins on its own fields");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--init takes the schema_version from the payload over the one on disk", () => {
+  const dir = tempProject();
+  try {
+    const configPath = path.join(dir, ".harness", "config.json");
+    mkdirSync(path.dirname(configPath), { recursive: true });
+    writeFileSync(configPath, JSON.stringify({ schema_version: 3, verify: "old" }) + "\n", "utf8");
+
+    const written = assertOk(
+      run(dir, ["--init", "--force", "--config-data", JSON.stringify({ verify: "npm test", schema_version: 4 })])
+    );
+
+    assert.equal(written.config.schema_version, 4);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--init writes no schema_version where neither the payload nor the disk has one", () => {
+  const dir = tempProject();
+  try {
+    const written = assertOk(run(dir, ["--init", "--config-data", JSON.stringify({ verify: "npm test" })]));
+    assert.equal("schema_version" in written.config, false, "harness-config never invents a version");
+    const onDisk = JSON.parse(readFileSync(path.join(dir, ".harness", "config.json"), "utf8"));
+    assert.equal("schema_version" in onDisk, false);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("INVALID_INPUT: a schema_version that is not a non-negative integer is refused", () => {
+  const dir = tempProject();
+  try {
+    for (const bad of ["4", -1, 1.5, null]) {
+      assertFail(
+        run(dir, ["--init", "--config-data", JSON.stringify({ verify: "npm test", schema_version: bad })]),
+        "INVALID_INPUT"
+      );
+    }
+    assert.equal(existsSync(path.join(dir, ".harness", "config.json")), false);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("the default docs gate excludes the harness directory and no longer names issues.json", () => {
+  const dir = tempProject();
+  try {
+    const written = assertOk(run(dir, ["--init", "--config-data", JSON.stringify({ verify: "npm test" })]));
+
+    // The tracker moved into .harness/issues: excluding one JSON file at the root is a promise
+    // about a file the storage no longer has, while the directory is where every harness-owned
+    // file now lives — issue files, archives, run logs.
+    assert.ok(written.config.docsGate.exclude.includes(".harness/**"));
+    assert.equal(written.config.docsGate.exclude.includes("issues.json"), false);
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("an empty exclude stays legitimate: excluding nothing is a choice, not a broken gate", () => {
   const dir = tempProject();
   try {
