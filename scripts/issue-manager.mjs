@@ -122,6 +122,7 @@ import {
   shortId,
   writeIssue,
 } from "./issue-store.mjs";
+import { TrackerLockError, withTrackerLock } from "./tracker-lock.mjs";
 
 // Resolved in main() from --project-dir (or the cwd) before any command runs.
 let issuesFilePath = null;
@@ -164,7 +165,7 @@ const TIERS = ["economy", "standard", "reasoning"];
 // a config that was never stamped does not make a tracker unreadable. Version 0 is what an absent
 // key means in a LEGACY issues.json, which is a different file answering a different question —
 // see upgradeTracker().
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 // Ordered migrations for --upgrade. Each entry names the schema version it PRODUCES (`to`) and a
 // function that migrates one issue object, returning either the same reference (untouched) or a
@@ -244,6 +245,16 @@ const MIGRATIONS = [
       return next;
     },
   },
+  {
+    to: 5,
+    migrateIssue(issue) {
+      if (hasProp(issue, "revision")) {
+        validateRevision(issue.revision);
+        return issue;
+      }
+      return { ...issue, revision: 1 };
+    },
+  },
 ];
 
 // Helper: exception carrying the failure envelope fields, thrown by any validator/reader and
@@ -291,6 +302,54 @@ function isNullOrWhitespace(value) {
 // Helper: current timestamp in the same format the .ps1 used (no milliseconds)
 function nowTimestamp() {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+function validateRevision(value, fieldName = "revision") {
+  if (!Number.isInteger(value) || value < 1) {
+    fail(`'${fieldName}' must be a positive integer.`, "INVALID_REVISION");
+  }
+  return value;
+}
+
+function normalizeStoredRevision(issue) {
+  const revision = hasProp(issue, "revision") ? validateRevision(issue.revision) : 1;
+  return { ...issue, revision };
+}
+
+function readCurrentIssue(issueId) {
+  const issue = readIssue(projectDir, issueId);
+  return issue === null ? null : normalizeStoredRevision(issue);
+}
+
+function readCurrentIssues() {
+  return readAllIssues(projectDir).map(normalizeStoredRevision);
+}
+
+function parseExpectedRevision(value) {
+  if (value === undefined) {
+    fail("Please provide --expected-revision for this mutation.", "MISSING_ARGS");
+  }
+  if (!/^\d+$/.test(value)) {
+    fail("'--expected-revision' must be a positive integer.", "INVALID_REVISION");
+  }
+  return validateRevision(Number(value), "--expected-revision");
+}
+
+function assertExpectedRevision(issue, expectedRevision) {
+  if (issue.revision !== expectedRevision) {
+    fail(
+      `Issue '${issue.id}' revision conflict: expected ${expectedRevision}, current ${issue.revision}.`,
+      "REVISION_CONFLICT"
+    );
+  }
+  return issue.revision;
+}
+
+function withMutation(callback) {
+  return withTrackerLock(projectDir, () => {
+    storage = classifyStorage(projectDir);
+    return callback();
+  });
 }
 
 // Helper: resolve the project directory whose tracker this invocation operates on.
@@ -343,7 +402,10 @@ function readConfigObject() {
 
 function readSchemaVersion() {
   const config = readConfigObject();
-  if (config === null) return SCHEMA_VERSION;
+  if (config === null) {
+    const issues = storage?.kind === "markdown" ? readAllIssues(projectDir) : [];
+    return issues.some((issue) => !hasProp(issue, "revision")) ? 4 : SCHEMA_VERSION;
+  }
   return typeof config.schema_version === "number" ? config.schema_version : SCHEMA_VERSION;
 }
 
@@ -369,7 +431,7 @@ function stampConfigSchemaVersion() {
 }
 
 function dumpIssues() {
-  const issues = readAllIssues(projectDir).sort((a, b) => a.id.localeCompare(b.id));
+  const issues = readCurrentIssues().sort((a, b) => a.id.localeCompare(b.id));
   writeOk({ schema_version: readSchemaVersion(), issues });
 }
 
@@ -1029,7 +1091,7 @@ function canonicalize(value) {
 }
 
 function sameIssue(left, right) {
-  return JSON.stringify(canonicalize(left)) === JSON.stringify(canonicalize(right));
+  return JSON.stringify(canonicalize(normalizeStoredRevision(left))) === JSON.stringify(canonicalize(normalizeStoredRevision(right)));
 }
 
 // Function to move a project from the legacy issues.json tracker to Markdown issue files at
@@ -1061,9 +1123,22 @@ function upgradeTracker() {
         "SCHEMA_TOO_NEW"
       );
     }
-    // Nothing to migrate: the tracker is already one file per issue. The config is still brought
-    // in line if it disagrees — a repair, not a migration — and stampConfigSchemaVersion() writes
-    // nothing when it already agrees, which is what makes the second run in a row cost no bytes.
+    const currentIssues = storage.kind === "markdown" ? readAllIssues(projectDir) : [];
+    const migratedIssues = currentIssues.map((issue) => {
+      if (hasProp(issue, "revision")) {
+        validateRevision(issue.revision);
+        return issue;
+      }
+      return { ...issue, revision: 1 };
+    });
+    const migratedCount = migratedIssues.filter((issue, index) => issue !== currentIssues[index]).length;
+    for (const issue of migratedIssues) {
+      if (!hasProp(currentIssues.find((current) => current.id === issue.id), "revision")) {
+        writeIssue(projectDir, issue);
+      }
+    }
+    // The config is brought in line after the issue records, so a crash never claims the
+    // migration completed before every record is readable at schema 5.
     stampConfigSchemaVersion();
     // The SAME shape as the migrating path, with the fields that have no value here spelled out as
     // null and false rather than left off. A payload whose keys depend on which branch ran makes
@@ -1071,8 +1146,8 @@ function upgradeTracker() {
     writeOk({
       from: declared,
       to: SCHEMA_VERSION,
-      migrated: 0,
-      issues: readAllIssues(projectDir).length,
+      migrated: migratedCount,
+      issues: migratedIssues.length,
       archivePath: null,
       resumed: false,
     });
@@ -1107,7 +1182,7 @@ function upgradeTracker() {
   let migratedIssues = issues;
 
   for (const migration of MIGRATIONS) {
-    if (migration.to <= fromVersion || migration.to > SCHEMA_VERSION) {
+    if ((migration.to <= fromVersion && migration.to !== 5) || migration.to > SCHEMA_VERSION) {
       continue;
     }
     migratedIssues = migratedIssues.map((issue, index) => {
@@ -1199,7 +1274,7 @@ function upgradeTracker() {
 // validateIssueInput(): --compact does not describe an issue, it describes how already-closed ones
 // get grouped.
 //
-//   { "blocks": [ { "title": "…", "description": "…", "issue_ids": ["<guid>", …] } ] }
+//   { "blocks": [ { "title": "…", "description": "…", "issues": [{ id, expected_revision }] } ] }
 //
 // title and description are capped by the SAME limits every other issue obeys (LIMITS.title /
 // LIMITS.description): a block becomes an issue like any other, and a summary that is allowed to
@@ -1207,7 +1282,7 @@ function upgradeTracker() {
 function validateCompactInput(payload) {
   if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
     fail(
-      "Compact data must be a JSON object of the form { blocks: [ { title, description, issue_ids } ] }.",
+      "Compact data must be a JSON object of the form { blocks: [ { title, description, issues } ] }.",
       "INVALID_INPUT"
     );
   }
@@ -1222,7 +1297,7 @@ function validateCompactInput(payload) {
 
   if (!Array.isArray(payload.blocks) || payload.blocks.length === 0) {
     fail(
-      "'blocks' must be a non-empty array of { title, description, issue_ids }.",
+      "'blocks' must be a non-empty array of { title, description, issues }.",
       "INVALID_INPUT"
     );
   }
@@ -1235,10 +1310,10 @@ function validateCompactInput(payload) {
 
   payload.blocks.forEach((block, index) => {
     if (block === null || typeof block !== "object" || Array.isArray(block)) {
-      fail(`'blocks[${index}]' must be an object with 'title', 'description' and 'issue_ids'.`, "INVALID_INPUT");
+      fail(`'blocks[${index}]' must be an object with 'title', 'description' and 'issues'.`, "INVALID_INPUT");
     }
 
-    const allowedBlockFields = ["title", "description", "issue_ids"];
+    const allowedBlockFields = ["title", "description", "issues"];
     const unknownBlockFields = Object.keys(block).filter((f) => !allowedBlockFields.includes(f));
     if (unknownBlockFields.length > 0) {
       fail(
@@ -1259,22 +1334,30 @@ function validateCompactInput(payload) {
 
     // An empty block covers nothing and would still write a done/pass record: a summary of no
     // history at all, which is the one thing an archive summary must never be.
-    if (!Array.isArray(block.issue_ids) || block.issue_ids.length === 0) {
+    if (!Array.isArray(block.issues) || block.issues.length === 0) {
       fail(
-        `'blocks[${index}].issue_ids' must be a non-empty array of issue ids: an empty block would archive nothing and still write a 'done' record.`,
+        `'blocks[${index}].issues' must be a non-empty array of { id, expected_revision }: an empty block would archive nothing and still write a 'done' record.`,
         "INVALID_INPUT"
       );
     }
 
-    block.issue_ids.forEach((id, idIndex) => {
-      if (typeof id !== "string" || !GUID_RE.test(id)) {
-        fail(`'blocks[${index}].issue_ids[${idIndex}]' is not a valid issue id (GUID).`, "INVALID_ID");
+    block.issues.forEach((reference, idIndex) => {
+      if (reference === null || typeof reference !== "object" || Array.isArray(reference)) {
+        fail(`'blocks[${index}].issues[${idIndex}]' must be an object.`, "INVALID_INPUT");
       }
+      if (Object.keys(reference).some((field) => field !== "id" && field !== "expected_revision")) {
+        fail(`'blocks[${index}].issues[${idIndex}]' has an unknown field.`, "INVALID_INPUT");
+      }
+      const { id, expected_revision: expectedRevision } = reference;
+      if (typeof id !== "string" || !GUID_RE.test(id)) {
+        fail(`'blocks[${index}].issues[${idIndex}].id' is not a valid issue id (GUID).`, "INVALID_ID");
+      }
+      validateRevision(expectedRevision, `blocks[${index}].issues[${idIndex}].expected_revision`);
       if (claimedBy.has(id)) {
         const first = claimedBy.get(id);
         const where =
           first === index
-            ? `twice in 'blocks[${index}].issue_ids'`
+            ? `twice in 'blocks[${index}].issues'`
             : `in both 'blocks[${first}]' and 'blocks[${index}]'`;
         fail(`Issue '${id}' is listed ${where}. An issue can only be archived once.`, "INVALID_INPUT");
       }
@@ -1334,25 +1417,26 @@ function compactTracker(compactData) {
   const payload = parseIssueData(compactData);
   validateCompactInput(payload);
 
-  const issues = readAllIssues(projectDir);
+  const issues = readCurrentIssues();
   const byId = new Map(issues.map((issue) => [issue.id, issue]));
 
   const archivedIds = new Set();
   for (const block of payload.blocks) {
-    for (const id of block.issue_ids) {
-      const issue = byId.get(id);
+    for (const reference of block.issues) {
+      const issue = byId.get(reference.id);
       if (!issue) {
-        fail(`Issue with ID '${id}' not found.`, "NOT_FOUND");
+        fail(`Issue with ID '${reference.id}' not found.`, "NOT_FOUND");
       }
+      assertExpectedRevision(issue, reference.expected_revision);
       // Only closed work can be summarised: an issue still moving would have its history frozen
       // under a 'done' block while the work it describes is still going on.
       if (issue.status !== "done") {
         fail(
-          `Issue '${id}' has status '${issue.status}': --compact only archives issues that are 'done'.`,
+          `Issue '${reference.id}' has status '${issue.status}': --compact only archives issues that are 'done'.`,
           "INVALID_STATUS"
         );
       }
-      archivedIds.add(id);
+      archivedIds.add(reference.id);
     }
   }
 
@@ -1383,7 +1467,7 @@ function compactTracker(compactData) {
   // The ORIGINAL objects, as read off disk and not rebuilt: an archive that normalised its records
   // would be an archive of what this version of the script thinks an issue looks like, not of what
   // was actually written.
-  const archivedIssues = payload.blocks.flatMap((block) => block.issue_ids.map((id) => byId.get(id)));
+  const archivedIssues = payload.blocks.flatMap((block) => block.issues.map((reference) => byId.get(reference.id)));
 
   const archiveRecord = {
     schema_version: readSchemaVersion(),
@@ -1393,6 +1477,7 @@ function compactTracker(compactData) {
 
   const blockIssues = payload.blocks.map((block) => ({
     id: generateNewId(),
+    revision: 1,
     title: block.title,
     description: block.description,
     status: "done",
@@ -1410,7 +1495,7 @@ function compactTracker(compactData) {
       // stays traceable back to the issues it replaced without reopening the archive to find out.
       criteria: [
         `Archived originals: ${archiveRelPath}`,
-        ...block.issue_ids.map((id) => `${id} - ${byId.get(id).title}`),
+        ...block.issues.map(({ id }) => `${id} - ${byId.get(id).title}`),
       ],
       state: "pass",
     },
@@ -1434,10 +1519,11 @@ function compactTracker(compactData) {
   writeOk({
     archivePath,
     removed: archivedIds.size,
+    consumed: archivedIssues.map((issue) => ({ id: issue.id, revision: issue.revision + 1 })),
     blocks: blockIssues.map((issue, index) => ({
       id: issue.id,
       title: issue.title,
-      archivedCount: payload.blocks[index].issue_ids.length,
+      archivedCount: payload.blocks[index].issues.length,
     })),
   });
 }
@@ -1452,9 +1538,9 @@ function showHelp() {
     "                        [--status backlog|in_progress|in_review|blocked|done, default: backlog]",
     "node issue-manager.mjs --dump",
     "node issue-manager.mjs --insert (--issue-data '<json>' | --issue-data-file <path>)",
-    "node issue-manager.mjs --update --issue-id <id> (--issue-data '<json>' | --issue-data-file <path>)",
+    "node issue-manager.mjs --update --issue-id <id> --expected-revision <n> (--issue-data '<json>' | --issue-data-file <path>)",
     "                        [--decomposition-unchanged]",
-    "node issue-manager.mjs --delete --issue-id <id>",
+    "node issue-manager.mjs --delete --issue-id <id> --expected-revision <n>",
     "node issue-manager.mjs --init",
     "node issue-manager.mjs --upgrade",
     "node issue-manager.mjs --compact (--issue-data '<json>' | --issue-data-file <path>)",
@@ -1473,7 +1559,8 @@ function showHelp() {
     "Error codes: INVALID_ID, INVALID_STATUS, INVALID_STATE, INVALID_TIER, INVALID_DEPENDENCY,",
     "             INVALID_INPUT, INVALID_JSON, LIMIT_EXCEEDED, NOT_FOUND, FILE_NOT_FOUND,",
     "             MISSING_ARGS, UNKNOWN_COMMAND, FORBIDDEN_ROLE, ALREADY_EXISTS, SCHEMA_TOO_NEW,",
-    "             STORAGE_NOT_MIGRATED, STORAGE_CONFLICT, ID_COLLISION",
+    "             STORAGE_NOT_MIGRATED, STORAGE_CONFLICT, ID_COLLISION, REVISION_CONFLICT,",
+    "             INVALID_REVISION, TRACKER_BUSY",
     "",
     "Role guard: when env var HARNESS_ROLE=worker, --insert/--update requests that set",
     "status=done, validation.state=pass, or check an entry of validation.tasks are rejected with",
@@ -1490,12 +1577,12 @@ function showHelp() {
     "                totalCount/issues are counted AFTER the --status filter, which defaults to",
     "                backlog when --status is omitted: a bare --get-all does not return the whole",
     "                tracker, only its backlog slice. Pass --status explicitly to see another state.",
-    "  --dump      : { schema_version: 4, issues: [...] } — every issue, ascending by id",
+    "  --dump      : { schema_version: 5, issues: [...] } — every issue, ascending by id",
     "  --insert    : the created issue object (read .data.id for the new GUID)",
     "  --update    : the updated issue object",
-    "  --delete    : { id, deleted }",
+    "  --delete    : { id, deleted, revision }",
     "  --init      : { path, created: true } — creates .harness/issues. If .harness/config.json",
-    "                already exists, it stamps schema_version: 4 there; it never creates config.",
+    "                already exists, it stamps schema_version: 5 there; it never creates config.",
     "                Fails with ALREADY_EXISTS if Markdown storage or legacy JSON already exists.",
     "  --upgrade   : { from, to, migrated, issues, archivePath, resumed } — moves a",
     "                legacy issues.json tracker to Markdown issue files at SCHEMA_VERSION, applying",
@@ -1510,7 +1597,7 @@ function showHelp() {
     "                file exists (it is never created), and issues.json is removed last. Nothing is",
     "                written until every issue has been migrated and serialized in memory: a",
     "                refusal leaves the project exactly as it was.",
-    "                Schema 4 IS the file layout, so a JSON tracker already declaring 4 still moves;",
+    "                Schema 4 is the file layout and schema 5 adds issue revisions, so a JSON tracker",
     "                a project already on Markdown storage returns migrated: 0 with archivePath null",
     "                and resumed false, and is NOT rewritten. The payload has the same keys on every",
     "                path: a caller never has to check which branch ran before reading one.",
@@ -1523,8 +1610,8 @@ function showHelp() {
     "                data. Neither --insert nor --update ever runs a migration on your behalf.",
     "  --compact   : { archivePath, removed, blocks: [ { id, title, archivedCount } ] } — shrinks",
     "                Markdown issues without losing history. Takes the groupings ALREADY DECIDED by the",
-    "                caller, as { blocks: [ { title, description, issue_ids } ] }; it groups",
-    "                nothing itself. Every id must exist and be 'done', no id in two blocks, no",
+    "                caller, as { blocks: [ { title, description, issues: [ { id, expected_revision } ] } ] }; it groups",
+    "                nothing itself. Every id must exist, match its expected revision, and be 'done', no id in two blocks, no",
     "                empty block, title/description within the usual limits. Refused with",
     "                INVALID_DEPENDENCY, listing the ids that point, when a LIVE issue still",
     "                declares an archived id in depends_on: unlink first, this command never",
@@ -1539,6 +1626,7 @@ function showHelp() {
     "Passing the payload:",
     "  --issue-data-file <path>  reads the JSON from a file — no shell quoting/escaping",
     "  --issue-data '<json>'     inline JSON; mutually exclusive with --issue-data-file",
+    "  --expected-revision <n>   required by --update and --delete; read it from --get first",
     "",
     "--decomposition-unchanged (on --update only): declares that the prose and its tasks still",
     "  describe the same steps, so one may move without the other. Without it, changing",
@@ -1581,7 +1669,7 @@ function showHelp() {
 // 2. Function to get issue details by ID
 function getIssue(issueId) {
   validateIssueId(issueId);
-  const issue = readIssue(projectDir, issueId);
+  const issue = readCurrentIssue(issueId);
   if (!issue) {
     fail(`Issue with ID '${issueId}' not found.`, "NOT_FOUND");
   }
@@ -1596,7 +1684,7 @@ function getAllIssues({ order, page, pageSize, status }) {
     fail("'pageSize' must be greater than 0.", "INVALID_INPUT");
   }
 
-  let issues = readAllIssues(projectDir);
+  let issues = readCurrentIssues();
 
   // Filter by status if provided
   if (status) {
@@ -1636,7 +1724,7 @@ function insertIssue(issueData) {
 
   const dependsOn = hasProp(newIssue, "depends_on") ? newIssue.depends_on : [];
   if (dependsOn.length > 0) {
-    validateDependencyGraph(dependsOn, readAllIssues(projectDir), null);
+    validateDependencyGraph(dependsOn, readCurrentIssues(), null);
   }
   enforceTasksForProgress(newIssue.status, hasProp(newIssue, "tasks") ? newIssue.tasks : []);
 
@@ -1645,6 +1733,7 @@ function insertIssue(issueData) {
   // Build the stored object with auto-managed fields; never trust caller-supplied id/timestamps
   const storedIssue = {
     id: generateNewId(),
+    revision: 1,
     title: newIssue.title,
     description: newIssue.description,
     status: newIssue.status,
@@ -1670,17 +1759,18 @@ function insertIssue(issueData) {
 
 // 5. Function to update an existing issue by ID
 // Merge semantics: a field absent from the payload keeps its current value.
-function updateIssue(issueId, issueData, declaredUnchanged = false) {
+function updateIssue(issueId, issueData, expectedRevision, declaredUnchanged = false) {
   validateIssueId(issueId);
   const updatedIssue = parseIssueData(issueData);
 
   validateIssueInput(updatedIssue, true);
   enforceRolePolicy(updatedIssue);
 
-  const existing = readIssue(projectDir, issueId);
+  const existing = readCurrentIssue(issueId);
   if (!existing) {
     fail(`Issue with ID '${issueId}' not found.`, "NOT_FOUND");
   }
+  const currentRevision = assertExpectedRevision(existing, expectedRevision);
 
   enforcePairedUpdate(updatedIssue, existing, declaredUnchanged);
 
@@ -1710,12 +1800,13 @@ function updateIssue(issueId, issueData, declaredUnchanged = false) {
     dependsOn.length !== existingDependsOn.length ||
     dependsOn.some((dependency, index) => dependency !== existingDependsOn[index]);
   if (hasProp(updatedIssue, "depends_on") && dependenciesChanged) {
-    validateDependencyGraph(dependsOn, readAllIssues(projectDir), issueId);
+    validateDependencyGraph(dependsOn, readCurrentIssues(), issueId);
   }
 
   // Rebuild the stored object: preserve id + created_at; set new updated_at
   const storedIssue = {
     id: issueId,
+    revision: currentRevision + 1,
     title: hasProp(updatedIssue, "title") ? updatedIssue.title : existing.title,
     description: hasProp(updatedIssue, "description") ? updatedIssue.description : existing.description,
     status: hasProp(updatedIssue, "status") ? updatedIssue.status : existing.status,
@@ -1750,14 +1841,15 @@ function updateIssue(issueId, issueData, declaredUnchanged = false) {
 }
 
 // 6. Function to delete an issue by ID
-function deleteIssue(issueId) {
+function deleteIssue(issueId, expectedRevision) {
   validateIssueId(issueId);
-  const issues = readAllIssues(projectDir);
+  const issues = readCurrentIssues();
 
-  const exists = issues.some((i) => i.id === issueId);
-  if (!exists) {
+  const existing = issues.find((issue) => issue.id === issueId);
+  if (!existing) {
     fail(`Issue with ID '${issueId}' not found.`, "NOT_FOUND");
   }
+  const currentRevision = assertExpectedRevision(existing, expectedRevision);
 
   // Deleting an issue others depend on would leave dangling ids behind. The alternative — stripping
   // the id from every dependent — would rewrite issues the caller never named, silently. Refusing
@@ -1774,7 +1866,7 @@ function deleteIssue(issueId) {
   }
 
   deleteIssueFile(projectDir, issueId);
-  writeOk({ id: issueId, deleted: true });
+  writeOk({ id: issueId, deleted: true, revision: currentRevision + 1 });
 }
 
 function main() {
@@ -1796,6 +1888,7 @@ function main() {
       "issue-id": { type: "string" },
       "issue-data": { type: "string" },
       "issue-data-file": { type: "string" },
+      "expected-revision": { type: "string" },
       "project-dir": { type: "string" },
       order: { type: "string", default: "asc" },
       page: { type: "string", default: "0" },
@@ -1857,7 +1950,7 @@ function main() {
     if (!issueData) {
       fail("Please provide issue data in JSON format to insert (--issue-data or --issue-data-file).", "MISSING_ARGS");
     }
-    insertIssue(issueData);
+    withMutation(() => insertIssue(issueData));
   } else if (values.update) {
     if (!issueId || !issueData) {
       fail(
@@ -1865,18 +1958,20 @@ function main() {
         "MISSING_ARGS"
       );
     }
-    updateIssue(issueId, issueData, values["decomposition-unchanged"] === true);
+    const expectedRevision = parseExpectedRevision(values["expected-revision"]);
+    withMutation(() => updateIssue(issueId, issueData, expectedRevision, values["decomposition-unchanged"] === true));
   } else if (values.delete) {
     if (!issueId) {
       fail("Please provide an issue ID to delete.", "MISSING_ARGS");
     }
-    deleteIssue(issueId);
+    const expectedRevision = parseExpectedRevision(values["expected-revision"]);
+    withMutation(() => deleteIssue(issueId, expectedRevision));
   } else if (values.init) {
-    initTracker();
+    withMutation(initTracker);
   } else if (values.upgrade) {
     // The one command that must NOT go through requireMarkdownStorage(): a tracker that has not
     // been migrated is precisely its input, and a conflict is the state it knows how to resume.
-    upgradeTracker();
+    withMutation(upgradeTracker);
   } else if (values.compact) {
     if (!issueData) {
       fail(
@@ -1884,7 +1979,7 @@ function main() {
         "MISSING_ARGS"
       );
     }
-    compactTracker(issueData);
+    withMutation(() => compactTracker(issueData));
   } else {
     fail("Invalid task specified. Use '--help' for usage information.", "UNKNOWN_COMMAND");
   }
@@ -1894,6 +1989,8 @@ try {
   main();
 } catch (err) {
   if (err instanceof IssueManagerError) {
+    writeFail(err.message, err.code);
+  } else if (err instanceof TrackerLockError) {
     writeFail(err.message, err.code);
   } else if (err instanceof StorageError) {
     writeFail(err.message, err.code);

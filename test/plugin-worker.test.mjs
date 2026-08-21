@@ -412,7 +412,7 @@ test("a worker launched by --run cannot close its own issue: issue-manager rejec
     cliPath,
     "import { spawnSync } from 'node:child_process';\n" +
       "const [, , promptFile, issueManagerPath, projectDir, issueId] = process.argv;\n" +
-      "const result = spawnSync(process.execPath, [issueManagerPath, '--update', '--issue-id', issueId,\n" +
+      "const result = spawnSync(process.execPath, [issueManagerPath, '--update', '--issue-id', issueId, '--expected-revision', '1',\n" +
       "  '--issue-data', JSON.stringify({ status: 'done' }), '--project-dir', projectDir], { encoding: 'utf8' });\n" +
       "console.log('SELF_CLOSE_STDOUT=' + result.stdout.trim());\n" +
       "console.log('SELF_CLOSE_STATUS=' + result.status);\n" +

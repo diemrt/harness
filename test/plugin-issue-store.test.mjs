@@ -51,6 +51,7 @@ test("issue-manager is the only shipped script that imports the store", () => {
 function completeIssue(overrides = {}) {
   return {
     id: ID_ONE,
+    revision: 1,
     title: "Issue One",
     description: "Description",
     status: "backlog",
@@ -105,6 +106,11 @@ test("serializeIssue/parseIssue round-trip the complete issue object", () => {
   });
 
   assert.deepEqual(parseIssue(serializeIssue(issue), "11111111.md"), issue);
+});
+
+test("serializeIssue/parseIssue round-trip revision", () => {
+  const issue = completeIssue({ revision: 7 });
+  assert.equal(parseIssue(serializeIssue(issue), "11111111.md").revision, 7);
 });
 
 test("parseIssue rejects plain scalars that require JSON quoting", () => {

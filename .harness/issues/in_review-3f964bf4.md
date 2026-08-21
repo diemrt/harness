@@ -1,7 +1,8 @@
 ---
 id: 3f964bf4-0c25-4fb1-99d7-1092ccb0138f
+revision: 2
 title: Revisioni atomiche e compare-and-set delle issue
-status: in_progress
+status: in_review
 tier: reasoning
 depends_on: []
 covers: []
@@ -15,27 +16,27 @@ tasks:
     id: 2
     short_title: Aggiungere revision e schema 5
     full_description: "Eseguire il Task 1 del piano: round-trip del campo revision, normalizzazione della baseline 1, superfici di lettura, insert e upgrade deterministico/idempotente di tracker Markdown e legacy."
-    checked: false
+    checked: true
   -
     id: 3
     short_title: Implementare il lock transazionale
     full_description: "Eseguire il Task 2 del piano: creare tracker-lock.mjs con acquisizione esclusiva, attesa, recupero dei lock abbandonati, grazia per file parziali e rilascio protetto dal token, con test portabili."
-    checked: false
+    checked: true
   -
     id: 4
     short_title: Proteggere tutte le mutazioni
     full_description: "Eseguire i Task 3 e 4 del piano: CAS obbligatorio e assenza di scritture per update/delete/compact, lock su init/insert/upgrade, compact all-or-nothing e prova concorrente a due processi."
-    checked: false
+    checked: true
   -
     id: 5
     short_title: Aggiornare chiamanti e contratto
     full_description: "Eseguire il Task 5 del piano: aggiornare worker, verificatore, skill e reference affinché rileggano, ricostruiscano il cambiamento e passino sempre la revisione osservata, distinguendo conflict da tracker busy."
-    checked: false
+    checked: true
   -
     id: 6
     short_title: Preparare 1.1.0 e handoff
     full_description: "Eseguire i Task 6 e 7 del piano: allineare i tre manifest a 1.1.0, eseguire npm run test e i controlli anti-regressione, aggiornare i task e consegnare la issue in_review a un verificatore distinto."
-    checked: false
+    checked: true
 validation:
   criteria:
     - La spec è committata prima del codice e il piano 2026-08-21-revisioni-atomiche-issue.md copre schema, lock, CAS, migrazione, chiamanti e release, escludendo lo storico fuori scope.
@@ -78,7 +79,7 @@ validation:
       checked: false
   state: unknown
 created_at: "2026-08-20T15:51:52Z"
-updated_at: "2026-08-21T07:28:16Z"
+updated_at: "2026-08-21T08:21:07Z"
 ---
 
 # Revisioni atomiche e compare-and-set delle issue

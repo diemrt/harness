@@ -70,7 +70,7 @@ rende visibile all'operazione `docs-gate`.
 
 ## `update <id> <modifica>` → aggiornare
 
-`--update --issue-id <id> --issue-data-file <path>`: merge, campi omessi invariati, un campo
+Prima di aggiornare, leggi `data.revision` con `--get`. `--update --issue-id <id> --expected-revision <revision appena letta> --issue-data-file <path>`: merge, campi omessi invariati, un campo
 presente dev'essere valido.
 
 **Prosa e decomposizione si toccano insieme:** cambiare la `description` senza rivedere i `tasks`

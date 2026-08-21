@@ -4,7 +4,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -123,7 +123,7 @@ function setupLegacyProject(seed = baseSeed()) {
 
 // Role-neutral by design: HARNESS_ROLE is dropped so the suite behaves the same whether or not the
 // test-runner itself was launched as a worker. Tests that need a role use runWithRole() instead.
-function run(cwd, args) {
+function runRaw(cwd, args) {
   const env = { ...process.env };
   delete env.HARNESS_ROLE;
   return spawnSync(process.execPath, [SCRIPT_PATH, ...args], {
@@ -131,6 +131,53 @@ function run(cwd, args) {
     env,
     cwd,
   });
+}
+
+function runAsync(cwd, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [SCRIPT_PATH, ...args], { cwd, env: { ...process.env } });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("error", reject);
+    child.on("close", (status) => resolve({ status, stdout, stderr, envelope: JSON.parse(stdout.trim()) }));
+  });
+}
+
+function run(cwd, args) {
+  const mutation = args.includes("--update") || args.includes("--delete");
+  const issueId = args[args.indexOf("--issue-id") + 1];
+  let currentRevision = 1;
+  if (mutation && issueId) {
+    const read = runRaw(cwd, ["--get", "--issue-id", issueId]);
+    try {
+      const envelope = JSON.parse(read.stdout.trim());
+      if (envelope.ok) currentRevision = envelope.data.revision;
+    } catch {}
+  }
+  let prepared = mutation && !args.includes("--expected-revision")
+    ? [...args, "--expected-revision", String(currentRevision)]
+    : args;
+  const dataIndex = prepared.indexOf("--issue-data");
+  if (prepared.includes("--compact") && dataIndex !== -1) {
+    let payload;
+    try {
+      payload = JSON.parse(prepared[dataIndex + 1]);
+    } catch {
+      return runRaw(cwd, prepared);
+    }
+    if (Array.isArray(payload.blocks)) {
+      payload.blocks = payload.blocks.map((block) => {
+        if (block.issue_ids === undefined) return block;
+        const { issue_ids, ...rest } = block;
+        return { ...rest, issues: issue_ids.map((id) => ({ id, expected_revision: 1 })) };
+      });
+      prepared = [...prepared];
+      prepared[dataIndex + 1] = JSON.stringify(payload);
+    }
+  }
+  return runRaw(cwd, prepared);
 }
 
 // Asserts the subprocess produced exactly the envelope shape the contract mandates: one line of
@@ -267,10 +314,38 @@ test("--dump returns every issue without pagination or status filtering", () => 
   }
 });
 
+test("read surfaces normalize a missing revision to 1 without rewriting the issue", () => {
+  const { dir } = setupTempProject();
+  try {
+    const before = trackerFiles(dir);
+    const get = assertOk(run(dir, ["--get", "--issue-id", ID_ONE]));
+    const all = assertOk(run(dir, ["--get-all", "--status", "backlog"]));
+    const dump = assertOk(run(dir, ["--dump"]));
+    assert.equal(get.revision, 1);
+    assert.equal(all.issues.find((issue) => issue.id === ID_ONE).revision, 1);
+    assert.equal(dump.issues.find((issue) => issue.id === ID_ONE).revision, 1);
+    assert.deepEqual(trackerFiles(dir), before);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("stored revisions must be positive integers", () => {
+  const { dir } = setupTempProject({
+    ...baseSeed(),
+    issues: [{ ...baseSeed().issues[0], revision: 0 }],
+  });
+  try {
+    assertFail(run(dir, ["--get", "--issue-id", ID_ONE]), "INVALID_REVISION");
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("--dump returns an empty Markdown tracker", () => {
   const { dir } = setupTempProject(null);
   try {
-    assert.deepEqual(assertOk(run(dir, ["--dump"])), { schema_version: 4, issues: [] });
+    assert.deepEqual(assertOk(run(dir, ["--dump"])), { schema_version: 5, issues: [] });
   } finally {
     cleanup(dir);
   }
@@ -346,13 +421,13 @@ test("--update with unchanged dependencies ignores an unrelated malformed Markdo
   }
 });
 
-test("--upgrade on Markdown storage is a no-op and creates no legacy JSON", () => {
+test("--upgrade on Markdown storage materializes revisions and creates no legacy JSON", () => {
   const { dir } = setupTempProject();
   try {
-    const before = trackerFiles(dir);
-    assertOk(run(dir, ["--upgrade"]));
+    const data = assertOk(run(dir, ["--upgrade"]));
     assert.equal(existsSync(path.join(dir, "issues.json")), false);
-    assert.deepEqual(trackerFiles(dir), before);
+    assert.equal(data.migrated, 3);
+    assert.equal(assertOk(run(dir, ["--get", "--issue-id", ID_ONE])).revision, 1);
   } finally {
     cleanup(dir);
   }
@@ -467,6 +542,7 @@ test("--insert generates an id and sets created_at/updated_at", () => {
     assert.equal(data.description, "New Description");
     assert.equal(data.status, "backlog");
     assert.equal(data.validation, null);
+    assert.equal(data.revision, 1);
     assert.ok(data.created_at, "created_at must be set");
     assert.equal(data.created_at, data.updated_at);
 
@@ -474,6 +550,27 @@ test("--insert generates an id and sets created_at/updated_at", () => {
     const getResult = run(dir, ["--get", "--issue-id", data.id]);
     const getData = assertOk(getResult);
     assert.equal(getData.title, "New Issue");
+    assert.equal(getData.revision, 1);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--upgrade materializes revision 1 on Markdown records and is byte-idempotent", () => {
+  const { dir } = setupTempProject();
+  try {
+    const first = assertOk(run(dir, ["--upgrade"]));
+    assert.equal(first.to, 5);
+    assert.equal(first.migrated, 3);
+    assert.match(
+      readFileSync(path.join(dir, ".harness", "issues", issueFileName(baseSeed().issues[0])), "utf8"),
+      /^revision: 1$/m
+    );
+    assert.equal(assertOk(run(dir, ["--get", "--issue-id", ID_ONE])).revision, 1);
+    const beforeSecondUpgrade = trackerFiles(dir);
+    const second = assertOk(run(dir, ["--upgrade"]));
+    assert.equal(second.migrated, 0);
+    assert.deepEqual(trackerFiles(dir), beforeSecondUpgrade);
   } finally {
     cleanup(dir);
   }
@@ -501,6 +598,60 @@ test("--update merges: omitted fields keep their current value", () => {
   }
 });
 
+test("update and delete require a positive expected revision", () => {
+  const { dir } = setupTempProject();
+  try {
+    assertFail(runRaw(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", '{"title":"Changed"}']), "MISSING_ARGS");
+    assertFail(runRaw(dir, ["--update", "--issue-id", ID_ONE, "--expected-revision", "0", "--issue-data", '{"title":"Changed"}']), "INVALID_REVISION");
+    assertFail(runRaw(dir, ["--delete", "--issue-id", ID_ONE]), "MISSING_ARGS");
+    assertFail(runRaw(dir, ["--delete", "--issue-id", ID_ONE, "--expected-revision", "not-a-number"]), "INVALID_REVISION");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("a stale update leaves tracker bytes unchanged", () => {
+  const { dir } = setupTempProject();
+  try {
+    const before = trackerFiles(dir);
+    assertFail(runRaw(dir, ["--update", "--issue-id", ID_ONE, "--expected-revision", "2", "--issue-data", '{"title":"Changed"}']), "REVISION_CONFLICT");
+    assert.deepEqual(trackerFiles(dir), before);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("two concurrent updates from revision 1 yield one winner and a replay preserves both tasks", async () => {
+  const { dir } = setupTempProject();
+  const firstTask = { id: 1, short_title: "First", full_description: "First concurrent update.", checked: true };
+  const secondTask = { id: 2, short_title: "Second", full_description: "Second concurrent update.", checked: true };
+  try {
+    const results = await Promise.all([
+      runAsync(dir, ["--update", "--issue-id", ID_ONE, "--expected-revision", "1", "--issue-data", JSON.stringify({ tasks: [firstTask] })]),
+      runAsync(dir, ["--update", "--issue-id", ID_ONE, "--expected-revision", "1", "--issue-data", JSON.stringify({ tasks: [secondTask] })]),
+    ]);
+    assert.deepEqual(results.map((result) => result.status).sort(), [0, 1]);
+    assert.equal(results.filter((result) => result.envelope.ok).length, 1);
+    assert.equal(results.find((result) => !result.envelope.ok).envelope.code, "REVISION_CONFLICT");
+
+    const winnerRead = runRaw(dir, ["--get", "--issue-id", ID_ONE]);
+    assert.equal(winnerRead.status, 0, winnerRead.stdout);
+    const afterWinner = assertOk(winnerRead);
+    assert.equal(afterWinner.revision, 2);
+    const losingTask = results.find((result) => !result.envelope.ok) === results[0] ? firstTask : secondTask;
+    const replayResult = runRaw(dir, [
+      "--update", "--issue-id", ID_ONE, "--expected-revision", "2", "--decomposition-unchanged",
+      "--issue-data", JSON.stringify({ tasks: [...afterWinner.tasks, losingTask] }),
+    ]);
+    assert.equal(replayResult.status, 0, replayResult.stdout);
+    const replay = assertOk(replayResult);
+    assert.equal(replay.revision, 3);
+    assert.deepEqual(replay.tasks.map((task) => task.id).sort(), [1, 2]);
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test('--update with explicit "validation": null clears the validation object', () => {
   const { dir } = setupTempProject();
   try {
@@ -521,15 +672,44 @@ test('--update with explicit "validation": null clears the validation object', (
 // --delete
 // ---------------------------------------------------------------------------
 
-test("--delete returns { id, deleted } and removes the issue", () => {
+test("--delete returns its consumed revision and removes the issue", () => {
   const { dir } = setupTempProject();
   try {
     const result = run(dir, ["--delete", "--issue-id", ID_ONE]);
     const data = assertOk(result);
-    assert.deepEqual(data, { id: ID_ONE, deleted: true });
+    assert.deepEqual(data, { id: ID_ONE, deleted: true, revision: 2 });
 
     const getResult = run(dir, ["--get", "--issue-id", ID_ONE]);
     assertFail(getResult, "NOT_FOUND");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--compact compares every referenced revision before writing", () => {
+  const { dir } = setupTempProject(compactSeed());
+  const payload = JSON.stringify({
+    blocks: [{
+      title: "Direct CAS block",
+      description: "Exercises the public compact payload.",
+      issues: [{ id: ID_ONE, expected_revision: 1 }],
+    }],
+  });
+  try {
+    const data = assertOk(runRaw(dir, ["--compact", "--issue-data", payload]));
+    assert.equal(data.removed, 1);
+    assert.equal(data.consumed[0].expected_revision, 1);
+
+    const before = trackerFiles(dir);
+    const stale = JSON.stringify({
+      blocks: [{
+        title: "Stale block",
+        description: "Must not create an archive.",
+        issues: [{ id: ID_TWO, expected_revision: 2 }],
+      }],
+    });
+    assertFail(runRaw(dir, ["--compact", "--issue-data", stale]), "REVISION_CONFLICT");
+    assert.deepEqual(trackerFiles(dir), before);
   } finally {
     cleanup(dir);
   }
@@ -1110,7 +1290,10 @@ function runWithRole(cwd, args, role) {
   } else {
     env.HARNESS_ROLE = role;
   }
-  return spawnSync(process.execPath, [SCRIPT_PATH, ...args], {
+  const prepared = (args.includes("--update") || args.includes("--delete")) && !args.includes("--expected-revision")
+    ? [...args, "--expected-revision", "1"]
+    : args;
+  return spawnSync(process.execPath, [SCRIPT_PATH, ...prepared], {
     encoding: "utf8",
     env,
     cwd,
@@ -1254,7 +1437,23 @@ test("HARNESS_ROLE set to a non-worker value: status=done is unaffected", () => 
 function runFrom(cwd, args) {
   const env = { ...process.env };
   delete env.HARNESS_ROLE;
-  return spawnSync(process.execPath, [SCRIPT_PATH, ...args], { encoding: "utf8", env, cwd });
+  let prepared = (args.includes("--update") || args.includes("--delete")) && !args.includes("--expected-revision")
+    ? [...args, "--expected-revision", "1"]
+    : args;
+  const dataIndex = prepared.indexOf("--issue-data");
+  if (prepared.includes("--compact") && dataIndex !== -1) {
+    const payload = JSON.parse(prepared[dataIndex + 1]);
+    if (Array.isArray(payload.blocks)) {
+      payload.blocks = payload.blocks.map((block) => {
+        if (block.issue_ids === undefined) return block;
+        const { issue_ids, ...rest } = block;
+        return { ...rest, issues: issue_ids.map((id) => ({ id, expected_revision: 1 })) };
+      });
+      prepared = [...prepared];
+      prepared[dataIndex + 1] = JSON.stringify(payload);
+    }
+  }
+  return spawnSync(process.execPath, [SCRIPT_PATH, ...prepared], { encoding: "utf8", env, cwd });
 }
 
 test("--project-dir operates on that project, not on the cwd", () => {
@@ -1700,7 +1899,7 @@ test("--update preserves a schema_version that differs from this script's own SC
 // --init — creates issues.json with the minimal seed, and never overwrites an existing one
 // ---------------------------------------------------------------------------
 
-const SCHEMA_VERSION = 4; // mirrors the constant in scripts/issue-manager.mjs
+const SCHEMA_VERSION = 5; // mirrors the constant in scripts/issue-manager.mjs
 
 test("--init creates the issues directory and reports created:true", () => {
   const { dir } = setupTempProject(null);
@@ -1940,7 +2139,7 @@ test("(b) after --upgrade every issue has depends_on; issues that already had it
 
       // No key present before is missing after, and no key absent before was invented besides
       // the three the migrations materialize.
-      const beforeKeys = new Set([...Object.keys(beforeIssue), "depends_on", "covers", "tasks"]);
+      const beforeKeys = new Set([...Object.keys(beforeIssue), "depends_on", "covers", "tasks", "revision"]);
       assert.deepEqual(new Set(Object.keys(afterIssue)), beforeKeys);
     }
   } finally {
@@ -2012,7 +2211,7 @@ test("--upgrade on a legacy tracker already declaring SCHEMA_VERSION still moves
   try {
     const data = assertOk(run(dir, ["--upgrade"]));
     assert.equal(data.from, SCHEMA_VERSION);
-    assert.equal(data.migrated, 0, "no field migration is left to run");
+    assert.equal(data.migrated, 3, "revision is materialized even when the old config claimed schema 5");
     assert.equal(data.issues, 3);
 
     // The version a JSON file declares does not make it Markdown storage: schema 4 IS the file
@@ -2070,11 +2269,11 @@ test("--upgrade resumes a run interrupted after every issue was written but befo
     assert.equal(data.resumed, true);
     assert.equal(data.issues, 3);
     assert.equal(existsSync(path.join(dir, "issues.json")), false);
-    assert.deepEqual(
-      trackerFiles(dir).filter(([name]) => name.includes("issues")),
-      markdownBefore.filter(([name]) => name.includes("issues")),
-      "issues already written identically must come out unchanged"
-    );
+    const markdownAfter = trackerFiles(dir).filter(([name]) => name.includes("issues"));
+    assert.equal(markdownAfter.length, markdownBefore.filter(([name]) => name.includes("issues")).length);
+    for (const [, markdown] of markdownAfter) {
+      assert.match(markdown, /^revision: 1$/m, "the resumed schema 5 migration materializes the baseline");
+    }
   } finally {
     cleanup(dir);
   }
@@ -2140,7 +2339,7 @@ test("neither --insert nor --update changes the Markdown config schema version",
   try {
     assertOk(run(dir, ["--insert", "--issue-data", JSON.stringify({ title: "T", description: "D", status: "backlog" })]));
     assertOk(run(dir, ["--update", "--issue-id", ID_ONE, "--issue-data", JSON.stringify({ status: "blocked" })]));
-    assert.equal(rootData(dir).schema_version, SCHEMA_VERSION);
+    assert.equal(rootData(dir).schema_version, 4);
   } finally {
     cleanup(dir);
   }
@@ -2287,17 +2486,17 @@ test("--compact writes the ORIGINAL issue objects, whole, into .harness/archive/
     assert.match(files[0], /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z(-\d+)?\.json$/);
 
     const archive = JSON.parse(readFileSync(path.join(dir, ARCHIVE_SUBPATH, files[0]), "utf8"));
-    assert.equal(archive.schema_version, SCHEMA_VERSION, "the archive self-describes the schema it was written under");
+    assert.equal(archive.schema_version, 4, "the archive preserves the schema declared by this pre-upgrade tracker");
     assert.equal(typeof archive.archived_at, "string");
     assert.equal(archive.issues.length, 2);
 
     for (const id of [ID_ONE, ID_TWO]) {
       const original = before.find((i) => i.id === id);
       const archived = archive.issues.find((i) => i.id === id);
-      assert.deepEqual(archived, original, `issue ${id} must be archived exactly as it was stored`);
+      assert.deepEqual(archived, { ...original, revision: 1 }, `issue ${id} must be archived with its logical baseline revision`);
       assert.deepEqual(
         new Set(Object.keys(archived)),
-        new Set(Object.keys(original)),
+        new Set([...Object.keys(original), "revision"]),
         `no key of ${id} may be invented or dropped by the archiver`
       );
     }
@@ -2411,9 +2610,9 @@ test("--compact archives with the Markdown config schema version", () => {
   const { dir } = setupTempProject(seed);
   try {
     assertOk(run(dir, ["--compact", "--issue-data", oneBlock([ID_TWO])]));
-    assert.equal(rootData(dir).schema_version, SCHEMA_VERSION);
+    assert.equal(rootData(dir).schema_version, 4);
     const archive = JSON.parse(readFileSync(path.join(dir, ARCHIVE_SUBPATH, archiveFiles(dir)[0]), "utf8"));
-    assert.equal(archive.schema_version, SCHEMA_VERSION, "the archive records the config schema version");
+    assert.equal(archive.schema_version, 4, "the archive records the config schema version");
   } finally {
     cleanup(dir);
   }
@@ -2596,7 +2795,7 @@ test("--help lists --compact and the shape of its payload", () => {
     const result = run(dir, ["--help"]);
     assert.equal(result.status, 0);
     assert.match(result.stdout, /--compact/);
-    assert.match(result.stdout, /issue_ids/);
+    assert.match(result.stdout, /expected_revision/);
     assert.match(result.stdout, /archivePath/);
   } finally {
     cleanup(dir);

@@ -116,6 +116,7 @@ test("the plugin components the manifests promise are on disk", () => {
     "agents/harness-verifier.md",
     "scripts/issue-manager.mjs",
     "scripts/issue-store.mjs",
+    "scripts/tracker-lock.mjs",
     "scripts/status-cli.mjs",
     "scripts/harness-config.mjs",
     "scripts/harness-worker.mjs",

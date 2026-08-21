@@ -1,6 +1,6 @@
 {
   "name": "harness",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Controlled development harness for AI agents with tracked issues and independent verification.",
   "author": {"name": "diemrt", "url": "https://github.com/diemrt"},
   "homepage": "https://github.com/diemrt/harness#readme",

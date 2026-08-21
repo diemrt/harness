@@ -37,8 +37,9 @@ directory nasce al **primo `--insert`**, oppure di proposito con `--init` (sotto
 
 ## `schema_version`
 
-Lo schema descritto in questa pagina è il `4`, ed è **anche il formato di storage**: schema 4
-vuol dire un file per issue. Lo script conosce la propria versione tramite la costante
+Lo schema descritto in questa pagina è il `5`: lo storage resta un file Markdown per issue e ogni
+record porta `revision`, un intero positivo e monotono. I record schema 4 senza campo leggono come
+revisione logica `1` senza essere riscritti; `--upgrade` materializza il campo. Lo script conosce la propria versione tramite la costante
 `SCHEMA_VERSION`.
 
 La versione è dichiarata in `.harness/config.json`, come **prima chiave dell'oggetto**, dai due
@@ -48,7 +49,7 @@ la configurazione da capo e una riscrittura che la perdesse farebbe leggere un t
 uno mai timbrato.
 
 - **chiave assente = versione corrente.** Un progetto già su storage Markdown ma senza config
-  timbrata si legge come schema 4, non come un tracker rotto: `.harness/issues/` esiste, e quello
+  timbrata si legge come schema 4 se almeno una issue non porta `revision`, altrimenti schema 5: `.harness/issues/` esiste, e quello
   è il fatto. `--upgrade` la timbra quando la trova in disaccordo, e non riscrive niente quando è
   già giusta.
 - **la config non viene creata da nessuno dei due comandi.** Se il progetto non ha
@@ -86,13 +87,13 @@ node "$SCRIPTS/issue-manager.mjs" --insert --issue-data-file ./new-issue.json
 node "$SCRIPTS/issue-manager.mjs" --insert --issue-data '{"title":"...","description":"...","status":"backlog","validation":{"criteria":["...","..."],"state":"unknown"}}'
 
 # aggiornare (merge: i campi omessi restano invariati)
-node "$SCRIPTS/issue-manager.mjs" --update --issue-id <id> --issue-data '{"status":"done","validation":{"criteria":"<evidenza>","state":"pass"}}'
+node "$SCRIPTS/issue-manager.mjs" --update --issue-id <id> --expected-revision <n> --issue-data '{"status":"done","validation":{"criteria":"<evidenza>","state":"pass"}}'
 
 # aggiornare la prosa dichiarando che la decomposizione in task regge ancora
-node "$SCRIPTS/issue-manager.mjs" --update --issue-id <id> --issue-data-file ./change.json --decomposition-unchanged
+node "$SCRIPTS/issue-manager.mjs" --update --issue-id <id> --expected-revision <n> --issue-data-file ./change.json --decomposition-unchanged
 
 # eliminare (rifiutato finché altre issue la dichiarano in depends_on)
-node "$SCRIPTS/issue-manager.mjs" --delete --issue-id <id>
+node "$SCRIPTS/issue-manager.mjs" --delete --issue-id <id> --expected-revision <n>
 
 # operare su un altro progetto
 node "$SCRIPTS/issue-manager.mjs" --get-all --project-dir /path/to/project
@@ -120,6 +121,18 @@ $id = (node "$SCRIPTS/issue-manager.mjs" --insert --issue-data-file .\new-issue.
 ```
 
 Un `"validation": null` **esplicito** azzera la validazione; ometterlo la lascia invariata.
+
+## Revisioni, lock e conflitti
+
+Ogni `--get`, `--get-all` e `--dump` restituisce `revision`. Prima di mutare, il chiamante legge
+l'issue e passa esattamente quel valore con `--expected-revision`; `revision` non è ammesso nei
+payload insert/update. `--update`, `--delete` e ogni riferimento di `--compact` sono compare-and-set.
+Il manager serializza init, insert, update, delete, compact e upgrade con
+`.harness/issue-manager.lock`; le letture restano lock-free.
+
+Su `REVISION_CONFLICT` non ripetere il payload: rileggi, ricostruisci il solo cambiamento richiesto
+sullo stato corrente, riesegui i guard locali e invia la nuova revisione. Su `TRACKER_BUSY` nessuno
+stato è stato confrontato: rileggi e riprova, senza cancellare un lock vivo.
 
 ## Aprire una issue: cosa decide chi la apre
 
@@ -255,7 +268,14 @@ payload. `--compact` esegue e basta.
 ```json
 {
   "blocks": [
-    { "title": "…", "description": "…", "issue_ids": ["<guid>", "<guid>"] }
+    {
+      "title": "…",
+      "description": "…",
+      "issues": [
+        { "id": "<guid>", "expected_revision": 3 },
+        { "id": "<guid>", "expected_revision": 7 }
+      ]
+    }
   ]
 }
 ```
@@ -271,13 +291,15 @@ l'archivio.
 1. `HARNESS_ROLE=worker` → `FORBIDDEN_ROLE`. Il controllo è il primo e non guarda nemmeno il
    payload: ogni blocco che questo comando scrive è un record `done` / `pass`, che è esattamente
    la mossa che il guard anti-self-validation esiste per impedire.
-2. forma del payload: campo sconosciuto, `blocks` assente o vuoto, blocco senza `issue_ids` o con
-   `issue_ids: []`, `title`/`description` vuoti → `INVALID_INPUT`; oltre i limiti →
-   `LIMIT_EXCEEDED`; id che non è un GUID → `INVALID_ID`. Lo stesso id in due blocchi (o due
+2. forma del payload: campo sconosciuto, `blocks` assente o vuoto, blocco senza `issues` o con
+   `issues: []`, `title`/`description` vuoti → `INVALID_INPUT`; oltre i limiti →
+   `LIMIT_EXCEEDED`; id che non è un GUID → `INVALID_ID`; `expected_revision` deve essere un
+   intero positivo. Lo stesso id in due blocchi (o due
    volte nello stesso) → `INVALID_INPUT`: l'originale viene rimosso e sostituito una volta sola,
    due riassunti dello stesso lavoro non possono essere entrambi veri.
-3. contro il tracker: id che non esiste → `NOT_FOUND`; issue che **non è `done`** →
-   `INVALID_STATUS`. Solo il lavoro chiuso si riassume.
+3. contro il tracker: id che non esiste → `NOT_FOUND`; revisione cambiata →
+   `REVISION_CONFLICT`; issue che **non è `done`** → `INVALID_STATUS`. Solo il lavoro chiuso si
+   riassume.
 4. una issue **viva** (che resta nel tracker) dichiara in `depends_on` uno degli id da
    archiviare → `INVALID_DEPENDENCY`, **elencando gli id che puntano**. È la stessa semantica di
    `--delete`: far puntare quei riferimenti al blocco muterebbe issue che il chiamante non ha

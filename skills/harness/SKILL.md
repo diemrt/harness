@@ -10,6 +10,9 @@ qualcun altro è una issue tracciata — quale sia, lo dice il capitolo «Cosa d
 ogni issue viene verificata da un agente **diverso** da chi l'ha svolta, e niente raggiunge il
 ramo condiviso prima di quella verifica.
 
+`scripts/tracker-lock.mjs` possiede il lock transazionale di progetto: non conosce payload o
+revisioni, che restano responsabilità di `issue-manager.mjs`.
+
 **Cosa harness scrive nel progetto:** soltanto `.harness/` — il tracker in `issues/`, un file
 Markdown per issue, più configurazione, archivi di `--compact` e `--upgrade`, log dei worker.
 Nient'altro: script e regole vivono in questo plugin. Cosa di tutto questo entri in git lo decide
@@ -177,11 +180,11 @@ chiudere la issue che ha appena svolto.
 Quindi, lavorando inline, **ogni mutazione del tracker si lancia col ruolo esplicito**:
 
 ```powershell
-$env:HARNESS_ROLE='worker'; node "$SCRIPTS/issue-manager.mjs" --update --issue-id <id> --issue-data-file <file>
+$env:HARNESS_ROLE='worker'; node "$SCRIPTS/issue-manager.mjs" --update --issue-id <id> --expected-revision <revision appena letta> --issue-data-file <file>
 ```
 
 ```bash
-HARNESS_ROLE=worker node "$SCRIPTS/issue-manager.mjs" --update --issue-id <id> --issue-data-file <file>
+HARNESS_ROLE=worker node "$SCRIPTS/issue-manager.mjs" --update --issue-id <id> --expected-revision <revision appena letta> --issue-data-file <file>
 ```
 
 Su PowerShell la forma `VAR=x comando` non esiste: la variabile va assegnata nella stessa

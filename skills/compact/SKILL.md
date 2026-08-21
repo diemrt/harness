@@ -30,7 +30,7 @@ separati i comandi dallo schema"). Nessun argomento: proponi i blocchi su tutte 
 ## 1. Leggi le issue done
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --get-all --status done --page-size 50 | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log('totalCount '+j.data.totalCount);for(const i of j.data.issues)console.log(i.id.slice(0,8)+' | '+i.title)})"
+node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --get-all --status done --page-size 50 | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log('totalCount '+j.data.totalCount);for(const i of j.data.issues)console.log(i.id.slice(0,8)+' | '+i.revision+' | '+i.title)})"
 ```
 
 **Proietta id e titolo prima che l'output arrivi in contesto**, e scorri tutte le pagine con
@@ -51,7 +51,7 @@ Scrivi il payload confermato su file e passalo con `--issue-data-file` (nessun e
 quote da gestire nella shell):
 
 ```json
-{ "blocks": [ { "title": "…", "description": "…", "issue_ids": ["<guid>", "<guid>"] } ] }
+{ "blocks": [ { "title": "…", "description": "…", "issues": [{"id":"<guid>","expected_revision":1}] } ] }
 ```
 
 ```bash
@@ -62,7 +62,9 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --compact --issue-data-fi
 
 Successo → riporta `archivePath` e, per ogni blocco creato, `id` e `title`.
 
-Errori: leggi `code` e non ritentare alla cieca con lo stesso payload.
+Errori: leggi `code` e non ritentare alla cieca con lo stesso payload. `REVISION_CONFLICT` richiede
+una nuova lettura e una nuova proposta; `TRACKER_BUSY` richiede attesa e rilettura, mai rimozione
+manuale del lock.
 
 - `INVALID_DEPENDENCY` → l'errore elenca gli id delle issue vive che puntano a un id da
   archiviare. Scollegale prima (aggiorna il loro `depends_on` con l'operazione `issue`), poi

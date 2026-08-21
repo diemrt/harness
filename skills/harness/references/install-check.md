@@ -64,6 +64,10 @@ un ramo. Se lo lanci mentre lavori, leggi `missing` come «ecco cosa non è anco
 
 ## Perché esiste
 
+Con schema 5, una copia 1.0 non deve mutare il tracker: non conosce `revision` e non applica il
+compare-and-set. Prima della prima mutazione dopo l'aggiornamento, installa la 1.1, esegui questo
+controllo e riavvia la sessione affinché carichi la nuova copia.
+
 Fra il 2026-07-29 e il 2026-08-13 il marketplace `diemrt` è stato registrato come `directory`
 sul working tree dell'autore. Per quindici giorni ogni progetto che usava harness ha eseguito
 quella cartella dal vivo — non un tag, non un commit, nemmeno un albero pulito — mentre la copia

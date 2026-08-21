@@ -81,10 +81,12 @@ dove ripartire invece di rifare tutto.
 ```bash
 # superata
 node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id> \
+  --expected-revision <revision letta da --get> \
   --issue-data-file <file con {"status":"done","validation":{"criteria":"<evidenza>","state":"pass"}}>
 
 # fallita
 node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id> \
+  --expected-revision <revision letta da --get> \
   --issue-data-file <file con {"status":"blocked","validation":{"criteria":"<motivo>","state":"fail"}}>
 ```
 

@@ -87,6 +87,9 @@ label a human can read. Bumping it is therefore not what ships the change — bu
 means nobody can answer "which harness is this", which is how one copy stayed frozen for 159
 commits while claiming to be the current one. Bump it, and check the copy afterwards.
 
+Il rilascio 1.1 porta il tracker a schema 5: prima di mutare un tracker aggiornato, il consumer
+deve aggiornare il plugin e aprire una nuova sessione. Una copia 1.0 non conosce revisioni e CAS.
+
 Between 2026-07-29 and 2026-08-13 exactly that happened, and the report is in
 [docs/superpowers/analisi/2026-08-13-plugin-pubblicato-divergente.md](docs/superpowers/analisi/2026-08-13-plugin-pubblicato-divergente.md).
 

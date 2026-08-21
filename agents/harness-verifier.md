@@ -140,7 +140,7 @@ Ti arrivano l'id della issue e il contesto di cosa è stato prodotto.
 6. **Chiudi la issue.** Payload su file (niente escaping nella shell):
 
    ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id> --issue-data-file <path>
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id> --expected-revision <revision letta da --get> --issue-data-file <path>
    ```
 
    - superata → `{"status":"done","validation":{"criteria":"<evidenza>","tasks":[…],"state":"pass"}}`
