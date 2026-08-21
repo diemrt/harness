@@ -90,14 +90,11 @@ spunta dei `validation.tasks` compresa.
 
 ## `upgrade` → migra un tracker legacy
 
-`--upgrade` porta un `issues.json` legacy allo storage Markdown (mai automatico da
-`new`/`update`). `data: { from, to, migrated, issues, archivePath, resumed }`; già su storage
-Markdown → `migrated: 0`, nessuna scrittura.
+`--upgrade` non è automatico da `new`/`update`; vedi `references/issues.md` per migrazione e
+schema 5. Markdown già aggiornato restituisce `migrated: 0`; revisioni mancanti sono
+materializzate in modo idempotente.
 
 ## Errori
 
-Su stdout c'è sempre una sola riga JSON. Se `ok` è `false`, riporta `code` e `error` così
-come sono: `INVALID_ID`, `NOT_FOUND`, `INVALID_INPUT`, `INVALID_TIER`, `LIMIT_EXCEEDED`,
-`FORBIDDEN_ROLE`, `STORAGE_CONFLICT` dicono già cosa è andato storto, non tirare a indovinare
-una correzione. `STORAGE_NOT_MIGRATED` ha una risposta sola, ed è nel messaggio: il progetto ha
-ancora il tracker JSON, va lanciato `upgrade`.
+Su stdout c'è una riga JSON: riporta `code` ed `error` senza inventare una correzione. Per
+`STORAGE_NOT_MIGRATED` esegui `upgrade`.

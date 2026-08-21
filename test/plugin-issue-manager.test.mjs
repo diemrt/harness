@@ -688,28 +688,41 @@ test("--delete returns its consumed revision and removes the issue", () => {
 
 test("--compact compares every referenced revision before writing", () => {
   const { dir } = setupTempProject(compactSeed());
-  const payload = JSON.stringify({
-    blocks: [{
-      title: "Direct CAS block",
-      description: "Exercises the public compact payload.",
-      issues: [{ id: ID_ONE, expected_revision: 1 }],
-    }],
-  });
   try {
-    const data = assertOk(runRaw(dir, ["--compact", "--issue-data", payload]));
-    assert.equal(data.removed, 1);
-    assert.equal(data.consumed[0].expected_revision, 1);
-
+    assertOk(runRaw(dir, [
+      "--update", "--issue-id", ID_TWO, "--expected-revision", "1",
+      "--issue-data", JSON.stringify({ title: "Issue Two, revised" }),
+    ]));
     const before = trackerFiles(dir);
     const stale = JSON.stringify({
       blocks: [{
         title: "Stale block",
         description: "Must not create an archive.",
-        issues: [{ id: ID_TWO, expected_revision: 2 }],
+        issues: [
+          { id: ID_ONE, expected_revision: 1 },
+          { id: ID_TWO, expected_revision: 1 },
+        ],
       }],
     });
     assertFail(runRaw(dir, ["--compact", "--issue-data", stale]), "REVISION_CONFLICT");
     assert.deepEqual(trackerFiles(dir), before);
+
+    const payload = JSON.stringify({
+      blocks: [{
+        title: "Direct CAS block",
+        description: "Exercises the public compact payload.",
+        issues: [
+          { id: ID_ONE, expected_revision: 1 },
+          { id: ID_TWO, expected_revision: 2 },
+        ],
+      }],
+    });
+    const data = assertOk(runRaw(dir, ["--compact", "--issue-data", payload]));
+    assert.equal(data.removed, 2);
+    assert.deepEqual(data.consumed, [
+      { id: ID_ONE, revision: 2 },
+      { id: ID_TWO, revision: 3 },
+    ]);
   } finally {
     cleanup(dir);
   }

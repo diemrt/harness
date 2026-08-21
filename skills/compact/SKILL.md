@@ -45,10 +45,13 @@ non fa". Per ogni blocco proposto mostra `title`, `description` e la lista `id` 
 
 **Non chiamare la primitiva finché l'utente non conferma il raggruppamento mostrato.**
 
-## 3. Chiama la primitiva
+## 3. Rileggi e chiama la primitiva
 
 Scrivi il payload confermato su file e passalo con `--issue-data-file` (nessun escaping di
-quote da gestire nella shell):
+quote da gestire nella shell). **Dopo la conferma, rileggi tutte le issue nominate**: ricostruisci
+il payload con le loro `revision` appena osservate. Se stato, dipendenze o raggruppamento non sono
+più quelli confermati, mostra la nuova proposta e chiedi di nuovo conferma; una revisione diversa
+da sola richiede comunque il payload ricostruito, mai il riuso cieco del file precedente:
 
 ```json
 { "blocks": [ { "title": "…", "description": "…", "issues": [{"id":"<guid>","expected_revision":1}] } ] }

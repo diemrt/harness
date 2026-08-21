@@ -76,7 +76,10 @@ dove ripartire invece di rifare tutto.
    ([config.md](config.md)). Il suo esito *è* il gate: se fallisce, la issue fallisce.
 4. **Non correggere niente.** Se trova un problema lo riporta; non lo aggiusta. Un
    verificatore che ripara è tornato a essere il worker, e la verifica è persa.
-5. **Chiudere la issue:**
+5. **Chiudere la issue:** rileggi con `--get` immediatamente prima della scrittura e usa quella
+`revision`, non quella letta all'avvio della verifica. `REVISION_CONFLICT` richiede rilettura,
+ricostruzione del payload e nuova valutazione delle evidenze; `TRACKER_BUSY` richiede attesa e
+rilettura. Nessuno dei due autorizza a ripetere ciecamente il payload precedente.
 
 ```bash
 # superata

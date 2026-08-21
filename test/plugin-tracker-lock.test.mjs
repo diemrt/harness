@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -37,6 +37,19 @@ test("withTrackerLock releases after a failing callback", () => {
   }
 });
 
+test("withTrackerLock never releases a successor's token", () => {
+  const dir = tempProject();
+  const lockPath = path.join(dir, ".harness", "issue-manager.lock");
+  try {
+    withTrackerLock(dir, () => {
+      writeFileSync(lockPath, JSON.stringify({ pid: process.pid, created_at: new Date().toISOString(), token: "successor" }));
+    });
+    assert.equal(JSON.parse(readFileSync(lockPath, "utf8")).token, "successor");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("withTrackerLock reports a live owner as busy", () => {
   const dir = tempProject();
   const lockPath = path.join(dir, ".harness", "issue-manager.lock");
@@ -52,6 +65,21 @@ test("withTrackerLock reports a live owner as busy", () => {
   }
 });
 
+test("withTrackerLock does not steal an old lock whose owner is alive", () => {
+  const dir = tempProject();
+  const lockPath = path.join(dir, ".harness", "issue-manager.lock");
+  try {
+    mkdirSync(path.dirname(lockPath), { recursive: true });
+    writeFileSync(lockPath, JSON.stringify({ pid: process.pid, created_at: "1970-01-01T00:00:00.000Z", token: "live-old" }));
+    assert.throws(
+      () => withTrackerLock(dir, () => {}, { retryMs: 1, timeoutMs: 5, graceMs: 1 }),
+      (error) => error.code === "TRACKER_BUSY"
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("withTrackerLock recovers an abandoned owner", () => {
   const dir = tempProject();
   const lockPath = path.join(dir, ".harness", "issue-manager.lock");
@@ -60,6 +88,24 @@ test("withTrackerLock recovers an abandoned owner", () => {
     writeFileSync(lockPath, JSON.stringify({ pid: 2147483647, created_at: new Date().toISOString(), token: "abandoned" }));
     assert.equal(withTrackerLock(dir, () => "acquired"), "acquired");
     assert.equal(existsSync(lockPath), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("withTrackerLock waits for a partial lock, then recovers it after its grace period", () => {
+  const dir = tempProject();
+  const lockPath = path.join(dir, ".harness", "issue-manager.lock");
+  try {
+    mkdirSync(path.dirname(lockPath), { recursive: true });
+    writeFileSync(lockPath, "{");
+    assert.throws(
+      () => withTrackerLock(dir, () => {}, { retryMs: 1, timeoutMs: 5, graceMs: 60_000 }),
+      (error) => error.code === "TRACKER_BUSY"
+    );
+    const old = new Date(0);
+    utimesSync(lockPath, old, old);
+    assert.equal(withTrackerLock(dir, () => "recovered", { graceMs: 1 }), "recovered");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

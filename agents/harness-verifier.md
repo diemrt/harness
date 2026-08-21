@@ -137,7 +137,12 @@ Ti arrivano l'id della issue e il contesto di cosa è stato prodotto.
    dallo scope della issue, modifiche accidentali alla configurazione, segreti finiti nel
    diff. La suite intera, non solo i test nuovi.
 
-6. **Chiudi la issue.** Payload su file (niente escaping nella shell):
+6. **Chiudi la issue.** Subito prima della scrittura, esegui di nuovo `--get` e usa la
+`revision` appena letta: la lettura iniziale non è un token di chiusura. Se ottieni
+`REVISION_CONFLICT`, rileggi, ricostruisci il payload con i task di validazione correnti e
+rivaluta le evidenze; se ottieni `TRACKER_BUSY`, attendi e rileggi. In entrambi i casi non
+ritentare mai alla cieca lo stesso payload. Poi scrivi il payload su file (niente escaping nella
+shell):
 
    ```bash
    node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-manager.mjs" --update --issue-id <id> --expected-revision <revision letta da --get> --issue-data-file <path>
