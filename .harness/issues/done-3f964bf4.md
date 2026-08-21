@@ -1,8 +1,8 @@
 ---
 id: 3f964bf4-0c25-4fb1-99d7-1092ccb0138f
-revision: 8
+revision: 9
 title: Revisioni atomiche e compare-and-set delle issue
-status: in_review
+status: done
 tier: reasoning
 depends_on: []
 covers: [88a99c4]
@@ -39,47 +39,47 @@ tasks:
     checked: true
 validation:
   criteria:
-    - La spec è committata prima del codice e il piano 2026-08-21-revisioni-atomiche-issue.md copre schema, lock, CAS, migrazione, chiamanti e release, escludendo lo storico fuori scope.
-    - Insert e blocchi nascono a revision 1; tutte le letture la espongono; record senza campo leggono 1 senza riscrittura; revisioni non positive falliscono INVALID_REVISION.
-    - Update, delete e compact richiedono la revisione osservata; ogni successo incrementa una volta; MISSING_ARGS, REVISION_CONFLICT e TRACKER_BUSY non cambiano alcun byte.
-    - Due processi sulla stessa revisione producono un successo e un REVISION_CONFLICT; rilettura e riapplicazione mirata arrivano a revision 3 conservando entrambe le spunte.
-    - Upgrade Markdown e legacy a schema 5 preserva timestamp e revisioni, materializza revision 1, scrive la config per ultima ed è idempotente; tutte le mutazioni usano il lock.
-    - Worker, verificatore, skill harness/issue/compact e reference passano la revisione appena letta e vietano retry ciechi; nessun chiamante mutante resta senza CAS.
-    - I tre manifest dichiarano 1.1.0 e npm run test esce 0, inclusi codec, lock, manager, concorrenza, worker, agenti e struttura del plugin.
+    - "PASS — git history: 4d1ba6e (spec) precedes d99c4f6 (plan), which precedes 88a99c4 (implementation); spec/plan cover schema 5, lock, CAS, migration, callers and 1.1.0, with immutable verification history explicitly out of scope."
+    - PASS — npm run test exits 0; 498/498 tests pass, including insert/read revision 1, codec round-trip, INVALID_REVISION, compatible reads without byte rewrites, and deterministic/idempotent Markdown and legacy upgrade.
+    - "PASS — full suite covers required/invalid/stale revisions, byte-identical refusals, update/delete increments and compact all-or-nothing CAS; issue-manager --help and issues.md expose delete.revision, compact.consumed and compact issues[].id."
+    - PASS — full suite covers live/busy, abandoned and partial locks plus token-safe release; the real two-process CAS test yields one winner and one REVISION_CONFLICT, then replay preserves both task ticks at revision 3.
+    - PASS — source inspection confirms init/insert/update/delete/compact/upgrade execute through withMutation/withTrackerLock; Markdown and legacy upgrades preserve timestamps/revisions, materialize 1, stamp config last and are byte-idempotent.
+    - PASS — rg inspection of scripts, skills, agents and references found mutation instructions using --expected-revision or compact expected_revision and distinct REVISION_CONFLICT/TRACKER_BUSY handling; no shipped operational caller retains issue_ids.
+    - "PASS — .claude-plugin/plugin.json, .claude-plugin/marketplace.json and .codex-plugin/plugin.json all declare 1.1.0; npm run test: 498 pass, 0 fail; git diff --check clean and git status --short empty before closure."
   tasks:
     -
       id: 1
       short_title: Controllare spec, piano e ordine git
       full_description: Confrontare spec e piano requisito per requisito e verificare dalla storia git che la spec preceda ogni commit di implementazione.
-      checked: false
+      checked: true
     -
       id: 2
       short_title: Provare schema e migrazione
       full_description: Eseguire test di revision 1, round-trip, valori invalidi, lettura compatibile e upgrade Markdown/legacy ripetuto senza variazioni di byte.
-      checked: false
+      checked: true
     -
       id: 3
       short_title: Provare CAS e assenza di scritture
       full_description: Eseguire update/delete/compact riusciti, mancanti, invalidi e stantii; confrontare i file prima/dopo tutti i rifiuti e controllare gli incrementi restituiti.
-      checked: false
+      checked: true
     -
       id: 4
       short_title: Provare lock e concorrenza reale
       full_description: Eseguire attesa, timeout, lock abbandonato/parziale e token di rilascio, quindi la corsa a due processi e il retry consapevole che conserva entrambe le spunte.
-      checked: false
+      checked: true
     -
       id: 5
       short_title: Ispezionare tutti i chiamanti
       full_description: Cercare ogni update/delete/compact in script, skill, agent e documentazione e verificare che usi il nuovo contratto e distingua REVISION_CONFLICT da TRACKER_BUSY.
-      checked: false
+      checked: true
     -
       id: 6
       short_title: Verificare release e gate completo
       full_description: Controllare 1.1.0 nei tre manifest, eseguire npm run test e ispezionare git status/diff per modifiche fuori scope prima di assegnare pass o fail.
-      checked: false
-  state: unknown
+      checked: true
+  state: pass
 created_at: "2026-08-20T15:51:52Z"
-updated_at: "2026-08-21T08:44:16Z"
+updated_at: "2026-08-21T08:50:17Z"
 ---
 
 # Revisioni atomiche e compare-and-set delle issue
