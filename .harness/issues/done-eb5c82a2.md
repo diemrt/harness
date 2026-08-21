@@ -82,6 +82,7 @@ validation:
   state: pass
 created_at: "2026-08-13T10:55:22Z"
 updated_at: "2026-08-13T13:03:32Z"
+revision: 1
 ---
 
 # Il verificatore ha una sola shell, e senza quella non verifica

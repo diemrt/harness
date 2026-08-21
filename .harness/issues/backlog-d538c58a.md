@@ -37,6 +37,7 @@ validation:
   state: unknown
 created_at: "2026-08-20T15:52:56Z"
 updated_at: "2026-08-20T15:52:56Z"
+revision: 1
 ---
 
 # Contratto delle capacità e preflight prima del dispatch

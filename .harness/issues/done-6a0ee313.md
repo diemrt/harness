@@ -82,6 +82,7 @@ validation:
   state: pass
 created_at: "2026-08-13T13:39:00Z"
 updated_at: "2026-08-13T14:12:23Z"
+revision: 1
 ---
 
 # L'eta' del tracker nella riga di stato, e come agganciarla

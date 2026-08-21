@@ -77,6 +77,7 @@ validation:
   state: pass
 created_at: "2026-08-13T14:43:25Z"
 updated_at: "2026-08-13T15:08:03Z"
+revision: 1
 ---
 
 # La riga di stato puo' restare ferma per minuti, e il documento dice il contrario

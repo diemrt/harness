@@ -94,6 +94,7 @@ validation:
   state: pass
 created_at: "2026-08-13T13:39:00Z"
 updated_at: "2026-08-14T09:57:44Z"
+revision: 1
 ---
 
 # La skill sa dove sono i propri script invece di indovinarli

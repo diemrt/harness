@@ -68,6 +68,7 @@ validation:
   state: pass
 created_at: "2026-08-18T08:54:39Z"
 updated_at: "2026-08-18T09:20:34Z"
+revision: 1
 ---
 
 # Lo stato della issue nel nome del file

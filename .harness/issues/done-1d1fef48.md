@@ -64,6 +64,7 @@ validation:
   state: pass
 created_at: "2026-08-17T12:49:45Z"
 updated_at: "2026-08-18T08:53:43Z"
+revision: 1
 ---
 
 # Documentare storage Markdown e rilascio 1.0

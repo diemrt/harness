@@ -19,6 +19,7 @@ validation:
   state: pass
 created_at: "2026-08-12T14:32:54Z"
 updated_at: "2026-08-12T14:32:54Z"
+revision: 1
 ---
 
 # Le regole del workflow: bussola, verifica, pubblicazione

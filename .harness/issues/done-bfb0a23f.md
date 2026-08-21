@@ -67,6 +67,7 @@ validation:
   state: pass
 created_at: "2026-08-13T10:17:45Z"
 updated_at: "2026-08-14T09:10:45Z"
+revision: 1
 ---
 
 # Il verificatore non spunta i validation.tasks, e l'agent non sa di doverlo

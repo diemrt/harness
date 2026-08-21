@@ -92,6 +92,7 @@ validation:
   state: pass
 created_at: "2026-08-17T07:55:25Z"
 updated_at: "2026-08-17T08:24:25Z"
+revision: 1
 ---
 
 # I comandi diventano skill: una definizione sola per operazione

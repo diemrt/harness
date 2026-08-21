@@ -68,6 +68,7 @@ validation:
   state: pass
 created_at: "2026-08-13T09:40:01Z"
 updated_at: "2026-08-14T14:13:08Z"
+revision: 1
 ---
 
 # Il board esce dal plugin senza lasciare riferimenti orfani

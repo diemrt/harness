@@ -38,6 +38,7 @@ validation:
   state: unknown
 created_at: "2026-08-20T15:55:00Z"
 updated_at: "2026-08-20T15:58:12Z"
+revision: 1
 ---
 
 # Comando archive per pulire le issue done

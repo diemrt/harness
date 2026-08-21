@@ -38,6 +38,7 @@ validation:
   state: unknown
 created_at: "2026-08-20T15:53:31Z"
 updated_at: "2026-08-20T15:58:12Z"
+revision: 1
 ---
 
 # Provider multipli configurabili e distribuzione multi-host

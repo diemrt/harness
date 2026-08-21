@@ -42,6 +42,7 @@ validation:
   state: pass
 created_at: "2026-08-16T22:17:47Z"
 updated_at: "2026-08-16T22:23:20Z"
+revision: 1
 ---
 
 # Rendere la skill portabile su Codex CLI

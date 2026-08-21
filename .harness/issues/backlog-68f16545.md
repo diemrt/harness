@@ -37,6 +37,7 @@ validation:
   state: unknown
 created_at: "2026-08-20T15:52:25Z"
 updated_at: "2026-08-20T15:52:25Z"
+revision: 1
 ---
 
 # Criteri immutabili e storico dei tentativi di verifica

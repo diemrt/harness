@@ -57,6 +57,7 @@ validation:
   state: pass
 created_at: "2026-08-13T15:35:48Z"
 updated_at: "2026-08-13T15:42:28Z"
+revision: 1
 ---
 
 # status.md descrive ancora l'eta' del tracker in coda alla riga

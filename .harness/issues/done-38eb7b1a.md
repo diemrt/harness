@@ -87,6 +87,7 @@ validation:
   state: pass
 created_at: "2026-08-13T10:35:10Z"
 updated_at: "2026-08-13T12:36:06Z"
+revision: 1
 ---
 
 # Conteggio dei task e colore opzionale nella riga di stato

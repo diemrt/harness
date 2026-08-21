@@ -87,6 +87,7 @@ validation:
   state: pass
 created_at: "2026-08-12T14:04:29Z"
 updated_at: "2026-08-12T14:23:38Z"
+revision: 1
 ---
 
 # Il blocco task della card parla la lingua del board

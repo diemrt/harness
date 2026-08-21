@@ -87,6 +87,7 @@ validation:
   state: pass
 created_at: "2026-08-13T13:39:00Z"
 updated_at: "2026-08-14T07:54:55Z"
+revision: 1
 ---
 
 # Il plugin pubblicato e il repository sono divergenti

@@ -72,6 +72,7 @@ validation:
   state: pass
 created_at: "2026-08-17T12:49:45Z"
 updated_at: "2026-08-18T08:20:04Z"
+revision: 1
 ---
 
 # Core storage Markdown e migrazione schema 4
