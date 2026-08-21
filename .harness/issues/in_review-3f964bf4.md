@@ -1,11 +1,11 @@
 ---
 id: 3f964bf4-0c25-4fb1-99d7-1092ccb0138f
-revision: 2
+revision: 3
 title: Revisioni atomiche e compare-and-set delle issue
 status: in_review
 tier: reasoning
 depends_on: []
-covers: []
+covers: [88a99c4]
 tasks:
   -
     id: 1
@@ -79,7 +79,7 @@ validation:
       checked: false
   state: unknown
 created_at: "2026-08-20T15:51:52Z"
-updated_at: "2026-08-21T08:21:07Z"
+updated_at: "2026-08-21T08:21:56Z"
 ---
 
 # Revisioni atomiche e compare-and-set delle issue
