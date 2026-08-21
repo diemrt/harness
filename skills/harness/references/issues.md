@@ -343,8 +343,9 @@ compattazione: il path dell'archivio (relativo al progetto — il tracker è con
 repository, un path assoluto di un clone non significherebbe niente in un altro) e una riga
 `id + titolo` per ogni issue coperta.
 
-`data`: `{ archivePath, removed, blocks: [ { id, title, archivedCount } ] }`, con `archivePath`
-assoluto (il chiamante può aprirlo subito) e `removed` il numero di issue tolte dal tracker.
+`data`: `{ archivePath, removed, consumed, blocks: [ { id, title, archivedCount } ] }`, con
+`archivePath` assoluto (il chiamante può aprirlo subito), `removed` il numero di issue tolte dal
+tracker e `consumed` gli id con la revisione consumata da ciascuna issue archiviata.
 
 ### Il giro che `--compact` non fa
 
@@ -397,10 +398,10 @@ eccezione: testo semplice). Su stderr non viene scritto nulla.
 | `--dump` | `{ schema_version, issues: [...] }` — tutto il tracker, per id crescente |
 | `--insert` | l'issue creata (con `id`) |
 | `--update` | l'issue aggiornata |
-| `--delete` | `{ id, deleted }` |
+| `--delete` | `{ id, deleted, revision }` |
 | `--init` | `{ path, created: true }` |
 | `--upgrade` | `{ from, to, migrated, issues, archivePath, resumed }` |
-| `--compact` | `{ archivePath, removed, blocks: [ { id, title, archivedCount } ] }` |
+| `--compact` | `{ archivePath, removed, consumed, blocks: [ { id, title, archivedCount } ] }` |
 
 | Parametro | Uso |
 |---|---|
@@ -641,7 +642,7 @@ Il `code` è stabile: usalo per la logica, il messaggio è per gli umani.
 
 | `code` | Quando |
 |---|---|
-| `INVALID_ID` | `--issue-id` non è un GUID valido, o un `issue_ids` di `--compact` non lo è |
+| `INVALID_ID` | `--issue-id` non è un GUID valido, o un `issues[].id` di `--compact` non lo è |
 | `INVALID_STATUS` | `status` fuori dai valori ammessi, o `--compact` su una issue che non è `done` |
 | `INVALID_STATE` | `validation.state` fuori da `unknown`, `pass`, `fail` |
 | `INVALID_TIER` | `tier` fuori da `economy`, `standard`, `reasoning` (un `null` esplicito è valido) |

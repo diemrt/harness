@@ -1608,7 +1608,7 @@ function showHelp() {
     "                A file declaring a schema_version ABOVE SCHEMA_VERSION fails with",
     "                SCHEMA_TOO_NEW and writes nothing: that is an old script in front of newer",
     "                data. Neither --insert nor --update ever runs a migration on your behalf.",
-    "  --compact   : { archivePath, removed, blocks: [ { id, title, archivedCount } ] } — shrinks",
+    "  --compact   : { archivePath, removed, consumed, blocks: [ { id, title, archivedCount } ] } — shrinks",
     "                Markdown issues without losing history. Takes the groupings ALREADY DECIDED by the",
     "                caller, as { blocks: [ { title, description, issues: [ { id, expected_revision } ] } ] }; it groups",
     "                nothing itself. Every id must exist, match its expected revision, and be 'done', no id in two blocks, no",
